@@ -8,6 +8,25 @@
    <title>庞博约 | Boyue Pang</title>
 
    <style>
+    .music-box {
+  width: 320px;
+  margin-top: 30px;
+  font-size: 14px;
+}
+
+.track {
+  margin-bottom: 18px;
+}
+
+.track span {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.track audio {
+  width: 100%;
+  height: 32px;
+}
     html,
     body {
       margin: 0;
@@ -24,7 +43,7 @@
     main {
       flex: 1;
       padding: 30px;
-      min-height: 400vh;
+      min-height: 200vh;
     }
 
     .footer-image {
@@ -58,6 +77,28 @@
 
     <br>
     <a href="有趣的小玩具展示/cube/cube.html">可视化二维点阵旋转图拧魔方</a>
+    <br>
+
+    <br>
+    <section class="music-box">
+  <p>Music</p>
+
+  <div class="track">
+    <span>第一首歌</span>
+    <audio controls preload="none">
+      <source src="music/qianqianquege.mp3" type="audio/mpeg">
+      你的浏览器不支持 audio。
+    </audio>
+  </div>
+
+  <div class="track">
+    <span>第二首歌</span>
+    <audio controls preload="none">
+      <source src="music/wozhizaihuni.mp3" type="audio/mpeg">
+      你的浏览器不支持 audio。
+    </audio>
+  </div>
+</section>
     <br>
   </main>
 
