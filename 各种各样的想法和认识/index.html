@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>各种各样的想法和认识</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+
+            background: #111;
+            color: #ddd;
+
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+        }
+
+        main {
+            max-width: 850px;
+            margin: 0 auto;
+            padding: 60px 30px 120px;
+        }
+
+        h1,
+        h2,
+        h3 {
+            color: #fff;
+        }
+
+        p {
+            line-height: 1.9;
+            font-size: 17px;
+        }
+
+        a {
+            color: #aaa;
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 40px;
+            text-decoration: none;
+        }
+
+        #content {
+            white-space: normal;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main>
+
+        <a class="back" href="../">
+            ← 返回主页
+        </a>
+
+        <div id="content">
+            正在加载……
+        </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script>
+        fetch("./thoughts.md")
+            .then(response => response.text())
+            .then(markdown => {
+                document.getElementById("content").innerHTML =
+                    marked.parse(markdown);
+            })
+            .catch(error => {
+                document.getElementById("content").textContent =
+                    "Markdown 加载失败：" + error;
+            });
+    </script>
+
+</body>
+
+</html>
