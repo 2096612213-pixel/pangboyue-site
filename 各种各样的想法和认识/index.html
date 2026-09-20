@@ -76,7 +76,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <script>
-        fetch("./thoughts.md")
+        fetch("thoughts.md")
             .then(response => response.text())
             .then(markdown => {
                 document.getElementById("content").innerHTML =
