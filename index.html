@@ -498,6 +498,48 @@ main a:hover {
   letter-spacing: 0.08em;
 }
 
+/* ===== 修复 Safari 顶部导航按钮偶尔消失 ===== */
+
+.top-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+
+  z-index: 99999;
+
+  isolation: isolate;
+}
+
+.nav-menu {
+  position: relative;
+  z-index: 2;
+}
+
+.nav-dropdown {
+  position: relative;
+  z-index: 3;
+}
+
+.nav-link {
+  display: block;
+
+  color: #e5e5e5 !important;
+
+  opacity: 1 !important;
+  visibility: visible !important;
+
+  background: transparent !important;
+  border: 0;
+
+  -webkit-appearance: none;
+  appearance: none;
+
+  position: relative;
+  z-index: 4;
+
+  cursor: pointer;
+}
+
   </style>
 </head>
 
@@ -511,7 +553,7 @@ main a:hover {
     <a href="/about/">关于我</a>
 
     <div class="nav-dropdown">
-      <button class="nav-link">学习</button>
+      <span class="nav-link">学习</span>
 
       <div class="dropdown-menu">
         <a href="/study/math/">数学</a>
@@ -522,7 +564,7 @@ main a:hover {
     </div>
 
     <div class="nav-dropdown">
-      <button class="nav-link">项目</button>
+      <span class="nav-link">项目</span>
 
       <div class="dropdown-menu">
         <a href="/projects/website/">个人网站</a>
