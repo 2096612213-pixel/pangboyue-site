@@ -122,58 +122,36 @@
        生词列表
        ========================= */
 
-    #markdown-content ul.vocab-grid {
-
-      /* Grid 四列布局 */
-      display: grid;
-
-      grid-template-columns:
-        repeat(4, minmax(0, 1fr));
-
-      /* 横向间距 / 纵向间距 */
-      column-gap: 70px;
-      row-gap: 12px;
-
-
-      /*
-        突破正文 900px 的限制。
-        在大屏幕上把生词列表扩展到 1400px 左右。
-      */
-
-      width: 1400px;
-
-      max-width:
-        calc(100vw - 100px);
-
-
-      /*
-        让整个列表以屏幕中央为中心，
-        而不是被限制在正文中间的小区域。
-      */
-
-      position: relative;
-
-      left: 50%;
-
-      transform:
-        translateX(-50%);
-
-
-      padding-left: 24px;
-
-      margin-top: 25px;
-      margin-bottom: 60px;
+    /* 只改这里的 4：可以写 3、4、5。窄屏会自动减少列数。 */
+    :root {
+      --vocab-columns: 4;
     }
 
+    #markdown-content ul.vocab-grid {
+      /* 先从上往下，再从左往右；各列宽度一致、间距一致。 */
+      column-count: var(--vocab-columns);
+      column-gap: 40px;
+      column-fill: balance;
 
-    #markdown-content ul.vocab-grid li {
+      /* 列表比正文更宽，因此第一列也会更靠左。 */
+      width: min(1500px, calc(100vw - 64px));
+      max-width: none;
+      position: relative;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0;
+      margin: 25px 0 60px;
+      list-style: none;
+    }
+
+    #markdown-content ul.vocab-grid > li {
+      /* 一个词条不拆到两列；长释义在本列内换行。 */
+      break-inside: avoid;
       margin: 0;
-
-      padding-right: 10px;
-
+      padding: 0 0 12px;
       line-height: 1.8;
-
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
 
 
@@ -191,109 +169,34 @@
     }
 
 
-    /* =========================
-       中等尺寸屏幕
-       四列 → 三列
-       ========================= */
-
+    /* 窄屏自动减少列数，避免五列挤在一起。 */
     @media (max-width: 1200px) {
-
       #markdown-content ul.vocab-grid {
-
-        grid-template-columns:
-          repeat(3, minmax(0, 1fr));
-
-        column-gap: 45px;
-
-        max-width:
-          calc(100vw - 70px);
+        column-count: min(var(--vocab-columns), 3);
+        column-gap: 32px;
       }
-
     }
-
-
-    /* =========================
-       平板
-       三列 → 两列
-       ========================= */
 
     @media (max-width: 850px) {
-
-      body {
-        padding:
-          60px 7%;
-      }
-
-
-      .page-title {
-        font-size: 38px;
-      }
-
-
+      body { padding: 60px 7%; }
+      .page-title { font-size: 38px; }
       #markdown-content ul.vocab-grid {
-
-        grid-template-columns:
-          repeat(2, minmax(0, 1fr));
-
-        column-gap: 35px;
-
-        width:
-          calc(100vw - 50px);
-
-        max-width: none;
+        column-count: min(var(--vocab-columns), 2);
+        column-gap: 28px;
       }
-
     }
 
-
-    /* =========================
-       手机
-       两列 → 一列
-       ========================= */
-
     @media (max-width: 600px) {
-
-      body {
-        padding:
-          40px 24px;
-      }
-
-
-      .page-title {
-        font-size: 31px;
-
-        margin-bottom: 45px;
-      }
-
-
-      #markdown-content {
-        font-size: 16px;
-      }
-
-
-      #markdown-content h2 {
-        font-size: 21px;
-      }
-
-
+      body { padding: 40px 24px; }
+      .page-title { font-size: 31px; margin-bottom: 45px; }
+      #markdown-content { font-size: 16px; }
+      #markdown-content h2 { font-size: 21px; }
       #markdown-content ul.vocab-grid {
-
-        grid-template-columns: 1fr;
-
+        column-count: 1;
         width: 100%;
-
         position: static;
-
         transform: none;
-
-        padding-left: 26px;
       }
-
-
-      #markdown-content ul.vocab-grid li {
-        white-space: normal;
-      }
-
     }
 
   </style>
@@ -354,34 +257,31 @@
           因此以后完全不需要改 HTML。
         */
 
-        const headings =
-          content.querySelectorAll("h2");
+        const headings = content.querySelectorAll("h2");
 
+headings.forEach(heading => {
 
-        headings.forEach(heading => {
+  if (heading.textContent.includes("生词记录")) {
 
-          if (
-            heading.textContent.includes("生词记录")
-          ) {
+    let element = heading.nextElementSibling;
 
-            let nextElement =
-              heading.nextElementSibling;
+    while (element) {
 
+      if (element.tagName === "UL") {
+        element.classList.add("vocab-grid");
+        break;
+      }
 
-            if (
-              nextElement &&
-              nextElement.tagName === "UL"
-            ) {
+      if (/^H[12]$/.test(element.tagName)) {
+        break;
+      }
 
-              nextElement.classList.add(
-                "vocab-grid"
-              );
+      element = element.nextElementSibling;
+    }
 
-            }
+  }
 
-          }
-
-        });
+});
 
       })
 
