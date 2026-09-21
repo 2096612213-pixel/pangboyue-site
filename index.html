@@ -321,6 +321,94 @@ main a:hover {
     sans-serif;
 }
 
+/* ===== 立体资料馆入口 ===== */
+
+.archive-card {
+  display: block;
+
+  width: calc(100% - 120px);
+  max-width: 1200px;
+
+  margin: 50px auto 70px auto;
+
+  color: #f2f2f2;
+  text-decoration: none;
+
+  cursor: pointer;
+}
+
+/* 图片 */
+
+.archive-card img {
+  display: block;
+
+  width: 100%;
+  height: auto;
+
+  border-radius: 18px;
+
+  transition:
+    transform 0.45s ease,
+    box-shadow 0.45s ease,
+    filter 0.45s ease;
+
+  transform: scale(1);
+}
+
+/* 鼠标移上去 */
+
+.archive-card:hover img {
+  transform: scale(1.025);
+
+  box-shadow:
+    0 0 24px rgba(255, 255, 255, 0.16),
+    0 0 60px rgba(255, 255, 255, 0.08);
+
+  filter: brightness(1.03);
+}
+
+/* 图片下面的文字 */
+
+.archive-title {
+  margin-top: 18px;
+
+  font-size: 22px;
+  font-weight: 500;
+
+  color: #f2f2f2;
+
+  text-decoration: none;
+
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.archive-card:hover .archive-title {
+  opacity: 0.8;
+  transform: translateX(4px);
+}
+
+
+/* 手机适配 */
+
+@media (max-width: 768px) {
+  .archive-card {
+    width: calc(100% - 32px);
+
+    margin-top: 35px;
+    margin-bottom: 50px;
+  }
+
+  .archive-title {
+    font-size: 17px;
+  }
+
+  .archive-card img {
+    border-radius: 12px;
+  }
+}
+
   </style>
 </head>
 
@@ -367,9 +455,13 @@ main a:hover {
     <p>我的个人网站正在建设中。哈喽，欢迎访问！</p>
 
     <br>
-    <a class="rhine-entry" href="rhine/index.html"  target="_blank" rel="noopener noreferrer">
-    进入立体资料馆(手机用户慎入) 
-    </a>
+    <a href="rhine/index.html" class="archive-card" target="_blank" rel="noopener noreferrer">
+  <img src="images/rhine_main2.png" alt="进入立体资料馆">
+
+  <div class="archive-title">
+    进入立体资料馆（手机用户慎入）
+  </div>
+</a>
     <br>  
     
     <br>
