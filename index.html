@@ -542,10 +542,64 @@ main a:hover {
   cursor: pointer;
 }
 
+.beijing-time {
+  text-align: center;
+
+  margin-top: -25px;
+  margin-bottom: 55px;
+
+  font-size: 17px;
+  font-weight: 400;
+
+  letter-spacing: 0.08em;
+
+  color: rgba(255, 255, 255, 0.58);
+
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
   </style>
 </head>
 
 <body>
+
+<script>
+  function updateBeijingTime() {
+
+    const now = new Date();
+
+    const formatter = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai",
+
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+
+      weekday: "long",
+
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+
+      hour12: false
+    });
+
+    const timeText = formatter.format(now);
+
+    document.getElementById("beijing-time").textContent =
+      "北京时间 · " + timeText;
+  }
+
+  updateBeijingTime();
+
+  setInterval(updateBeijingTime, 1000);
+</script>
 
 <header class="top-nav">
   <a href="/" class="brand">庞博约</a>
@@ -584,6 +638,8 @@ main a:hover {
     <br>
     <br>
     <p class="welcome-text">哈喽，欢迎访问！pby的个人空间</p>
+
+    <div class="beijing-time" id="beijing-time"></div>
 
     <br>
     <a href="rhine/index.html" class="archive-card" target="_blank" rel="noopener noreferrer">
