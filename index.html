@@ -207,6 +207,120 @@ body {
       height: auto;
       display: block;
     }
+
+    /* ===== 全站深色主题 ===== */
+
+html,
+body {
+  background: #0f0f0f;
+  color: #f2f2f2;
+}
+
+/* 正文 */
+
+main {
+  background: #0f0f0f;
+  color: #f2f2f2;
+}
+
+/* 标题 */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #ffffff;
+}
+
+/* 普通文字 */
+
+p {
+  color: #d6d6d6;
+}
+
+/* 链接 */
+
+a {
+  color: #e8e8e8;
+}
+
+main a {
+  color: #b8b8b8;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+main a:hover {
+  color: #ffffff;
+}
+
+
+/* ===== 顶部导航栏深色化 ===== */
+
+.top-nav {
+  background: rgba(15, 15, 15, 0.82);
+
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.10);
+
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+
+/* 左侧名字 */
+
+.brand {
+  color: #ffffff;
+}
+
+
+/* 导航文字 */
+
+.nav-menu > a,
+.nav-link {
+  color: #e5e5e5;
+}
+
+
+/* ===== 下拉菜单深色化 ===== */
+
+.dropdown-menu {
+  background: rgba(28, 28, 28, 0.96);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.10);
+
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.dropdown-menu a {
+  color: #eeeeee;
+}
+
+.dropdown-menu a:hover {
+  background:
+    rgba(255, 255, 255, 0.08);
+}
+
+  body {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
+    "PingFang SC",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
   </style>
 </head>
 
