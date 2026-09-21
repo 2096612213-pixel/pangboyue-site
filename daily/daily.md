@@ -1,23 +1,23 @@
-# 我现在每天正在做的事
-
 ## 2026-09-21
 
 - 更新个人网站
-- 复习考研（每天做一套数学2 英语1的真题 背里面不会的单词）
+- 复习考研（每天做一套数学2、英语1的真题，背里面不会的单词）
 - 学习数学
-- 学习力学（理论力学 材料力学 流体力学 量子力学）
+- 学习力学（理论力学、材料力学、流体力学、量子力学）
 - 整理自己的想法
 
+
 ## 2026-09-21 2023年英语一生词记录
-- caravanserial 商队驿站
+
+- caravanserai 商队驿站
 - caravan 商队 旅行队
 - enclosed 围起来的
 - merchant 商人
-- pilhrim 朝圣者
+- pilgrim 朝圣者
 - commodity 商品 货物
 - wares 商品 货物
 - sympathise 支持
-- propose 被提议的
+- proposed 被提议的
 - dispute 反驳
 - populous 人口众多的
 - deputy director 副主管
@@ -41,15 +41,15 @@
 - exceptionally 非常
 - surpass 超过 胜过
 - unaligned 未结盟的 独立的
-- bidding war 价格战
+- bidding war 竞价战
 - conformity 一致 趋同
 - plurality 多样性 多元化
 - casualty 受害者 牺牲品
-- all comers 所有竞争者 任何对手
-- perceived 被认可的
+- all-comers 所有竞争者 任何对手
+- perceived 被认为的
 - citation 引文 引用
 - prestige 声望 威望
-- consipre 共同做某事
+- conspire 共同做某事
 - predatory 掠夺性的
 - consultancy 咨询公司
 - advent 到来
@@ -58,9 +58,9 @@
 - peculiar 奇怪的 异常的
 - supposedly 按说 据称
 - suppose 设想
-- accure 积累 逐渐增加
-- insidious 潜伏性的危害
-- mainpulation 操纵
+- accrue 积累 逐渐增加
+- insidious 隐蔽而有害的 潜伏性的危害
+- manipulation 操纵
 - rampant 猖獗的 泛滥的
 - malpractice 不当行为 营私舞弊
 - steer 驾驶 带领
