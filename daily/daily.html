@@ -7,10 +7,7 @@
 
   <title>我现在每天正在做的事</title>
 
-  <!-- Markdown 渲染库 -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <style>
+<style>
 
     * {
       box-sizing: border-box;
@@ -58,10 +55,10 @@
 
 
     /* =========================
-       Markdown 正文
+       页面正文
        ========================= */
 
-    #markdown-content {
+    #daily-content {
       font-size: 18px;
       line-height: 1.9;
 
@@ -69,7 +66,7 @@
     }
 
 
-    #markdown-content h1 {
+    #daily-content h1 {
       font-size: 34px;
 
       margin-top: 60px;
@@ -79,7 +76,7 @@
     }
 
 
-    #markdown-content h2 {
+    #daily-content h2 {
       font-size: 25px;
 
       margin-top: 55px;
@@ -89,7 +86,7 @@
     }
 
 
-    #markdown-content h3 {
+    #daily-content h3 {
       font-size: 20px;
 
       margin-top: 35px;
@@ -98,22 +95,22 @@
     }
 
 
-    #markdown-content p {
+    #daily-content p {
       margin: 18px 0;
     }
 
 
-    #markdown-content ul {
+    #daily-content ul {
       padding-left: 34px;
     }
 
 
-    #markdown-content li {
+    #daily-content li {
       margin: 10px 0;
     }
 
 
-    #markdown-content a {
+    #daily-content a {
       color: #ffffff;
     }
 
@@ -127,7 +124,7 @@
       --vocab-columns: 4;
     }
 
-    #markdown-content ul.vocab-grid {
+    #daily-content ul.vocab-grid {
       /* 先从上往下，再从左往右；各列宽度一致、间距一致。 */
       column-count: var(--vocab-columns);
       column-gap: 40px;
@@ -144,7 +141,7 @@
       list-style: none;
     }
 
-    #markdown-content ul.vocab-grid > li {
+    #daily-content ul.vocab-grid > li {
       /* 一个词条不拆到两列；长释义在本列内换行。 */
       break-inside: avoid;
       margin: 0;
@@ -159,7 +156,7 @@
        分割线
        ========================= */
 
-    #markdown-content hr {
+    #daily-content hr {
       border: none;
 
       border-top:
@@ -171,7 +168,7 @@
 
     /* 窄屏自动减少列数，避免五列挤在一起。 */
     @media (max-width: 1200px) {
-      #markdown-content ul.vocab-grid {
+      #daily-content ul.vocab-grid {
         column-count: min(var(--vocab-columns), 3);
         column-gap: 32px;
       }
@@ -180,7 +177,7 @@
     @media (max-width: 850px) {
       body { padding: 60px 7%; }
       .page-title { font-size: 38px; }
-      #markdown-content ul.vocab-grid {
+      #daily-content ul.vocab-grid {
         column-count: min(var(--vocab-columns), 2);
         column-gap: 28px;
       }
@@ -189,9 +186,9 @@
     @media (max-width: 600px) {
       body { padding: 40px 24px; }
       .page-title { font-size: 31px; margin-bottom: 45px; }
-      #markdown-content { font-size: 16px; }
-      #markdown-content h2 { font-size: 21px; }
-      #markdown-content ul.vocab-grid {
+      #daily-content { font-size: 16px; }
+      #daily-content h2 { font-size: 21px; }
+      #daily-content ul.vocab-grid {
         column-count: 1;
         width: 100%;
         position: static;
@@ -212,91 +209,77 @@
     </div>
 
 
-    <div id="markdown-content">
-      正在读取……
+    <div id="daily-content">
+      <h2>2026-09-21</h2>
+      <ul>
+        <li>更新个人网站</li>
+        <li>复习考研（每天做一套数学2、英语1的真题，背里面不会的单词）</li>
+        <li>学习数学</li>
+        <li>学习力学（理论力学、材料力学、流体力学、量子力学）</li>
+        <li>整理自己的想法</li>
+      </ul>
+      <h2>2026-09-21 2023年英语一生词记录 每天遇到我记得拿里面的生单词拷打我</h2>
+      <ul class="vocab-grid">
+        <li>caravanserai 商队驿站</li>
+        <li>caravan 商队 旅行队</li>
+        <li>enclosed 围起来的</li>
+        <li>merchant 商人</li>
+        <li>pilgrim 朝圣者</li>
+        <li>commodity 商品 货物</li>
+        <li>wares 商品 货物</li>
+        <li>sympathise 支持</li>
+        <li>proposed 被提议的</li>
+        <li>dispute 反驳</li>
+        <li>populous 人口众多的</li>
+        <li>deputy director 副主管</li>
+        <li>decentralise 下放权力</li>
+        <li>rental rent 租赁</li>
+        <li>swath 一大片</li>
+        <li>flip 翻动 转手倒卖</li>
+        <li>vacancy 空置</li>
+        <li>strained 紧张的 吃紧的</li>
+        <li>coalition 联盟</li>
+        <li>realtor 房产经纪人</li>
+        <li>crux 核心 关键</li>
+        <li>de facto 实际上的</li>
+        <li>disguise 伪装</li>
+        <li>rein in 控制 遏制</li>
+        <li>mandate 强制要求</li>
+        <li>levy 税 强制征收</li>
+        <li>prominent 显眼的 重要的</li>
+        <li>boycott 抵制</li>
+        <li>appropriately 适当地</li>
+        <li>exceptionally 非常</li>
+        <li>surpass 超过 胜过</li>
+        <li>unaligned 未结盟的 独立的</li>
+        <li>bidding war 竞价战</li>
+        <li>conformity 一致 趋同</li>
+        <li>plurality 多样性 多元化</li>
+        <li>casualty 受害者 牺牲品</li>
+        <li>all-comers 所有竞争者 任何对手</li>
+        <li>perceived 被认为的</li>
+        <li>citation 引文 引用</li>
+        <li>prestige 声望 威望</li>
+        <li>conspire 共同做某事</li>
+        <li>predatory 掠夺性的</li>
+        <li>consultancy 咨询公司</li>
+        <li>advent 到来</li>
+        <li>outlet 渠道 出版平台</li>
+        <li>instance 例子 情况</li>
+        <li>peculiar 奇怪的 异常的</li>
+        <li>supposedly 按说 据称</li>
+        <li>suppose 设想</li>
+        <li>accrue 积累 逐渐增加</li>
+        <li>insidious 隐蔽而有害的 潜伏性的危害</li>
+        <li>manipulation 操纵</li>
+        <li>rampant 猖獗的 泛滥的</li>
+        <li>malpractice 不当行为 营私舞弊</li>
+        <li>steer 驾驶 带领</li>
+        <li>oblige 迫使 使不得不</li>
+      </ul>
     </div>
 
   </main>
-
-
-  <script>
-
-    fetch("daily.md")
-
-      .then(response => {
-
-        if (!response.ok) {
-          throw new Error("无法读取 daily.md");
-        }
-
-        return response.text();
-
-      })
-
-      .then(markdown => {
-
-        const content =
-          document.getElementById("markdown-content");
-
-
-        /*
-          先把 Markdown 转换成 HTML
-        */
-
-        content.innerHTML =
-          marked.parse(markdown);
-
-
-        /*
-          自动寻找所有标题中包含
-          “生词记录” 的 h2。
-
-          如果标题后面的元素是 ul，
-          就给这个 ul 加上 vocab-grid。
-
-          因此以后完全不需要改 HTML。
-        */
-
-        const headings = content.querySelectorAll("h2");
-
-headings.forEach(heading => {
-
-  if (heading.textContent.includes("生词记录")) {
-
-    let element = heading.nextElementSibling;
-
-    while (element) {
-
-      if (element.tagName === "UL") {
-        element.classList.add("vocab-grid");
-        break;
-      }
-
-      if (/^H[12]$/.test(element.tagName)) {
-        break;
-      }
-
-      element = element.nextElementSibling;
-    }
-
-  }
-
-});
-
-      })
-
-      .catch(error => {
-
-        document.getElementById(
-          "markdown-content"
-        ).innerHTML =
-          "内容读取失败。";
-
-        console.error(error);
-
-      });
-
-  </script>
 
 </body>
 
