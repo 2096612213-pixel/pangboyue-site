@@ -12,6 +12,10 @@
 
   <style>
 
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       padding: 80px 10%;
@@ -29,7 +33,9 @@
     }
 
 
-    /* 页面主体 */
+    /* =========================
+       页面主体
+       ========================= */
 
     .daily-container {
       max-width: 900px;
@@ -37,7 +43,9 @@
     }
 
 
-    /* 页面标题 */
+    /* =========================
+       页面大标题
+       ========================= */
 
     .page-title {
       font-size: 46px;
@@ -49,7 +57,9 @@
     }
 
 
-    /* Markdown 正文 */
+    /* =========================
+       Markdown 正文
+       ========================= */
 
     #markdown-content {
       font-size: 18px;
@@ -61,6 +71,7 @@
 
     #markdown-content h1 {
       font-size: 34px;
+
       margin-top: 60px;
       margin-bottom: 25px;
 
@@ -70,8 +81,9 @@
 
     #markdown-content h2 {
       font-size: 25px;
-      margin-top: 45px;
-      margin-bottom: 20px;
+
+      margin-top: 55px;
+      margin-bottom: 22px;
 
       color: #ffffff;
     }
@@ -79,6 +91,7 @@
 
     #markdown-content h3 {
       font-size: 20px;
+
       margin-top: 35px;
 
       color: #ffffff;
@@ -87,6 +100,11 @@
 
     #markdown-content p {
       margin: 18px 0;
+    }
+
+
+    #markdown-content ul {
+      padding-left: 34px;
     }
 
 
@@ -100,15 +118,182 @@
     }
 
 
-    /* 分割线 */
+    /* =========================
+       生词列表
+       ========================= */
+
+    #markdown-content ul.vocab-grid {
+
+      /* Grid 四列布局 */
+      display: grid;
+
+      grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+      /* 横向间距 / 纵向间距 */
+      column-gap: 70px;
+      row-gap: 12px;
+
+
+      /*
+        突破正文 900px 的限制。
+        在大屏幕上把生词列表扩展到 1400px 左右。
+      */
+
+      width: 1400px;
+
+      max-width:
+        calc(100vw - 100px);
+
+
+      /*
+        让整个列表以屏幕中央为中心，
+        而不是被限制在正文中间的小区域。
+      */
+
+      position: relative;
+
+      left: 50%;
+
+      transform:
+        translateX(-50%);
+
+
+      padding-left: 24px;
+
+      margin-top: 25px;
+      margin-bottom: 60px;
+    }
+
+
+    #markdown-content ul.vocab-grid li {
+      margin: 0;
+
+      padding-right: 10px;
+
+      line-height: 1.8;
+
+      white-space: nowrap;
+    }
+
+
+    /* =========================
+       分割线
+       ========================= */
 
     #markdown-content hr {
       border: none;
 
       border-top:
-        1px solid rgba(255,255,255,0.15);
+        1px solid rgba(255, 255, 255, 0.15);
 
       margin: 50px 0;
+    }
+
+
+    /* =========================
+       中等尺寸屏幕
+       四列 → 三列
+       ========================= */
+
+    @media (max-width: 1200px) {
+
+      #markdown-content ul.vocab-grid {
+
+        grid-template-columns:
+          repeat(3, minmax(0, 1fr));
+
+        column-gap: 45px;
+
+        max-width:
+          calc(100vw - 70px);
+      }
+
+    }
+
+
+    /* =========================
+       平板
+       三列 → 两列
+       ========================= */
+
+    @media (max-width: 850px) {
+
+      body {
+        padding:
+          60px 7%;
+      }
+
+
+      .page-title {
+        font-size: 38px;
+      }
+
+
+      #markdown-content ul.vocab-grid {
+
+        grid-template-columns:
+          repeat(2, minmax(0, 1fr));
+
+        column-gap: 35px;
+
+        width:
+          calc(100vw - 50px);
+
+        max-width: none;
+      }
+
+    }
+
+
+    /* =========================
+       手机
+       两列 → 一列
+       ========================= */
+
+    @media (max-width: 600px) {
+
+      body {
+        padding:
+          40px 24px;
+      }
+
+
+      .page-title {
+        font-size: 31px;
+
+        margin-bottom: 45px;
+      }
+
+
+      #markdown-content {
+        font-size: 16px;
+      }
+
+
+      #markdown-content h2 {
+        font-size: 21px;
+      }
+
+
+      #markdown-content ul.vocab-grid {
+
+        grid-template-columns: 1fr;
+
+        width: 100%;
+
+        position: static;
+
+        transform: none;
+
+        padding-left: 26px;
+      }
+
+
+      #markdown-content ul.vocab-grid li {
+        white-space: normal;
+      }
+
     }
 
   </style>
@@ -123,6 +308,7 @@
       我现在每天正在做的事
     </div>
 
+
     <div id="markdown-content">
       正在读取……
     </div>
@@ -134,18 +320,76 @@
 
     fetch("daily.md")
 
-      .then(response => response.text())
+      .then(response => {
+
+        if (!response.ok) {
+          throw new Error("无法读取 daily.md");
+        }
+
+        return response.text();
+
+      })
 
       .then(markdown => {
 
-        document.getElementById("markdown-content").innerHTML =
+        const content =
+          document.getElementById("markdown-content");
+
+
+        /*
+          先把 Markdown 转换成 HTML
+        */
+
+        content.innerHTML =
           marked.parse(markdown);
+
+
+        /*
+          自动寻找所有标题中包含
+          “生词记录” 的 h2。
+
+          如果标题后面的元素是 ul，
+          就给这个 ul 加上 vocab-grid。
+
+          因此以后完全不需要改 HTML。
+        */
+
+        const headings =
+          content.querySelectorAll("h2");
+
+
+        headings.forEach(heading => {
+
+          if (
+            heading.textContent.includes("生词记录")
+          ) {
+
+            let nextElement =
+              heading.nextElementSibling;
+
+
+            if (
+              nextElement &&
+              nextElement.tagName === "UL"
+            ) {
+
+              nextElement.classList.add(
+                "vocab-grid"
+              );
+
+            }
+
+          }
+
+        });
 
       })
 
       .catch(error => {
 
-        document.getElementById("markdown-content").innerHTML =
+        document.getElementById(
+          "markdown-content"
+        ).innerHTML =
           "内容读取失败。";
 
         console.error(error);
