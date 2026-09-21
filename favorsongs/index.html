@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>最爱的歌曲 | Boyue Pang</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: #0f0f0f;
+      color: #f2f2f2;
+    }
+
+    body {
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Text",
+        "PingFang SC",
+        "Helvetica Neue",
+        Arial,
+        sans-serif;
+    }
+
+    .page {
+      width: min(1100px, calc(100% - 48px));
+      margin: 0 auto;
+
+      padding: 90px 0 120px;
+    }
+
+    .back {
+      display: inline-block;
+
+      margin-bottom: 70px;
+
+      color: rgba(255,255,255,0.55);
+      text-decoration: none;
+
+      font-size: 14px;
+
+      transition: color 0.25s ease;
+    }
+
+    .back:hover {
+      color: #ffffff;
+    }
+
+    .title {
+      margin: 0;
+
+      font-size: 54px;
+      font-weight: 500;
+
+      letter-spacing: -0.03em;
+    }
+
+    .star {
+      color: #ff3b30;
+
+      font-size: 0.65em;
+
+      margin-left: 8px;
+
+      vertical-align: 6px;
+    }
+
+    .subtitle {
+      margin-top: 18px;
+      margin-bottom: 70px;
+
+      color: rgba(255,255,255,0.45);
+
+      font-size: 16px;
+      line-height: 1.8;
+    }
+
+    .songs {
+      display: flex;
+      flex-direction: column;
+
+      gap: 24px;
+    }
+
+    .song {
+      padding: 28px 30px;
+
+      border:
+        1px solid rgba(255,255,255,0.08);
+
+      border-radius: 20px;
+
+      background:
+        rgba(255,255,255,0.035);
+
+      transition:
+        transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+        background 0.45s ease,
+        border-color 0.45s ease;
+    }
+
+    .song:hover {
+      transform: translateY(-4px);
+
+      background:
+        rgba(255,255,255,0.055);
+
+      border-color:
+        rgba(255,255,255,0.14);
+    }
+
+    .song-name {
+      display: block;
+
+      margin-bottom: 20px;
+
+      font-size: 22px;
+      font-weight: 500;
+    }
+
+    audio {
+      display: block;
+
+      width: 100%;
+    }
+
+
+    @media (max-width: 700px) {
+      .page {
+        width: calc(100% - 28px);
+
+        padding-top: 55px;
+      }
+
+      .title {
+        font-size: 38px;
+      }
+
+      .song {
+        padding: 22px 18px;
+      }
+
+      .song-name {
+        font-size: 19px;
+      }
+    }
+  </style>
+</head>
+
+
+<body>
+
+  <main class="page">
+
+    <a href="../index.html" class="back">
+      ← 返回主页
+    </a>
+
+
+    <h1 class="title">
+      最爱的歌曲
+      <span class="star">★</span>
+    </h1>
+
+    <p class="subtitle">
+      一些我会反复听的歌。
+    </p>
+
+
+    <section class="songs">
+
+      <div class="song">
+
+        <span class="song-name">
+          千千阙歌
+        </span>
+
+        <audio controls preload="metadata">
+          <source
+            src="qianqianquege.mp3"
+            type="audio/mpeg">
+
+          你的浏览器不支持 audio。
+        </audio>
+
+      </div>
+
+
+      <div class="song">
+
+        <span class="song-name">
+          我只在乎你
+        </span>
+
+        <audio controls preload="metadata">
+          <source
+            src="wozhizaihuni.mp3"
+            type="audio/mpeg">
+
+          你的浏览器不支持 audio。
+        </audio>
+
+      </div>
+
+    </section>
+
+  </main>
+
+</body>
+
+</html>
