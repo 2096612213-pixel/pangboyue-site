@@ -7,13 +7,17 @@
 
   <title>我现在每天正在做的事</title>
 
+  <!-- Markdown 渲染库 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
   <style>
+
     body {
       margin: 0;
-      padding: 60px 8%;
+      padding: 80px 10%;
 
       background: #0f0f0f;
-      color: #f2f2f2;
+      color: #e8e8e8;
 
       font-family:
         -apple-system,
@@ -24,26 +28,131 @@
         sans-serif;
     }
 
-    h1 {
-      font-size: 42px;
-      margin-bottom: 40px;
+
+    /* 页面主体 */
+
+    .daily-container {
+      max-width: 900px;
+      margin: 0 auto;
     }
 
-    .intro {
-      color: #bdbdbd;
-      font-size: 18px;
-      line-height: 1.8;
+
+    /* 页面标题 */
+
+    .page-title {
+      font-size: 46px;
+      font-weight: 600;
+
+      margin-bottom: 60px;
+
+      color: #ffffff;
     }
+
+
+    /* Markdown 正文 */
+
+    #markdown-content {
+      font-size: 18px;
+      line-height: 1.9;
+
+      color: #d8d8d8;
+    }
+
+
+    #markdown-content h1 {
+      font-size: 34px;
+      margin-top: 60px;
+      margin-bottom: 25px;
+
+      color: #ffffff;
+    }
+
+
+    #markdown-content h2 {
+      font-size: 25px;
+      margin-top: 45px;
+      margin-bottom: 20px;
+
+      color: #ffffff;
+    }
+
+
+    #markdown-content h3 {
+      font-size: 20px;
+      margin-top: 35px;
+
+      color: #ffffff;
+    }
+
+
+    #markdown-content p {
+      margin: 18px 0;
+    }
+
+
+    #markdown-content li {
+      margin: 10px 0;
+    }
+
+
+    #markdown-content a {
+      color: #ffffff;
+    }
+
+
+    /* 分割线 */
+
+    #markdown-content hr {
+      border: none;
+
+      border-top:
+        1px solid rgba(255,255,255,0.15);
+
+      margin: 50px 0;
+    }
+
   </style>
 </head>
 
+
 <body>
 
-  <h1>我现在每天正在做的事</h1>
+  <main class="daily-container">
 
-  <p class="intro">
-    这里记录我最近每天正在学习、制作、思考和推进的事情。
-  </p>
+    <div class="page-title">
+      我现在每天正在做的事
+    </div>
+
+    <div id="markdown-content">
+      正在读取……
+    </div>
+
+  </main>
+
+
+  <script>
+
+    fetch("daily.md")
+
+      .then(response => response.text())
+
+      .then(markdown => {
+
+        document.getElementById("markdown-content").innerHTML =
+          marked.parse(markdown);
+
+      })
+
+      .catch(error => {
+
+        document.getElementById("markdown-content").innerHTML =
+          "内容读取失败。";
+
+        console.error(error);
+
+      });
+
+  </script>
 
 </body>
 
