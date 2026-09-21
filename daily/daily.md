@@ -7,3 +7,61 @@
 - 学习数学
 - 学习力学（理论力学 材料力学 流体力学 量子力学）
 - 整理自己的想法
+
+## 2026-09-21 2023年英语一生词记录
+- caravanserial 商队驿站
+- caravan 商队 旅行队
+- enclosed 围起来的
+- merchant 商人
+- pilhrim 朝圣者
+- commodity 商品 货物
+- wares 商品 货物
+- sympathise 支持
+- propose 被提议的
+- dispute 反驳
+- populous 人口众多的
+- deputy director 副主管
+- decentralise 下放权力
+- rental rent 租赁
+- swath 一大片
+- flip 翻动 转手倒卖
+- vacancy 空置
+- strained 紧张的 吃紧的
+- coalition 联盟
+- realtor 房产经纪人
+- crux 核心 关键
+- de facto 实际上的
+- disguise 伪装
+- rein in 控制 遏制
+- mandate 强制要求
+- levy 税 强制征收
+- prominent 显眼的 重要的
+- boycott 抵制
+- appropriately 适当地
+- exceptionally 非常
+- surpass 超过 胜过
+- unaligned 未结盟的 独立的
+- bidding war 价格战
+- conformity 一致 趋同
+- plurality 多样性 多元化
+- casualty 受害者 牺牲品
+- all comers 所有竞争者 任何对手
+- perceived 被认可的
+- citation 引文 引用
+- prestige 声望 威望
+- consipre 共同做某事
+- predatory 掠夺性的
+- consultancy 咨询公司
+- advent 到来
+- outlet 渠道 出版平台
+- instance 例子 情况
+- peculiar 奇怪的 异常的
+- supposedly 按说 据称
+- suppose 设想
+- accure 积累 逐渐增加
+- insidious 潜伏性的危害
+- mainpulation 操纵
+- rampant 猖獗的 泛滥的
+- malpractice 不当行为 营私舞弊
+- steer 驾驶 带领
+- oblige 迫使 使不得不
