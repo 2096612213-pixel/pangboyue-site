@@ -383,8 +383,8 @@ main a:hover {
   cursor: pointer;
 
   transition:
-    transform 0.45s ease,
-    filter 0.45s ease;
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 
@@ -398,15 +398,15 @@ main a:hover {
   border-radius: 18px;
 
   transition:
-    box-shadow 0.45s ease,
-    filter 0.45s ease;
+    box-shadow 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 
 /* 鼠标进入图片或者文字区域
    整个卡片一起放大 */
 .archive-card:hover {
-  transform: scale(1.025);
+  transform: scale(1.015);
 }
 
 
