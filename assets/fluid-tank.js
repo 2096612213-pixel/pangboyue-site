@@ -1,434 +1,232 @@
-/* Original WebGL2 implementation of the standard Stable Fluids pipeline.
- * rtfs2d informed the solver stages; no Vulkan source or third-party code is embedded.
- * Velocities live on right/top cell faces (MAC grid); glyphs are solid cells.
- * This is an interactive visual approximation, not an engineering CFD solver.
+/* Procedural layered cloud rendering using the previous hero's WebGL pipeline.
+ * Domain-warped density is advected left to right at different depths; this is
+ * a visual atmosphere model, not a meteorological or full volumetric solver.
+ * Moon surface is a locally drawn SVG; ephemerides use vendored MIT Astronomy Engine.
+ * Scattering is an artistic eight-level optical approximation, not weather data.
  */
 (() => {
   'use strict';
   const tank = document.querySelector('#fluid-tank');
   if (!tank) return;
   const canvas = tank.querySelector('.tank-fluid');
-  const lettering = tank.querySelector('.tank-lettering');
-  function setStatus(text) { canvas.setAttribute('aria-label', text); }
-  const pauseButton = tank.querySelector('.tank-pause');
-  const coarse = matchMedia('(pointer: coarse)').matches;
-  if (coarse) tank.dataset.touch = 'ink';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let paused = reduced.matches, visible = true, lost = false, failed = false;
-  let raf = 0, previous = 0, elapsed = 0, frameCount = 0, slowFrames = 0;
-  let quality = coarse ? 1 : 2, targetFPS = coarse ? 30 : 60;
-  let W = 0, H = 0, displayW = 0, displayH = 0, pendingResize = true, maskDirty = true;
-  let lastMask = 0, lastSample = 0, lastQuality = 0, measuredFPS = 0;
-  let pointer = null, pendingSplats = [], hue = 0;
-  let fields, maskTexture, emptyVAO, maskPixels;
-  const programs = [];
-  const gl = canvas.getContext('webgl2', { alpha: false, depth: false, stencil: false,
-    antialias: false, preserveDrawingBuffer: false, powerPreference: 'low-power' });
-  const labelContext = lettering.getContext('2d');
-  const maskCanvas = document.createElement('canvas');
-  const maskContext = maskCanvas.getContext('2d', { willReadFrequently: true });
-  const diagnostics = { state: 'initializing', fps: 0, steps: 0, grid: '', glyphCells: 0,
-    pointerInjections: 0, quality: 0, error: null };
-  // Read-only diagnostic snapshot; no GPU readbacks in normal animation.
-  Object.defineProperty(tank, 'fluidStats', { get: () => ({ ...diagnostics }) });
-  function fallback(error) {
+  // Only the first archive entrance receives the reveal behavior.
+  const first = document.querySelector('a.archive-card[href="rhine/index.html"]');
+  if (first && !reduced.matches && 'IntersectionObserver' in window) {
+    const reveal = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        first.classList.add('is-visible'); reveal.disconnect();
+      }
+    }, { threshold: .08 });
+    first.classList.add('archive-reveal'); reveal.observe(first);
+    first.addEventListener('focus', () => first.classList.add('is-visible'));
+  }
+  const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, powerPreference: 'low-power' });
+  let paused = reduced.matches, visible = true, failed = false, raf = 0, previous = 0, time = 0;
+  let nextFlash = 5 + Math.random() * 5, frames = 0;
+  let glows = [];
+  const stats = { state: 'initializing', frames: 0, flashes: 0, error: null };
+  Object.defineProperty(tank, 'cloudStats', { get: () => ({ ...stats, time, resolution: [canvas.width, canvas.height] }) });
+  function fallback(e) {
     failed = true; cancelAnimationFrame(raf); raf = 0;
-    diagnostics.state = 'static'; diagnostics.error = String(error);
-    tank.classList.remove('fluid-ready'); canvas.hidden = true; canvas.style.display = 'none';
-    lettering.style.display = 'none';
-    setStatus('静态玻璃缸 · 当前浏览器未启用流体效果');
-    pauseButton.disabled = true;
-    console.warn('Fluid tank:', error);
+    canvas.style.display = 'none';
+    stats.state = 'static'; stats.error = String(e);
+    console.warn('Storm clouds:', e);
   }
-  if (!gl || !labelContext || !maskContext || !gl.getExtension('EXT_color_buffer_float')) {
-    fallback('WebGL2 floating-point render targets unavailable'); return;
-  }
+  if (!gl) { fallback('WebGL2 unavailable'); return; }
   const vertex = `#version 300 es
-  precision highp float;
   out vec2 uv;
-  void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); uv=p; gl_Position=vec4(p*2.-1.,0.,1.); }`;
-  const common = `#version 300 es
+  void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));uv=p;gl_Position=vec4(p*2.-1.,0,1);}`;
+  const fragment = `#version 300 es
   precision highp float;
-  precision highp sampler2D;
   in vec2 uv; out vec4 result;
-  uniform sampler2D source, velocity, obstacle, pressure, divergence, curlField;
-  uniform vec2 px, dimensions;
-  uniform float dt, clockTime, inlet;
-  vec3 palette(float t){
-    float q=fract(t)*5.; float f=smoothstep(.15,.85,fract(q));
-    vec3 blue=vec3(.03,.28,1.), green=vec3(.02,.9,.22), yellow=vec3(1.,.77,.025);
-    vec3 purple=vec3(.65,.07,1.), red=vec3(1.,.055,.09);
-    if(q<1.) return mix(blue,green,f);
-    if(q<2.) return mix(green,yellow,f);
-    if(q<3.) return mix(yellow,purple,f);
-    if(q<4.) return mix(purple,red,f);
-    return mix(red,blue,f);
+  uniform vec2 resolution;
+  uniform float clockTime;
+  uniform sampler2D moonSurface;
+  uniform vec4 moon; // center x/y, radius in viewport heights, illuminated fraction
+  uniform vec2 moonLight; // signed horizontal and view-facing solar direction
+  uniform vec4 glow0, glow1;
+  uniform vec4 event0, event1;
+  float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+  float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
+  float fbm(vec2 p){float s=0.,a=.52;for(int i=0;i<5;i++){s+=a*noise(p);p=mat2(.8,-.6,.6,.8)*p*2.03+7.3;a*=.49;}return s;}
+  float density(vec2 p){vec2 w=vec2(fbm(p*.63+2.),fbm(p*.63-8.));return fbm(p+w*2.1);}
+  // Eight reference transmission levels, smoothly interpolated to avoid bands.
+  float transmit(float thin){
+    float levels[8]=float[8](.012,.035,.080,.155,.27,.43,.62,.82);
+    float v=clamp(thin,0.,1.)*7.;int k=min(6,int(floor(v)));
+    return mix(levels[k],levels[k+1],smoothstep(0.,1.,v-float(k)));
   }
-  float solid(vec2 p){
-    if(p.y<px.y || p.y>1.-px.y) return 1.;
-    if(p.x<0. || p.x>1.) return 0.;
-    return step(.12,texture(obstacle,p).a);
+  float cloudOpening(vec2 world){
+    vec2 p=world*5.1+vec2(-clockTime*.018,19.7);
+    return smoothstep(.32,.68,density(p));
   }
-  vec4 bilerp(sampler2D tex,vec2 p){
-    vec2 size=vec2(textureSize(tex,0)); vec2 q=p*size-.5;
-    vec2 i=floor(q), f=fract(q); vec2 a=(i+.5)/size, d=1./size;
-    return mix(mix(texture(tex,a),texture(tex,a+vec2(d.x,0)),f.x),
-      mix(texture(tex,a+vec2(0,d.y)),texture(tex,a+d),f.x),f.y);
-  }
-  vec2 flow(vec2 p){return vec2(bilerp(velocity,p-vec2(px.x*.5,0)).x,
-    bilerp(velocity,p-vec2(0,px.y*.5)).y);}
-  vec2 trace(vec2 p,vec2 v){
-    vec2 back=clamp(p-dt*v*px,px*.5,1.-px*.5); vec2 last=p;
-    for(int i=1;i<=6;i++){vec2 q=mix(p,back,float(i)/6.); if(solid(q)>.5) break; last=q;}
-    return last;
-  }
-  vec2 boundary(vec2 v){
-    if(solid(uv)>.5) return vec2(0);
-    if(solid(uv+vec2(px.x,0))>.5) v.x=0.;
-    if(solid(uv+vec2(0,px.y))>.5) v.y=0.;
-    if(uv.x<px.x*2.) v=vec2(inlet,0.);
-    // Open right outlet: zero-pressure projection, no incoming backflow.
-    if(uv.x>1.-px.x*2.) v.x=max(v.x,0.);
-    return clamp(v,vec2(-95.),vec2(95.));
-  }
-  `;
-  function program(body, extra = '') {
-    function compile(type, code) {
-      const s = gl.createShader(type); gl.shaderSource(s, code); gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        const info = gl.getShaderInfoLog(s); gl.deleteShader(s); throw new Error(info);
+  void main(){
+    float aspect=resolution.x/resolution.y;
+    vec2 world=vec2(uv.x*aspect,uv.y);
+    vec3 col=mix(vec3(.035,.048,.062),vec3(.28,.36,.41),uv.y);
+    float thinSum=0.;
+    for(int i=0;i<3;i++){
+      float layer=float(i);
+      vec2 p=world*(3.2+layer*1.9)+vec2(-clockTime*(.012+layer*.005),layer*19.7);
+      p.y+=sin(clockTime*.018+layer)*.09;
+      float d=density(p);
+      float shape=smoothstep(.27,.70,d);
+      thinSum+=smoothstep(.30,.67,d)/3.;
+      float rim=max(0.,density(p+vec2(-.09,.12))-d);
+      vec3 cloud=mix(vec3(.043,.060,.077),vec3(.34,.40,.43),smoothstep(.31,.73,d));
+      cloud+=rim*vec3(.50,.55,.57);
+      // Soft light sources behind the cloud layers, with no lightning geometry.
+      for(int j=0;j<2;j++){
+        vec4 source=j==0?glow0:glow1;
+        vec4 event=j==0?event0:event1;
+        vec2 delta=world-vec2(source.x*aspect,source.y);
+        float c=cos(event.z),s=sin(event.z);
+        delta=mat2(c,-s,s,c)*delta;
+        vec2 radius=max(source.zw*(1.+event.y*.65+layer*.10),vec2(.001));
+        float halo=exp(-dot(delta/radius,delta/radius)*1.65);
+        float transmission=exp(-shape*(.8+event.y*2.4));
+        cloud+=vec3(.66,.74,.90)*halo*event.x*(.3+shape)*transmission*3.2;
       }
-      return s;
+      col=mix(col,cloud,.46+shape*.25);
     }
-    const vs = compile(gl.VERTEX_SHADER, vertex), fs = compile(gl.FRAGMENT_SHADER, common + extra + body);
-    const p = gl.createProgram(); gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
-    gl.deleteShader(vs); gl.deleteShader(fs);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-    const uniforms = new Map();
-    const obj = { p, location(name) { if (!uniforms.has(name)) uniforms.set(name, gl.getUniformLocation(p, name)); return uniforms.get(name); } };
-    programs.push(obj); return obj;
-  }
-  let advect, divergencePass, pressurePass, project, curlPass, swirl, dyePass, splat, display, seed;
+    vec2 center=vec2(moon.x*aspect,moon.y);
+    vec2 delta=world-center;
+    thinSum=smoothstep(.20,.78,thinSum);
+    float dist=length(delta), transmission=transmit(thinSum);
+    float lunarPower=pow(moon.w,1.5);
+    // Circular disc with a spherical terminator; waxing is lit on the right.
+    vec2 q=delta/moon.z;
+    float edge=1.-smoothstep(.98,1.02,length(q));
+    if(edge>0.){
+      float z=sqrt(max(0.,1.-dot(q,q)));
+      float incidence=q.x*moonLight.x+z*moonLight.y;
+      float lit=smoothstep(-.015,.035,incidence);
+      vec3 surface=texture(moonSurface,q*.5+.5).rgb;
+      vec3 moonColor=surface*vec3(.84,.88,.94)*(.48+.52*sqrt(max(incidence,0.)));
+      col=mix(col,moonColor,edge*lit*min(.90,transmission*1.5));
+    }
+    // Radial shadow samples originate at the moon, so shafts follow moving gaps.
+    float rays=0.;
+    for(int k=1;k<=6;k++){
+      vec2 samplePoint=center+delta*(float(k)/7.);
+      rays+=transmit(cloudOpening(samplePoint))/6.;
+    }
+    float outward=smoothstep(moon.z*.9,moon.z*2.5,dist);
+    float falloff=exp(-dist*5.5);
+    float shafts=pow(rays,1.35)*outward*falloff*(.25+thinSum*.75);
+    float halo=exp(-dist*dist/(moon.z*moon.z*12.))*(.12+transmission*.40);
+    col+=vec3(.57,.66,.82)*lunarPower*(halo*.65+shafts*1.25);
+    float fade=smoothstep(.03,.85,uv.y);
+    col=mix(vec3(.0588235),col,fade);
+    result=vec4(col,1.);
+  }`;
+  let program;
   try {
-    emptyVAO = gl.createVertexArray(); gl.bindVertexArray(emptyVAO);
-    advect = program(`void main(){
-      vec2 fx=uv+vec2(px.x*.5,0), fy=uv+vec2(0,px.y*.5);
-      vec2 v=vec2(bilerp(source,trace(fx,flow(fx))-vec2(px.x*.5,0)).x,
-                  bilerp(source,trace(fy,flow(fy))-vec2(0,px.y*.5)).y);
-      v*=exp(-dt*.08);
-      // Gentle distributed drive maintains through-flow despite numerical dissipation.
-      v.x+=(inlet-v.x)*(1.-exp(-dt*.45));
-      result=vec4(boundary(v),0,1);
-    }`);
-    curlPass = program(`void main(){
-      vec2 l=flow(uv-vec2(px.x,0)),r=flow(uv+vec2(px.x,0));
-      vec2 b=flow(uv-vec2(0,px.y)),t=flow(uv+vec2(0,px.y));
-      result=vec4(.5*(r.y-l.y-t.x+b.x),0,0,1);
-    }`);
-    swirl = program(`void main(){
-      float c=texture(curlField,uv).x;
-      vec2 n=vec2(abs(texture(curlField,uv+vec2(px.x,0)).x)-abs(texture(curlField,uv-vec2(px.x,0)).x),
-                  abs(texture(curlField,uv+vec2(0,px.y)).x)-abs(texture(curlField,uv-vec2(0,px.y)).x));
-      n/=(length(n)+.0001);
-      vec2 v=texture(source,uv).xy+dt*2.8*vec2(n.y,-n.x)*c;
-      result=vec4(boundary(v),0,1);
-    }`);
-    divergencePass = program(`void main(){
-      if(solid(uv)>.5){result=vec4(0);return;}
-      vec2 c=texture(velocity,uv).xy;
-      float l=texture(velocity,uv-vec2(px.x,0)).x;
-      float b=texture(velocity,uv-vec2(0,px.y)).y;
-      result=vec4(c.x-l+c.y-b,0,0,1);
-    }`);
-    pressurePass = program(`void main(){
-      if(solid(uv)>.5){result=vec4(0);return;}
-      vec2 l=uv-vec2(px.x,0),r=uv+vec2(px.x,0),b=uv-vec2(0,px.y),t=uv+vec2(0,px.y);
-      float pc=texture(pressure,uv).x;
-      float pl=solid(l)>.5||l.x<0.?pc:texture(pressure,l).x;
-      float pr=solid(r)>.5?pc:(r.x>1.?0.:texture(pressure,r).x);
-      float pb=solid(b)>.5?pc:texture(pressure,b).x;
-      float pt=solid(t)>.5?pc:texture(pressure,t).x;
-      result=vec4((pl+pr+pb+pt-texture(divergence,uv).x)*.25,0,0,1);
-    }`);
-    project = program(`void main(){
-      float c=texture(pressure,uv).x;
-      float r=uv.x+px.x>1.?0.:texture(pressure,uv+vec2(px.x,0)).x;
-      float t=texture(pressure,uv+vec2(0,px.y)).x;
-      vec2 v=texture(velocity,uv).xy-vec2(r-c,t-c);
-      result=vec4(boundary(v),0,1);
-    }`);
-    dyePass = program(`void main(){
-      if(solid(uv)>.5){result=vec4(0);return;}
-      vec3 ink=bilerp(source,trace(uv,flow(uv))).rgb*exp(-dt*.075);
-      if(uv.x<px.x*3.) {
-        float bands=pow(.5+.5*sin(uv.y*28.+sin(clockTime*.6+uv.y*7.)*1.8),8.);
-        vec3 color=palette(uv.y+clockTime*.012);
-        ink=mix(ink,color*(.22+1.8*bands),1.-exp(-dt*8.));
-      }
-      // Feather dye at the open exit instead of accumulating a colored edge.
-      ink*=exp(-dt*8.*smoothstep(.97,1.,uv.x));
-      result=vec4(ink,1);
-    }`);
-    splat = program(`void main(){
-      vec2 p=uv-point; p.x*=dimensions.x/dimensions.y;
-      float weight=exp(-dot(p,p)/(radius*radius));
-      vec4 value=texture(source,uv);
-      if(isVelocity==1) result=vec4(boundary(value.xy+force*weight),0,1);
-      else result=solid(uv)>.5?vec4(0):vec4(min(value.rgb+color*weight,vec3(3.)),1);
-    }`, 'uniform vec2 point,force; uniform vec3 color; uniform float radius; uniform int isVelocity;\n');
-    seed = program(`void main(){
-      if(isVelocity==1) result=vec4(boundary(vec2(inlet,0)),0,1);
-      else {
-        float waves=pow(.5+.5*sin(uv.y*28.+sin(uv.x*9.)*1.3),10.);
-        vec3 color=palette(uv.y);
-        result=solid(uv)>.5?vec4(0):vec4(color*(.12+waves)*(.6+.4*(1.-uv.x)),1);
-      }
-    }`, 'uniform int isVelocity;\n');
-    display = program(`void main(){
-      vec3 d=max(bilerp(source,uv).rgb,vec3(0));
-      vec3 base=mix(vec3(.036,.055,.073),vec3(.052,.080,.092),uv.y);
-      vec3 color=base+vec3(1.)-exp(-d*2.7);
-      float edge=pow(max(abs(uv.x-.5)*2.,abs(uv.y-.5)*2.),14.);
-      color*=1.-.25*edge;
-      result=vec4(color,1);
-    }`);
-    maskTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, maskTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  } catch (e) { fallback(e); return; }
-  function target(w, h) {
-    const texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
-    const fbo = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-      gl.deleteFramebuffer(fbo); gl.deleteTexture(texture); throw new Error('Float framebuffer incomplete');
+    function compile(type, source) {
+      const shader=gl.createShader(type); gl.shaderSource(shader,source); gl.compileShader(shader);
+      if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
+      return shader;
     }
-    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-    return { texture, fbo, w, h };
+    const vs=compile(gl.VERTEX_SHADER,vertex), fs=compile(gl.FRAGMENT_SHADER,fragment);
+    program=gl.createProgram(); gl.attachShader(program,vs); gl.attachShader(program,fs); gl.linkProgram(program);
+    gl.deleteShader(vs);gl.deleteShader(fs);
+    if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
+    gl.useProgram(program);gl.bindVertexArray(gl.createVertexArray());
+  } catch(e) { fallback(e); return; }
+  const locations=Object.fromEntries(['resolution','clockTime','glow0','glow1','event0','event1','moonSurface','moon','moonLight'].map(n=>[n,gl.getUniformLocation(program,n)]));
+  const moonTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,moonTexture);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([190,190,180,255]));
+  gl.uniform1i(locations.moonSurface,0);
+  const moonImage=new Image();
+  moonImage.onload=()=>{
+    if(failed)return;
+    gl.bindTexture(gl.TEXTURE_2D,moonTexture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,moonImage);draw();
+  };
+  moonImage.src=new URL('moon-surface.svg',document.querySelector('script[src*="fluid-tank.js"]').src).href;
+  let moonFraction=0,moonX=0,moonZ=-1,lastMoonUpdate=0;
+  function updateMoon(now=Date.now()){
+    if(now-lastMoonUpdate<60000)return;
+    lastMoonUpdate=now;
+    if(!window.Astronomy){stats.moonError='Astronomy library unavailable';return;}
+    const date=new Date(now), info=Astronomy.Illumination('Moon',date);
+    const phase=Astronomy.MoonPhase(date),angle=info.phase_angle*Math.PI/180;
+    moonFraction=info.phase_fraction;moonX=Math.sin(angle)*(phase<180?1:-1);moonZ=Math.cos(angle);
+    tank.dataset.moonIllumination=(moonFraction*100).toFixed(2);
+    tank.dataset.moonPhase=phase<180?'waxing':'waning';
+    tank.dataset.moonDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(date);
+    stats.moon={fraction:moonFraction,phaseDegrees:phase,beijingDate:tank.dataset.moonDate};
   }
-  function pair(w,h) { return { read: target(w,h), write: target(w,h), swap() { [this.read,this.write]=[this.write,this.read]; } }; }
-  function dispose() {
-    if (!fields) return;
-    for (const f of Object.values(fields)) for (const t of f.read ? [f.read,f.write] : [f]) {
-      gl.deleteTexture(t.texture); gl.deleteFramebuffer(t.fbo);
-    }
-    fields = null;
+  const random=(a,b)=>a+Math.random()*(b-a);
+  function makeGlow(){
+    const size=random(.065,.29);
+    return {
+      x:random(.08,.92),y:random(.38,.88),
+      radiusX:size*random(.75,1.55),radiusY:size*random(.65,1.25),
+      depth:random(.08,.95),angle:random(0,Math.PI),
+      brightness:random(.25,1.55),start:time+random(0,.16),
+      duration:random(.45,.85),echo:random(.14,.30),
+      attack:random(.045,.085),echoStrength:random(.2,.7)
+    };
   }
-  function draw(p, dest, textures = {}, values = {}) {
-    gl.useProgram(p.p); gl.bindVertexArray(emptyVAO);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, dest ? dest.fbo : null);
-    gl.viewport(0, 0, dest ? dest.w : canvas.width, dest ? dest.h : canvas.height);
-    gl.uniform2f(p.location('px'), 1/W, 1/H);
-    gl.uniform2f(p.location('dimensions'), W, H);
-    gl.uniform1f(p.location('dt'), stepDT);
-    gl.uniform1f(p.location('clockTime'), elapsed);
-    gl.uniform1f(p.location('inlet'), W * .07);
-    let unit=0;
-    for (const [name, texture] of Object.entries({ obstacle: maskTexture, ...textures })) {
-      gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, texture.texture || texture);
-      gl.uniform1i(p.location(name),unit++);
-    }
-    for(const [name, value] of Object.entries(values)) {
-      const l=p.location(name);
-      if(name==='isVelocity') gl.uniform1i(l,value);
-      else if(Array.isArray(value)) {
-        if(value.length===2) gl.uniform2f(l,...value); else gl.uniform3f(l,...value);
-      } else gl.uniform1f(l,value);
-    }
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  function resize(){
+    const r=tank.getBoundingClientRect();
+    // Render below device resolution: the soft atmosphere needs no retina buffer.
+    const scale=Math.min(.7,1100/r.width,800/r.height);
+    canvas.width=Math.max(1,Math.round(r.width*scale));canvas.height=Math.max(1,Math.round(r.height*scale));
+    draw();
   }
-  let stepDT=1/60;
-  // The identical rasterized glyph image is both the visible lettering and obstacle mask.
-  function drawLetters() {
-    const rect=canvas.getBoundingClientRect(), sx=lettering.width/rect.width, sy=lettering.height/rect.height;
-    labelContext.setTransform(sx,0,0,sy,0,0);
-    labelContext.clearRect(0,0,rect.width,rect.height);
-    const range=document.createRange();
-    for(const block of tank.querySelectorAll('.welcome-text, .beijing-time')) {
-      const style=getComputedStyle(block);
-      labelContext.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      labelContext.fillStyle=style.color;
-      labelContext.textBaseline='alphabetic';
-      const walker=document.createTreeWalker(block,NodeFilter.SHOW_TEXT);
-      let node;
-      while((node=walker.nextNode())) {
-        let offset=0;
-        for(const character of node.textContent) {
-          range.setStart(node,offset); offset+=character.length; range.setEnd(node,offset);
-          const r=range.getBoundingClientRect(); if(!r.width || !r.height) continue;
-          const m=labelContext.measureText(character);
-          const ascent=m.fontBoundingBoxAscent ?? parseFloat(style.fontSize)*.85;
-          const descent=m.fontBoundingBoxDescent ?? parseFloat(style.fontSize)*.2;
-          const baseline=r.top-rect.top+(r.height-ascent-descent)*.5+ascent;
-          labelContext.fillText(character,r.left-rect.left,baseline);
+  function draw(){
+    if(failed)return;
+    gl.viewport(0,0,canvas.width,canvas.height);
+    gl.uniform2f(locations.resolution,canvas.width,canvas.height);
+    gl.uniform1f(locations.clockTime,time);
+    updateMoon();
+    const mobile=canvas.width/canvas.height<.85;
+    gl.uniform4f(locations.moon,mobile?.76:.79,mobile?.80:.77,mobile?.034:.046,moonFraction);
+    gl.uniform2f(locations.moonLight,moonX,moonZ);
+    for(let i=0;i<2;i++){
+      const glow=glows[i];let strength=0;
+      if(glow&&!paused&&!reduced.matches){
+        const age=time-glow.start;
+        if(age>=0&&age<glow.duration){
+          strength=(Math.exp(-Math.pow((age-.09)/glow.attack,2))+
+            glow.echoStrength*Math.exp(-Math.pow((age-glow.echo)/.10,2)))*glow.brightness;
         }
       }
+      gl.uniform4f(locations['glow'+i],glow?glow.x:0,glow?glow.y:0,glow?glow.radiusX:.1,glow?glow.radiusY:.1);
+      gl.uniform4f(locations['event'+i],strength,glow?glow.depth:1,glow?glow.angle:0,0);
     }
-    maskContext.clearRect(0,0,W,H);
-    maskContext.drawImage(lettering,0,0,W,H);
-    // Normalize translucent clock glyphs; leave only the glyph silhouettes solid.
-    maskPixels=maskContext.getImageData(0,0,W,H);
-    let count=0;
-    for(let i=3;i<maskPixels.data.length;i+=4) {
-      const on=maskPixels.data[i]>24; maskPixels.data[i]=on?255:0; if(on) count++;
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    stats.frames=++frames;
+  }
+  function running(){return !paused&&!failed&&visible&&!document.hidden;}
+  function schedule(){if(!raf&&running())raf=requestAnimationFrame(frame);}
+  function frame(now){
+    raf=0;if(!running())return;
+    if(previous&&now-previous<32){schedule();return;}
+    time+=previous?(now-previous)/1000:0;previous=now;
+    if(time>=nextFlash){
+      glows=Array.from({length:Math.random()<.5?1:2},makeGlow);
+      nextFlash=time+5+Math.random()*5;stats.flashes++;stats.glows=glows.length;
+      stats.lastFlashTime=time;
     }
-    maskContext.putImageData(maskPixels,0,0);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,maskTexture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,maskCanvas);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
-    diagnostics.glyphCells=count; maskDirty=false;
+    draw();stats.state='running';schedule();
   }
-  function resize() {
-    const rect=canvas.getBoundingClientRect(); if(rect.width<1||rect.height<1) return;
-    const aspect=rect.width/rect.height;
-    const longSide=[320,400,560][quality];
-    W=aspect>=1?longSide:Math.round(longSide*aspect);
-    H=aspect>=1?Math.round(longSide/aspect):longSide;
-    const scale=Math.min(1,Math.sqrt((coarse?90000:160000)/(W*H)));
-    W=Math.round(W*scale); H=Math.round(H*scale);
-    const dpr=Math.min(devicePixelRatio||1,coarse?1.5:1.75);
-    canvas.width=Math.min(1920,Math.round(rect.width*dpr));
-    canvas.height=Math.round(canvas.width/aspect);
-    lettering.width=Math.round(rect.width*Math.min(devicePixelRatio||1,2));
-    lettering.height=Math.round(rect.height*Math.min(devicePixelRatio||1,2));
-    displayW=rect.width; displayH=rect.height;
-    maskCanvas.width=W; maskCanvas.height=H;
-    dispose();
-    fields={ v:pair(W,H), p:pair(W,H), d:pair(W*2,H*2), div:target(W,H), curl:target(W,H) };
-    drawLetters(); seedFields(); pendingResize=false;
-    diagnostics.grid=`${W} × ${H}`; diagnostics.quality=quality;
-    tank.classList.add('fluid-ready');
+  function sync(){
+    cancelAnimationFrame(raf);raf=0;previous=0;
+    stats.state=paused?'paused':'idle';draw();schedule();
   }
-  function seedFields() {
-    draw(seed,fields.v.read,{}, {isVelocity:1});
-    draw(seed,fields.d.read,{}, {isVelocity:0});
-    // Settle inlet/obstacle pressure before the first visible frame.
-    for(let i=0;i<8;i++) projectVelocity(24);
-  }
-  function projectVelocity(iterations) {
-    // Solve for this step's pressure correction; stale pressure biases short Jacobi solves.
-    gl.bindFramebuffer(gl.FRAMEBUFFER,fields.p.read.fbo);
-    gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
-    draw(divergencePass,fields.div,{velocity:fields.v.read});
-    for(let i=0;i<iterations;i++) {
-      draw(pressurePass,fields.p.write,{pressure:fields.p.read,divergence:fields.div}); fields.p.swap();
-    }
-    draw(project,fields.v.write,{velocity:fields.v.read,pressure:fields.p.read}); fields.v.swap();
-  }
-  function addInk(x,y,dx=0,dy=0) {
-    if(paused||failed||lost) return;
-    pendingSplats.push({x,y,dx,dy,hue: hue++}); if(pendingSplats.length>12) pendingSplats.shift();
-    diagnostics.pointerInjections++; schedule();
-  }
-  function inject(s) {
-    const colors=[[.03,.28,1],[.02,.9,.22],[1,.77,.025],[.65,.07,1],[1,.055,.09]];
-    const point=[s.x,1-s.y], radius=coarse?.055:.042;
-    const force=[Math.max(-70,Math.min(70,s.dx*W*5)),Math.max(-70,Math.min(70,-s.dy*H*5))];
-    draw(splat,fields.v.write,{source:fields.v.read},{point,force,radius,isVelocity:1,color:[0,0,0]}); fields.v.swap();
-    draw(splat,fields.d.write,{source:fields.d.read},{point,force:[0,0],radius,isVelocity:0,color:colors[Math.floor(s.hue/24)%colors.length]}); fields.d.swap();
-  }
-  function simulate() {
-    draw(advect,fields.v.write,{source:fields.v.read,velocity:fields.v.read}); fields.v.swap();
-    for(const s of pendingSplats) inject(s); pendingSplats.length=0;
-    draw(curlPass,fields.curl,{velocity:fields.v.read});
-    draw(swirl,fields.v.write,{source:fields.v.read,curlField:fields.curl}); fields.v.swap();
-    projectVelocity([14,18,24][quality]);
-    draw(dyePass,fields.d.write,{source:fields.d.read,velocity:fields.v.read}); fields.d.swap();
-    diagnostics.steps++;
-  }
-  function render() { draw(display,null,{source:fields.d.read}); }
-  function shouldRun() { return !paused && visible && !document.hidden && !lost && !failed; }
-  function schedule() { if(!raf && shouldRun()) raf=requestAnimationFrame(frame); }
-  function frame(now) {
-    raf=0; if(!shouldRun()) return;
-    try {
-      if(previous && now-previous<1000/targetFPS-2) { schedule(); return; }
-      const interval=previous?now-previous:1000/targetFPS; previous=now;
-      stepDT=Math.min(interval/1000,1/30); elapsed+=stepDT;
-      if(pendingResize) resize();
-      if(maskDirty && now-lastMask>900) { drawLetters(); lastMask=now; }
-      simulate(); render();
-      diagnostics.state='running'; frameCount++;
-      if(!lastSample) lastSample=now;
-      if(now-lastSample>2000) {
-        measuredFPS=frameCount*1000/(now-lastSample); diagnostics.fps=Math.round(measuredFPS);
-        frameCount=0; lastSample=now;
-        if(measuredFPS<targetFPS*.68) slowFrames++; else slowFrames=0;
-        if(slowFrames>=2 && now-lastQuality>7000) {
-          if(quality>0) {quality--; pendingResize=true;} else targetFPS=30;
-          slowFrames=0; lastQuality=now;
-        }
-      }
-      schedule();
-    } catch(e) { fallback(e); }
-  }
-  function syncPause() {
-    pauseButton.textContent=paused?'播放':'暂停'; pauseButton.setAttribute('aria-pressed',String(paused));
-    setStatus(paused?'流体已暂停，点播放继续':'流体互动区域：点击加墨，按住拖动搅动');
-    cancelAnimationFrame(raf); raf=0; previous=0; lastSample=0; frameCount=0;
-    diagnostics.state=paused?'paused':'waiting';
-    if(!paused) schedule();
-  }
-  pauseButton.addEventListener('click',()=>{paused=!paused; syncPause();});
-  reduced.addEventListener('change',e=>{paused=e.matches; syncPause();});
-  function position(e) { const r=canvas.getBoundingClientRect(); return {x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}; }
-  canvas.addEventListener('pointerdown',e=>{
-    if(paused || (e.pointerType==='mouse' && e.button!==0) || pointer) return;
-    const p=position(e); pointer={id:e.pointerId,...p,start:p,moved:false,touch:e.pointerType==='touch'};
-    if(e.pointerType!=='touch'||tank.dataset.touch==='ink') {
-      canvas.setPointerCapture(e.pointerId); addInk(p.x,p.y);
-    }
-  });
-  canvas.addEventListener('pointermove',e=>{
-    if(!pointer||e.pointerId!==pointer.id) return;
-    const p=position(e), dx=p.x-pointer.x,dy=p.y-pointer.y;
-    if(Math.hypot((p.x-pointer.start.x)*displayW,(p.y-pointer.start.y)*displayH)>8) pointer.moved=true;
-    if(!pointer.touch||tank.dataset.touch==='ink') {
-      const n=Math.min(5,Math.max(1,Math.ceil(Math.hypot(dx*W,dy*H)/4)));
-      for(let i=1;i<=n;i++) addInk(pointer.x+dx*i/n,pointer.y+dy*i/n,dx/n,dy/n);
-    }
-    pointer.x=p.x; pointer.y=p.y;
-  });
-  canvas.addEventListener('pointerup',e=>{
-    if(pointer && pointer.id===e.pointerId) {
-      if(pointer.touch && tank.dataset.touch!=='ink' && !pointer.moved) addInk(pointer.x,pointer.y);
-      pointer=null; if(canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
-    }
-  });
-  for(const event of ['pointercancel','lostpointercapture']) canvas.addEventListener(event,()=>{pointer=null;});
-  const resizeObserver=new ResizeObserver(()=>{pendingResize=true; if(paused && visible && !document.hidden && !failed && !lost) {try{resize(); render();}catch(e){fallback(e);}} else schedule();});
-  resizeObserver.observe(tank);
-  const mutationObserver=new MutationObserver(()=>{maskDirty=true; if(paused && visible && !document.hidden && !failed && !lost && fields) drawLetters();});
-  mutationObserver.observe(tank.querySelector('.tank-copy'),{childList:true,subtree:true,characterData:true});
-  const intersectionObserver=new IntersectionObserver(entries=>{
-    visible=entries[0].isIntersecting; previous=0; lastSample=0; frameCount=0;
-    if(!visible) {cancelAnimationFrame(raf);raf=0;diagnostics.state='offscreen';}
-    else if(paused && fields && !failed && !lost) {drawLetters();render();} else schedule();
-  },{threshold:0}); intersectionObserver.observe(tank);
-  document.addEventListener('visibilitychange',()=>{
-    previous=0; lastSample=0; frameCount=0;
-    if(document.hidden) {cancelAnimationFrame(raf);raf=0;diagnostics.state='hidden';}
-    else if(paused && visible && fields && !failed && !lost) {drawLetters();render();} else schedule();
-  });
-  canvas.addEventListener('webglcontextlost',e=>{
-    e.preventDefault(); lost=true; cancelAnimationFrame(raf);raf=0;diagnostics.state='context-lost';
-    setStatus('动画暂时暂停，正在等待图形恢复');
-  });
-  // A restored context invalidates every shader and texture. Preserve readable content.
-  canvas.addEventListener('webglcontextrestored',()=>{
-    // Keep a readable static panel; a page refresh safely creates a new context and resources.
-    fallback('Graphics context restored; refresh to resume animation');
-    setStatus('图形已恢复 · 刷新页面继续动画');
-  });
-  document.fonts.ready.then(()=>{maskDirty=true; if(paused && visible && !document.hidden && fields && !failed&&!lost) drawLetters();});
-  try {resize(); render(); syncPause();} catch(e) {fallback(e);}
+  reduced.addEventListener('change',()=>{paused=reduced.matches;if(first)first.classList.add('is-visible');sync();});
+  new ResizeObserver(resize).observe(tank);
+  new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;sync();},{threshold:0}).observe(tank);
+  document.addEventListener('visibilitychange',sync);
+  setInterval(()=>{if(visible&&!document.hidden&&!failed){updateMoon();if(paused)draw();}},60000);
+  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();fallback('Graphics context lost');});
+  resize();sync();
 })();

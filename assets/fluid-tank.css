@@ -1,46 +1,24 @@
-/* The simulation stays inside the welcome panel. */
+/* Full-bleed storm hero. All other homepage cards retain their existing styles. */
+body { padding-top: 0; }
+main { padding-top: 0; }
 .fluid-tank {
-  position: relative;
-  isolation: isolate;
-  width: min(1440px, 100%);
-  height: clamp(360px, 33vw, 500px);
-  margin: 36px auto 64px;
-  box-sizing: border-box;
-  overflow: hidden;
-  border: 1px solid rgba(205, 235, 240, .28);
-  border-radius: 24px;
-  background: radial-gradient(ellipse at 20% 65%, #122b32 0, transparent 65%), linear-gradient(130deg, #101a20, #0b1117 65%, #151922);
-  box-shadow: inset 0 1px 0 #ffffff26, inset 0 0 40px #84dfff06, 0 24px 70px #0005;
+  position: relative; isolation: isolate; overflow: hidden;
+  width: calc(100% + 60px); margin: 0 -30px 64px;
+  height: 100svh; min-height: 620px;
+  background: radial-gradient(ellipse at 28% 8%, #637982, transparent 68%), linear-gradient(#283c48, #0f0f0f 96%);
 }
-.fluid-tank::after {
-  content: ''; position: absolute; inset: 7px; border-radius: 18px;
-  border: 1px solid #b3eaf512; pointer-events: none; z-index: 4;
-  background: linear-gradient(115deg, #ffffff05, transparent 26%, transparent 80%, #ffffff03);
+.tank-fluid { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.fluid-tank::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(transparent 30%, #0f0f0f26 60%, #0f0f0f 100%); }
+.tank-copy { position: absolute; top: 37%; left: 10.9%; right: 8%; z-index: 2; }
+.fluid-tank .welcome-text { margin: 0; text-align: left; font-family: inherit; font-size: clamp(32px, 2.65vw, 52px); font-weight: 400; line-height: 1.7; letter-spacing: -.025em; color: #f8fafc; text-shadow: 0 2px 28px #07121b45; }
+.fluid-tank .welcome-text span { display: block; }
+.fluid-tank .beijing-time { text-align: left; margin: 32px 0 0; font-size: clamp(12px, 1.05vw, 19px); line-height: 1.8; letter-spacing: .01em; color: #c4cdd4; }
+.archive-card.archive-reveal { opacity: 0; translate: 0 70px; transition: opacity 1.3s ease, translate 1.3s cubic-bezier(.22,1,.36,1), transform .9s, filter .9s; }
+.archive-card.archive-reveal.is-visible { opacity: 1; translate: 0 0; }
+@media(max-width: 600px) {
+  .fluid-tank { min-height: 560px; margin-bottom: 36px; }
+  .tank-copy { left: 8%; right: 7%; top: 36%; }
+  .fluid-tank .welcome-text { font-size: clamp(27px, 7.5vw, 38px); }
+  .fluid-tank .beijing-time { max-width: 290px; margin-top: 26px; }
 }
-.tank-fluid, .tank-lettering { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.tank-fluid { z-index: 1; cursor: crosshair; touch-action: pan-y; }
-.fluid-tank[data-touch="ink"] .tank-fluid { touch-action: none; }
-.tank-lettering { z-index: 3; pointer-events: none; }
-.tank-copy { position: absolute; inset: 65px 7% 72px; display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; z-index: 2; }
-.fluid-tank .welcome-text { margin: 0; max-width: 100%; font-size: clamp(25px, 3.2vw, 46px); line-height: 1.65; letter-spacing: .06em; font-weight: 400; text-wrap: balance; }
-.fluid-tank .welcome-text span { display: inline-block; }
-.fluid-tank .beijing-time { margin: 22px 0 0; font-size: clamp(11px, 1.15vw, 16px); letter-spacing: .04em; line-height: 1.8; text-wrap: balance; }
-.fluid-tank.fluid-ready .tank-copy { opacity: 0; }
-.tank-top, .tank-bottom { position: absolute; left: 25px; right: 25px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; pointer-events: none; font: 11px/1.5 -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; color: #a0bbc2; letter-spacing: .08em; }
-.tank-top { top: 20px; }
-.tank-bottom { bottom: 18px; justify-content: flex-end; }
-.tank-flow-label { display: flex; align-items: center; gap: 9px; }
-.tank-buttons { display: flex; gap: 8px; pointer-events: auto; }
-.tank-buttons button { appearance: none; border: 1px solid #c6e7ed30; border-radius: 20px; padding: 6px 12px; background: #101c238c; color: #c1d7dc; font: inherit; letter-spacing: .02em; cursor: pointer; }
-.tank-buttons button:hover { background: #28414c; }
-.tank-buttons button:focus-visible { outline: 2px solid #ace8ef; outline-offset: 3px; }
-@media (max-width: 600px) {
-  .fluid-tank { height: 410px; margin: 20px auto 40px; border-radius: 18px; }
-  .tank-copy { inset: 80px 22px; }
-  .fluid-tank .welcome-text { font-size: 27px; }
-  .fluid-tank .beijing-time { max-width: 245px; margin-top: 24px; font-size: 11px; }
-  .tank-top, .tank-bottom { left: 17px; right: 17px; letter-spacing: .02em; }
-  .tank-bottom { flex-wrap: wrap; gap: 9px; }
-  .tank-buttons button { padding: 7px 10px; }
-}
-@media (prefers-reduced-motion: reduce) { .tank-fluid { cursor: default; } }
+@media(prefers-reduced-motion: reduce) { .archive-card.archive-reveal { opacity: 1; translate: none; transition: none; } }
