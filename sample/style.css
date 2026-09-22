@@ -1,0 +1,72 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #111;
+}
+
+body {
+  margin: 0;
+  background: #111;
+  color: #e8e8e8;
+
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  line-height: 1.8;
+}
+
+.book-page {
+  width: min(900px, 88vw);
+  margin: 0 auto;
+  padding: 90px 0 180px;
+}
+
+h1 {
+  font-size: 48px;
+  margin-bottom: 40px;
+}
+
+h2 {
+  font-size: 30px;
+  margin-top: 64px;
+  margin-bottom: 18px;
+}
+
+p,
+li {
+  font-size: 18px;
+  color: #cfcfcf;
+}
+
+strong {
+  color: #fff;
+}
+
+hr {
+  border: none;
+  height: 1px;
+  background: #333;
+  margin: 56px 0;
+}
+
+.katex-display {
+  margin: 2.2rem 0;
+
+  overflow-x: auto;
+  overflow-y: visible;
+
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+}
+
+.katex {
+  font-size: 1.25em;
+  line-height: 1.4;
+}
