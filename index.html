@@ -91,73 +91,108 @@
 /* ===== 下拉菜单 ===== */
 
 .nav-dropdown {
-  position: relative;
+  position: static;
 }
 
 .dropdown-menu {
   position: absolute;
-
-  top: 54px;
-  left: 50%;
-
-  transform:
-    translateX(-50%)
-    translateY(-8px);
-
-  min-width: 190px;
-
-  padding: 10px;
-
-  background: rgba(255, 255, 255, 0.96);
-
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-
-  border: 1px solid rgba(0, 0, 0, 0.08);
-
-  border-radius: 14px;
-
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.10);
-
+  top: calc(100% - 1px);
+  left: 0;
+  width: 100%;
+  min-height: 322px;
+  box-sizing: border-box;
+  background: rgba(8, 10, 13, 0.84);
+  backdrop-filter: blur(32px) saturate(155%);
+  -webkit-backdrop-filter: blur(32px) saturate(155%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.18);
+  border-radius: 0 0 24px 24px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.09),
+    0 28px 70px rgba(0, 0, 0, 0.38);
   opacity: 0;
   visibility: hidden;
-
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease,
-    visibility 0.2s;
+  pointer-events: none;
+  transform: translateY(-10px) scaleY(.94);
+  transform-origin: top center;
+  clip-path: inset(0 0 100% 0);
+  transition: opacity .28s ease,
+    transform .42s cubic-bezier(.22, 1, .36, 1),
+    clip-path .42s cubic-bezier(.22, 1, .36, 1),
+    visibility 0s linear .42s;
 }
 
-.dropdown-menu a {
-  display: block;
+.dropdown-menu::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(125deg, rgba(255, 255, 255, .055), transparent 40%, rgba(255, 255, 255, .018));
+  pointer-events: none;
+}
 
-  padding: 11px 14px;
+.dropdown-inner {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 44px 40px 52px;
+}
 
-  border-radius: 9px;
+.dropdown-label {
+  margin: 0 0 22px;
+  color: rgba(255, 255, 255, .55);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .04em;
+}
 
-  color: #111;
+.dropdown-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 280px));
+  column-gap: clamp(48px, 10vw, 150px);
+  row-gap: 24px;
+}
+
+.dropdown-links a {
+  width: fit-content;
+  color: #f5f5f5;
   text-decoration: none;
-
-  font-size: 14px;
-
-  transition: background 0.15s ease;
+  font-size: clamp(21px, 2vw, 28px);
+  font-weight: 500;
+  line-height: 1.3;
+  transition: color .2s ease, transform .2s ease;
 }
 
-.dropdown-menu a:hover {
-  background: rgba(0, 0, 0, 0.055);
+.dropdown-links a:hover,
+.dropdown-links a:focus-visible {
+  color: #fff;
+  transform: translateX(5px);
+  text-shadow: 0 0 18px rgba(255, 255, 255, .35);
 }
 
 
 /* 鼠标放上去展开 */
 
-.nav-dropdown:hover .dropdown-menu {
+.nav-dropdown:hover .dropdown-menu,
+.nav-dropdown:focus-within .dropdown-menu {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scaleY(1);
+  clip-path: inset(0 0 0 0);
+  transition: opacity .28s ease,
+    transform .42s cubic-bezier(.22, 1, .36, 1),
+    clip-path .42s cubic-bezier(.22, 1, .36, 1),
+    visibility 0s;
+}
 
-  transform:
-    translateX(-50%)
-    translateY(0);
+@media (max-width: 768px) {
+  .dropdown-menu { min-height: 0; max-height: calc(100vh - 64px); overflow-y: auto; }
+  .dropdown-inner { padding: 32px 24px 40px; }
+  .dropdown-links { grid-template-columns: 1fr; row-gap: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu, .dropdown-links a { transition: none; }
 }
 
 
@@ -292,27 +327,6 @@ main a:hover {
   color: #e5e5e5;
 }
 
-
-/* ===== 下拉菜单深色化 ===== */
-
-.dropdown-menu {
-  background: rgba(28, 28, 28, 0.96);
-
-  border:
-    1px solid rgba(255, 255, 255, 0.10);
-
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.45);
-}
-
-.dropdown-menu a {
-  color: #eeeeee;
-}
-
-.dropdown-menu a:hover {
-  background:
-    rgba(255, 255, 255, 0.08);
-}
 
   body {
   font-family:
@@ -516,12 +530,12 @@ main a:hover {
 }
 
 .nav-menu {
-  position: relative;
+  position: static;
   z-index: 2;
 }
 
 .nav-dropdown {
-  position: relative;
+  position: static;
   z-index: 3;
 }
 
@@ -543,6 +557,13 @@ main a:hover {
   z-index: 4;
 
   cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .top-nav { padding: 0 14px; }
+  .brand { font-size: 16px; white-space: nowrap; }
+  .nav-menu { gap: 9px; }
+  .nav-menu > a, .nav-link { font-size: 12px; white-space: nowrap; }
 }
 
 .beijing-time {
@@ -584,23 +605,33 @@ main a:hover {
     <a href="/about/">关于我</a>
 
     <div class="nav-dropdown">
-      <span class="nav-link">学习</span>
+      <button class="nav-link" type="button" aria-haspopup="true" aria-controls="study-menu">学习</button>
 
-      <div class="dropdown-menu">
-        <a href="/study/math/">数学</a>
-        <a href="/study/mechanics/">力学</a>
-        <a href="/study/ai/">人工智能</a>
-        <a href="/study/exam/">考研记录</a>
+      <div class="dropdown-menu" id="study-menu">
+        <div class="dropdown-inner">
+          <p class="dropdown-label">探索学习</p>
+          <div class="dropdown-links">
+            <a href="/study/math/">数学</a>
+            <a href="/study/mechanics/">力学</a>
+            <a href="/study/ai/">人工智能</a>
+            <a href="/study/exam/">考研记录</a>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="nav-dropdown">
-      <span class="nav-link">项目</span>
+      <button class="nav-link" type="button" aria-haspopup="true" aria-controls="projects-menu">项目</button>
 
-      <div class="dropdown-menu">
-        <a href="/projects/website/">个人网站</a>
-        <a href="/projects/blender/">Blender</a>
-        <a href="/projects/ai/">AI 项目</a>
+      <div class="dropdown-menu" id="projects-menu">
+        <div class="dropdown-inner">
+          <p class="dropdown-label">探索项目</p>
+          <div class="dropdown-links">
+            <a href="/projects/website/">个人网站</a>
+            <a href="/projects/blender/">Blender</a>
+            <a href="/projects/ai/">AI 项目</a>
+          </div>
+        </div>
       </div>
     </div>
 
