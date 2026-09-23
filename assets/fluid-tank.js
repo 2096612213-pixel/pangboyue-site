@@ -97,14 +97,19 @@
     float lunarPower=pow(moon.w,1.5);
     // Circular disc with a spherical terminator; waxing is lit on the right.
     vec2 q=delta/moon.z;
-    float edge=1.-smoothstep(.98,1.02,length(q));
+    float edge=1.-smoothstep(.965,1.,length(q));
     if(edge>0.){
       float z=sqrt(max(0.,1.-dot(q,q)));
       float incidence=q.x*moonLight.x+z*moonLight.y;
       float lit=smoothstep(-.015,.035,incidence);
-      vec3 surface=texture(moonSurface,q*.5+.5).rgb;
+      // Sample inside the SVG's transparent limb, respecting coverage.
+      vec2 surfaceQ=q*min(1.,.98/max(length(q),.001));
+      vec4 texel=texture(moonSurface,surfaceQ*.5+.5);
+      vec3 surface=texel.rgb;
       vec3 moonColor=surface*vec3(.84,.88,.94)*(.48+.52*sqrt(max(incidence,0.)));
-      col=mix(col,moonColor,edge*lit*min(.90,transmission*1.5));
+      // Moonlight adds radiance behind the clouds; it must not darken a bright
+      // cloud into a black rim when the lunar limb is shaded.
+      col+=moonColor*edge*lit*texel.a*min(.90,transmission*1.5);
     }
     // Radial shadow samples originate at the moon, so shafts follow moving gaps.
     float rays=0.;
