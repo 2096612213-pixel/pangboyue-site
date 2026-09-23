@@ -247,7 +247,7 @@
   }
   function sync(){
     cancelAnimationFrame(raf);raf=0;previous=0;
-    if (!running()) window.StormSound?.stopAll();
+    window.StormSound?.setSceneActive(running());
     stats.state=paused?'paused':'idle';draw();schedule();
   }
   reduced.addEventListener('change',()=>{paused=reduced.matches;if(first)first.classList.add('is-visible');sync();});

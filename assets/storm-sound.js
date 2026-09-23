@@ -1,6 +1,5 @@
-/* One thunder burst per cloud flash. Each recording is decoded once and its
- * strongest short passage is played with a soft tail, without changing the
- * original 5–10 second lightning rhythm. */
+/* One thunder burst per cloud flash, with a quiet bed of overlapping distant
+ * rolls. The short burst passages preserve the 5–10 second lightning rhythm. */
 (() => {
   'use strict';
   const button = document.querySelector('#storm-sound-toggle');
@@ -20,11 +19,14 @@
     ['thunder-rumbling-in-the-distance.mp3', 'distant']
   ];
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
-  let context, master, compressor, loaded = [], loading, enabled = false;
-  let lastTrack = '', scheduled = 0, played = 0;
-  const active = new Set();
+  let context, master, compressor, ambientBus, loaded = [], loading, enabled = false;
+  let lastTrack = '', lastAmbientTrack = '', scheduled = 0, played = 0;
+  let sceneActive = false, ambientTimer = 0, nextAmbientTime = 0, ambientScheduled = 0;
+  const active = new Set(), ambientSources = new Set();
   const diagnostics = { get enabled() { return enabled; }, get loaded() { return loaded.length; },
-    get scheduled() { return scheduled; }, get played() { return played; }, lastDelay: 0, lastDistance: 0, lastTrack: '' };
+    get scheduled() { return scheduled; }, get played() { return played; },
+    get ambientScheduled() { return ambientScheduled; }, get ambientActive() { return ambientSources.size; },
+    lastDelay: 0, lastDistance: 0, lastTrack: '' };
 
   function setButton(label) {
     button.setAttribute('aria-label', label);
@@ -61,6 +63,35 @@
     return { offset, duration, normalization: clamp(.52 / peak, .45, 2.2) };
   }
 
+  function rollingPassage(buffer) {
+    const samples = buffer.getChannelData(0);
+    const stride = Math.max(1, Math.floor(buffer.sampleRate * .12));
+    const levels = [];
+    for (let start = 0; start < samples.length; start += stride) {
+      let power = 0, count = 0;
+      for (let i = start; i < Math.min(start + stride, samples.length); i += 12) {
+        power += samples[i] * samples[i]; count++;
+      }
+      levels.push(Math.sqrt(power / Math.max(count, 1)));
+    }
+    const duration = Math.min(6.2, buffer.duration - .15);
+    const windowBins = Math.max(1, Math.floor(duration * buffer.sampleRate / stride));
+    const loudest = Math.max(...levels);
+    let bestStart = 0, bestScore = Infinity, bestMean = .01;
+    for (let start = 0; start + windowBins <= levels.length; start += 3) {
+      const window = levels.slice(start, start + windowBins);
+      const mean = window.reduce((sum, value) => sum + value, 0) / window.length;
+      if (mean < loudest * .11) continue;
+      const highest = Math.max(...window);
+      const variance = window.reduce((sum, value) => sum + (value - mean) ** 2, 0) / window.length;
+      // Prefer an audible, steady roll over a quiet gap or a sharp thunderclap.
+      const score = highest / mean + Math.sqrt(variance) / mean - .12 * mean / loudest;
+      if (score < bestScore) { bestScore = score; bestStart = start; bestMean = mean; }
+    }
+    return { offset: Math.min(bestStart * stride / buffer.sampleRate, buffer.duration - duration),
+      duration, normalization: clamp(.04 / bestMean, .2, 1.4) };
+  }
+
   async function prepare() {
     if (loading) return loading;
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -75,6 +106,9 @@
     master = context.createGain();
     master.gain.value = .68;
     compressor.connect(master).connect(context.destination);
+    ambientBus = context.createGain();
+    ambientBus.gain.value = .8;
+    ambientBus.connect(compressor);
     // Resume synchronously from the click; Safari requires a user gesture.
     const resumed = context.resume();
     loading = (async () => {
@@ -86,7 +120,8 @@
             const response = await fetch(new URL('thunder/' + file, scriptURL));
             if (!response.ok) throw Error(file + ': HTTP ' + response.status);
             const buffer = await context.decodeAudioData(await response.arrayBuffer());
-            return { file, type, buffer, ...strongestPassage(buffer, type) };
+            return { file, type, buffer, ...strongestPassage(buffer, type),
+              rolling: type === 'distant' ? rollingPassage(buffer) : null };
           } catch (error) { lastError = error; }
         }
         throw lastError;
@@ -107,10 +142,67 @@
   }
 
   function stopAll() {
+    if (ambientTimer) clearInterval(ambientTimer);
+    ambientTimer = 0;
+    nextAmbientTime = 0;
     for (const source of active) {
       try { source.stop(); } catch (_) { /* The source may have just ended. */ }
     }
     active.clear();
+    for (const source of ambientSources) {
+      try { source.stop(); } catch (_) { /* The source may have just ended. */ }
+    }
+    ambientSources.clear();
+  }
+
+  function queueAmbience() {
+    if (!enabled || !sceneActive || !context || context.state !== 'running') return;
+    const pool = loaded.filter(track => track.rolling);
+    if (!pool.length) return;
+    while (nextAmbientTime < context.currentTime + 8) {
+      let choices = pool.filter(track => track.file !== lastAmbientTrack);
+      if (!choices.length) choices = pool;
+      const track = choices[Math.floor(Math.random() * choices.length)];
+      lastAmbientTrack = track.file;
+      const source = context.createBufferSource();
+      source.buffer = track.buffer;
+      source.playbackRate.value = .86 + Math.random() * .14;
+      const filter = context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 230 + Math.random() * 130;
+      const volume = context.createGain();
+      const when = nextAmbientTime;
+      const playDuration = track.rolling.duration / source.playbackRate.value;
+      const fade = Math.min(1.8, playDuration * .27);
+      const level = track.rolling.normalization * (.75 + Math.random() * .35);
+      volume.gain.setValueAtTime(.0001, when);
+      volume.gain.linearRampToValueAtTime(level, when + fade);
+      volume.gain.setValueAtTime(level, when + playDuration - fade);
+      volume.gain.linearRampToValueAtTime(.0001, when + playDuration);
+      source.connect(filter).connect(volume).connect(ambientBus);
+      source.onended = () => ambientSources.delete(source);
+      ambientSources.add(source);
+      source.start(when, track.rolling.offset, track.rolling.duration);
+      source.stop(when + playDuration + .02);
+      nextAmbientTime += playDuration - fade;
+      ambientScheduled++;
+      button.dataset.ambientRolls = String(ambientScheduled);
+    }
+  }
+
+  function startAmbience() {
+    if (!enabled || !sceneActive || !context || context.state !== 'running' || ambientTimer) return;
+    nextAmbientTime = context.currentTime + .08;
+    queueAmbience();
+    ambientTimer = setInterval(queueAmbience, 900);
+  }
+
+  function setSceneActive(activeNow) {
+    sceneActive = activeNow;
+    if (!sceneActive) { stopAll(); return; }
+    if (enabled && context && context.state !== 'running') {
+      context.resume().then(() => { if (sceneActive) startAmbience(); }).catch(() => {});
+    } else startAmbience();
   }
 
   function pickTrack(impact) {
@@ -181,6 +273,7 @@
       await prepare();
       await context.resume();
       enabled = true;
+      startAmbience();
       setButton('关闭雷声');
     } catch (error) {
       console.warn('Storm sound:', error);
@@ -188,6 +281,5 @@
       loading = null;
     } finally { button.disabled = false; }
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(); });
-  window.StormSound = { schedule, stopAll, diagnostics };
+  window.StormSound = { schedule, setSceneActive, diagnostics };
 })();
