@@ -66,13 +66,17 @@
     vec2 world=vec2(uv.x*aspect,uv.y);
     vec3 col=mix(vec3(.035,.048,.062),vec3(.28,.36,.41),uv.y);
     float thinSum=0.;
+    float clearestPath=1.;
     for(int i=0;i<3;i++){
       float layer=float(i);
       vec2 p=world*(3.2+layer*1.9)+vec2(-clockTime*(.012+layer*.005),layer*19.7);
       p.y+=sin(clockTime*.018+layer)*.09;
       float d=density(p);
       float shape=smoothstep(.27,.70,d);
-      thinSum+=smoothstep(.30,.67,d)/3.;
+      float layerOpening=smoothstep(.30,.67,d);
+      thinSum+=layerOpening/3.;
+      // An opaque layer cannot be averaged away by brighter clouds behind it.
+      clearestPath=min(clearestPath,layerOpening);
       float rim=max(0.,density(p+vec2(-.09,.12))-d);
       vec3 cloud=mix(vec3(.043,.060,.077),vec3(.34,.40,.43),smoothstep(.31,.73,d));
       cloud+=rim*vec3(.50,.55,.57);
@@ -93,7 +97,9 @@
     vec2 center=vec2(moon.x*aspect,moon.y);
     vec2 delta=world-center;
     thinSum=smoothstep(.20,.78,thinSum);
-    float dist=length(delta), transmission=transmit(thinSum);
+    // Exactly zero in the darkest cloud cores, fading smoothly at their edges.
+    float moonVisibility=smoothstep(.08,.42,clearestPath);
+    float dist=length(delta), transmission=transmit(thinSum)*moonVisibility;
     float lunarPower=pow(moon.w,1.5);
     // Circular disc with a spherical terminator; waxing is lit on the right.
     vec2 q=delta/moon.z;
@@ -121,7 +127,7 @@
     float falloff=exp(-dist*5.5);
     float shafts=pow(rays,1.35)*outward*falloff*(.25+thinSum*.75);
     float halo=exp(-dist*dist/(moon.z*moon.z*12.))*(.12+transmission*.40);
-    col+=vec3(.57,.66,.82)*lunarPower*(halo*.65+shafts*1.25);
+    col+=vec3(.57,.66,.82)*lunarPower*(halo*.65+shafts*1.25)*moonVisibility;
     float fade=smoothstep(.03,.85,uv.y);
     col=mix(vec3(.0588235),col,fade);
     result=vec4(col,1.);
