@@ -26,6 +26,16 @@
   let nextFlash = 5 + Math.random() * 5, frames = 0;
   let glows = [];
   const stats = { state: 'initializing', frames: 0, flashes: 0, error: null };
+  // Pick one cloud field per page load; keep it fixed while the scene animates.
+  const cloudSeed = new Float32Array(4);
+  if (window.crypto && window.crypto.getRandomValues) {
+    const values = new Uint32Array(4);
+    window.crypto.getRandomValues(values);
+    for (let i = 0; i < 4; i++) cloudSeed[i] = values[i] / 4294967296 * 128;
+  } else {
+    for (let i = 0; i < 4; i++) cloudSeed[i] = Math.random() * 128;
+  }
+  stats.cloudSeed = Array.from(cloudSeed);
   Object.defineProperty(tank, 'cloudStats', { get: () => ({ ...stats, time, resolution: [canvas.width, canvas.height] }) });
   function fallback(e) {
     failed = true; cancelAnimationFrame(raf); raf = 0;
@@ -42,6 +52,7 @@
   in vec2 uv; out vec4 result;
   uniform vec2 resolution;
   uniform float clockTime;
+  uniform vec4 cloudSeed;
   uniform sampler2D moonSurface;
   uniform vec4 moon; // center x/y, radius in viewport heights, illuminated fraction
   uniform vec2 moonLight; // signed horizontal and view-facing solar direction
@@ -58,7 +69,7 @@
     return mix(levels[k],levels[k+1],smoothstep(0.,1.,v-float(k)));
   }
   float cloudOpening(vec2 world){
-    vec2 p=world*5.1+vec2(-clockTime*.018,19.7);
+    vec2 p=world*5.1+vec2(-clockTime*.018,19.7)+cloudSeed.zw;
     return smoothstep(.32,.68,density(p));
   }
   void main(){
@@ -69,7 +80,8 @@
     vec3 unlitCloud=col;
     for(int i=0;i<3;i++){
       float layer=float(i);
-      vec2 p=world*(3.2+layer*1.9)+vec2(-clockTime*(.012+layer*.005),layer*19.7);
+      vec2 p=world*(3.2+layer*1.9)+vec2(-clockTime*(.012+layer*.005),layer*19.7)
+        +mix(cloudSeed.xy,cloudSeed.zw,layer*.5);
       p.y+=sin(clockTime*.018+layer)*.09;
       float d=density(p);
       float shape=smoothstep(.27,.70,d);
@@ -147,7 +159,7 @@
     if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
     gl.useProgram(program);gl.bindVertexArray(gl.createVertexArray());
   } catch(e) { fallback(e); return; }
-  const locations=Object.fromEntries(['resolution','clockTime','glow0','glow1','event0','event1','moonSurface','moon','moonLight'].map(n=>[n,gl.getUniformLocation(program,n)]));
+  const locations=Object.fromEntries(['resolution','clockTime','cloudSeed','glow0','glow1','event0','event1','moonSurface','moon','moonLight'].map(n=>[n,gl.getUniformLocation(program,n)]));
   const moonTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,moonTexture);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -199,6 +211,7 @@
     gl.viewport(0,0,canvas.width,canvas.height);
     gl.uniform2f(locations.resolution,canvas.width,canvas.height);
     gl.uniform1f(locations.clockTime,time);
+    gl.uniform4fv(locations.cloudSeed,cloudSeed);
     updateMoon();
     const mobile=canvas.width/canvas.height<.85;
     gl.uniform4f(locations.moon,mobile?.76:.79,mobile?.80:.77,mobile?.034:.046,moonFraction);
