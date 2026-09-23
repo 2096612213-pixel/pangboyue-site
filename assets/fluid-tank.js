@@ -66,7 +66,7 @@
     vec2 world=vec2(uv.x*aspect,uv.y);
     vec3 col=mix(vec3(.035,.048,.062),vec3(.28,.36,.41),uv.y);
     float thinSum=0.;
-    float clearestPath=1.;
+    vec3 unlitCloud=col;
     for(int i=0;i<3;i++){
       float layer=float(i);
       vec2 p=world*(3.2+layer*1.9)+vec2(-clockTime*(.012+layer*.005),layer*19.7);
@@ -75,11 +75,10 @@
       float shape=smoothstep(.27,.70,d);
       float layerOpening=smoothstep(.30,.67,d);
       thinSum+=layerOpening/3.;
-      // An opaque layer cannot be averaged away by brighter clouds behind it.
-      clearestPath=min(clearestPath,layerOpening);
       float rim=max(0.,density(p+vec2(-.09,.12))-d);
       vec3 cloud=mix(vec3(.043,.060,.077),vec3(.34,.40,.43),smoothstep(.31,.73,d));
       cloud+=rim*vec3(.50,.55,.57);
+      unlitCloud=mix(unlitCloud,cloud,.46+shape*.25);
       // Soft light sources behind the cloud layers, with no lightning geometry.
       for(int j=0;j<2;j++){
         vec4 source=j==0?glow0:glow1;
@@ -98,7 +97,10 @@
     vec2 delta=world-center;
     thinSum=smoothstep(.20,.78,thinSum);
     // Exactly zero in the darkest cloud cores, fading smoothly at their edges.
-    float moonVisibility=smoothstep(.08,.42,clearestPath);
+    // Match the visible cloud composite, rather than letting the darkest of
+    // three hidden layers veto every other layer. Lightning cannot open gaps.
+    float cloudLuminance=dot(unlitCloud,vec3(.2126,.7152,.0722));
+    float moonVisibility=smoothstep(.075,.135,cloudLuminance);
     float dist=length(delta), transmission=transmit(thinSum)*moonVisibility;
     float lunarPower=pow(moon.w,1.5);
     // Circular disc with a spherical terminator; waxing is lit on the right.
