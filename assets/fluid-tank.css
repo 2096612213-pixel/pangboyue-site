@@ -13,6 +13,15 @@ main { padding-top: 0; }
 .fluid-tank .welcome-text { margin: 0; text-align: left; font-family: inherit; font-size: clamp(32px, 2.65vw, 52px); font-weight: 600; line-height: 1.9; letter-spacing: .035em; color: #f8fafc; text-shadow: 0 2px 28px #07121b45; }
 .fluid-tank .welcome-text span { display: block; }
 .fluid-tank .beijing-time { text-align: left; margin: 32px 0 0; font-size: clamp(12px, 1.05vw, 19px); line-height: 1.8; letter-spacing: .01em; color: #c4cdd4; }
+.fluid-tank #beijing-time { display: inline-block; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.storm-sound-toggle { display: inline-grid; place-items: center; vertical-align: middle; width: 26px; height: 26px; padding: 4px; border: 0; border-radius: 50%; background: transparent; color: #a3a9ad; opacity: .58; cursor: pointer; transition: opacity .2s, background .2s; }
+.storm-sound-toggle svg { width: 18px; height: 18px; }
+.storm-sound-toggle .sound-icon-waves { display: none; }
+.storm-sound-toggle[aria-pressed="true"] .sound-icon-waves { display: initial; }
+.storm-sound-toggle[aria-pressed="true"] .sound-icon-slash { display: none; }
+.storm-sound-toggle:hover, .storm-sound-toggle:focus-visible { opacity: .9; background: #b9c5cf14; }
+.storm-sound-toggle:focus-visible { outline: 1px solid #d5dfe5a6; outline-offset: 2px; }
+.storm-sound-toggle:disabled { cursor: wait; opacity: .35; }
 .archive-card.archive-reveal { opacity: 0; translate: 0 70px; transition: opacity 1.3s ease, translate 1.3s cubic-bezier(.22,1,.36,1), transform .9s, filter .9s; }
 .archive-card.archive-reveal.is-visible { opacity: 1; translate: 0 0; }
 @media(max-width: 600px) {

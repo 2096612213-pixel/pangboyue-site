@@ -36,7 +36,7 @@
     for (let i = 0; i < 4; i++) cloudSeed[i] = Math.random() * 128;
   }
   stats.cloudSeed = Array.from(cloudSeed);
-  Object.defineProperty(tank, 'cloudStats', { get: () => ({ ...stats, time, resolution: [canvas.width, canvas.height] }) });
+  Object.defineProperty(tank, 'cloudStats', { get: () => ({ ...stats, time, resolution: [canvas.width, canvas.height], audio: window.StormSound?.diagnostics }) });
   function fallback(e) {
     failed = true; cancelAnimationFrame(raf); raf = 0;
     canvas.style.display = 'none';
@@ -239,6 +239,7 @@
     time+=previous?(now-previous)/1000:0;previous=now;
     if(time>=nextFlash){
       glows=Array.from({length:Math.random()<.5?1:2},makeGlow);
+      for (const glow of glows) window.StormSound?.schedule(glow, time);
       nextFlash=time+5+Math.random()*5;stats.flashes++;stats.glows=glows.length;
       stats.lastFlashTime=time;
     }
@@ -246,6 +247,7 @@
   }
   function sync(){
     cancelAnimationFrame(raf);raf=0;previous=0;
+    if (!running()) window.StormSound?.stopAll();
     stats.state=paused?'paused':'idle';draw();schedule();
   }
   reduced.addEventListener('change',()=>{paused=reduced.matches;if(first)first.classList.add('is-visible');sync();});
