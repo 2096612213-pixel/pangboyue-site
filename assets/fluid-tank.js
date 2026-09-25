@@ -11,7 +11,7 @@
   const canvas = tank.querySelector('.tank-fluid');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   // Only the first archive entrance receives the reveal behavior.
-  const first = document.querySelector('a.archive-card[href="rhine/index.html"]');
+  const first = document.querySelector('a.archive-card');
   if (first && !reduced.matches && 'IntersectionObserver' in window) {
     const reveal = new IntersectionObserver(entries => {
       if (entries.some(e => e.isIntersecting)) {
