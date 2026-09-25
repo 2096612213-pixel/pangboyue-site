@@ -16,6 +16,8 @@
     .back:hover, .back:focus-visible { background: #202327; }
     .column-header h1 { margin: 0; font-size: 21px; font-weight: 750; }
     .post { padding: 17px 19px 23px; }
+    .post + .post { border-top: 1px solid #2f3336; }
+    .video-title { margin: 0 0 17px; font-size: 19px; line-height: 1.4; }
     .author { display: flex; align-items: center; gap: 10px; margin-bottom: 17px; }
     .avatar { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #584c50, #18181b 70%); color: #eee; font-weight: 700; }
     .name { font-weight: 750; line-height: 1.25; }
@@ -47,7 +49,7 @@
         <div><div class="name">Stephan Livera</div><div class="handle">@stephanlivera</div></div>
       </div>
       <p class="intro">Opus 5.5 on Max effort - "make a dynamic 15-second motion graphics video that shows what an incredible motion designer you are, like it's your showreel for a résumé. go all out."</p>
-      <div class="player" aria-label="视频播放器">
+      <div class="player" data-duration="15" aria-label="视频播放器">
         <video id="showreel" src="media/opus-5-5-showreel.mp4" preload="metadata" playsinline></video>
         <canvas class="preview" id="preview" aria-hidden="true"></canvas>
         <div class="controls">
@@ -65,75 +67,102 @@
         </div>
       </div>
     </article>
+    <article class="post">
+      <h2 class="video-title">Western History</h2>
+      <div class="player" data-duration="136.49" aria-label="Western History 视频播放器">
+        <video src="media/western-history-opus5.5.mp4" poster="media/western-history-poster.jpg" preload="none" playsinline></video>
+        <img class="preview" src="media/western-history-poster.jpg" alt="" aria-hidden="true" loading="lazy" decoding="async">
+        <div class="controls">
+          <button class="icon-button play-toggle" type="button" aria-label="播放视频" title="播放视频">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.7a1 1 0 0 1 1.5-.86l11 7.3a1 1 0 0 1 0 1.72l-11 7.3A1 1 0 0 1 7 19.3z"/></svg>
+          </button>
+          <span class="time">0:00 / 2:16</span>
+          <input class="progress" type="range" min="0" max="1000" value="0" aria-label="视频播放进度">
+          <button class="icon-button mute-toggle" type="button" aria-label="静音" title="静音">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm12.5-1.5v9a5 5 0 0 1 0-9zm1.8-2.3v2.1a7 7 0 0 1 0 9.4v2.1a9 9 0 0 0 0-13.6z"/></svg>
+          </button>
+          <button class="icon-button fullscreen-toggle" type="button" aria-label="全屏" title="全屏">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10V4h6v2H6v4zm14 0V6h-4V4h6v6zM6 14v4h4v2H4v-6zm12 0h2v6h-6v-2h4z"/></svg>
+          </button>
+        </div>
+      </div>
+    </article>
   </main>
   <script>
-    const video = document.getElementById('showreel');
-    const playToggle = document.getElementById('play-toggle');
-    const muteToggle = document.getElementById('mute-toggle');
-    const fullscreenToggle = document.getElementById('fullscreen-toggle');
-    const progress = document.getElementById('progress');
-    const time = document.getElementById('time');
-    const preview = document.getElementById('preview');
-    let manuallyStarted = false;
-    video.autoplay = false;
-    video.pause();
     const formatTime = seconds => {
       if (!Number.isFinite(seconds)) return '0:00';
       const whole = Math.floor(seconds);
       return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
     };
-    const sync = () => {
-      const duration = Number.isFinite(video.duration) ? video.duration : 15;
-      const position = manuallyStarted ? video.currentTime : 0;
-      time.textContent = `${formatTime(position)} / ${formatTime(duration)}`;
-      progress.value = duration ? Math.round(position / duration * 1000) : 0;
-      playToggle.setAttribute('aria-label', video.paused ? '播放视频' : '暂停视频');
-      playToggle.title = video.paused ? '播放视频' : '暂停视频';
-      playToggle.innerHTML = video.paused
-        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.7a1 1 0 0 1 1.5-.86l11 7.3a1 1 0 0 1 0 1.72l-11 7.3A1 1 0 0 1 7 19.3z"/></svg>'
-        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
-    };
-    playToggle.addEventListener('click', async () => {
-      if (video.paused) {
-        if (!manuallyStarted) video.currentTime = 0;
-        manuallyStarted = true;
-        preview.hidden = true;
-        try { await video.play(); } catch { sync(); }
-      } else video.pause();
-    });
-    progress.addEventListener('input', () => {
-      if (Number.isFinite(video.duration)) video.currentTime = video.duration * Number(progress.value) / 1000;
-    });
-    muteToggle.addEventListener('click', () => {
-      video.muted = !video.muted;
-      muteToggle.setAttribute('aria-label', video.muted ? '取消静音' : '静音');
-      muteToggle.title = video.muted ? '取消静音' : '静音';
-    });
-    fullscreenToggle.addEventListener('click', () => {
-      const player = document.querySelector('.player');
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (player.requestFullscreen) player.requestFullscreen();
-      else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
-    });
-    video.addEventListener('play', () => {
-      if (!manuallyStarted) {
-        video.pause();
-        video.currentTime = 0;
+    document.querySelectorAll('.player').forEach(player => {
+      const video = player.querySelector('video');
+      const preview = player.querySelector('.preview');
+      const playToggle = player.querySelector('.play-toggle, #play-toggle');
+      const muteToggle = player.querySelector('.mute-toggle, #mute-toggle');
+      const fullscreenToggle = player.querySelector('.fullscreen-toggle, #fullscreen-toggle');
+      const progress = player.querySelector('.progress, #progress');
+      const time = player.querySelector('.time, #time');
+      const fallbackDuration = Number(player.dataset.duration);
+      let manuallyStarted = false;
+      video.autoplay = false;
+      video.pause();
+      const sync = () => {
+        const duration = Number.isFinite(video.duration) ? video.duration : fallbackDuration;
+        const position = manuallyStarted ? video.currentTime : 0;
+        time.textContent = `${formatTime(position)} / ${formatTime(duration)}`;
+        progress.value = duration ? Math.round(position / duration * 1000) : 0;
+        playToggle.setAttribute('aria-label', video.paused ? '播放视频' : '暂停视频');
+        playToggle.title = video.paused ? '播放视频' : '暂停视频';
+        playToggle.innerHTML = video.paused
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.7a1 1 0 0 1 1.5-.86l11 7.3a1 1 0 0 1 0 1.72l-11 7.3A1 1 0 0 1 7 19.3z"/></svg>'
+          : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+      };
+      playToggle.addEventListener('click', async () => {
+        if (video.paused) {
+          document.querySelectorAll('.player video').forEach(other => {
+            if (other !== video) other.pause();
+          });
+          if (!manuallyStarted) video.currentTime = 0;
+          manuallyStarted = true;
+          preview.hidden = true;
+          try { await video.play(); } catch { preview.hidden = false; sync(); }
+        } else video.pause();
+      });
+      progress.addEventListener('input', () => {
+        if (Number.isFinite(video.duration)) video.currentTime = video.duration * Number(progress.value) / 1000;
+      });
+      muteToggle.addEventListener('click', () => {
+        video.muted = !video.muted;
+        muteToggle.setAttribute('aria-label', video.muted ? '取消静音' : '静音');
+        muteToggle.title = video.muted ? '取消静音' : '静音';
+      });
+      fullscreenToggle.addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else if (player.requestFullscreen) player.requestFullscreen();
+        else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+      });
+      video.addEventListener('play', () => {
+        if (!manuallyStarted) {
+          video.pause();
+          video.currentTime = 0;
+        }
+        sync();
+      });
+      if (preview.tagName === 'CANVAS') {
+        video.addEventListener('loadedmetadata', () => {
+          if (!manuallyStarted && video.duration > 2) video.currentTime = 1;
+        }, { once: true });
+        video.addEventListener('seeked', () => {
+          if (manuallyStarted || video.currentTime < .5) return;
+          preview.width = video.videoWidth;
+          preview.height = video.videoHeight;
+          preview.getContext('2d').drawImage(video, 0, 0);
+          video.currentTime = 0;
+        });
       }
+      for (const event of ['loadedmetadata', 'timeupdate', 'pause', 'ended']) video.addEventListener(event, sync);
       sync();
     });
-    video.addEventListener('loadedmetadata', () => {
-      if (!manuallyStarted && video.duration > 2) video.currentTime = 1;
-    }, { once: true });
-    video.addEventListener('seeked', () => {
-      if (manuallyStarted || video.currentTime < .5) return;
-      preview.width = video.videoWidth;
-      preview.height = video.videoHeight;
-      preview.getContext('2d').drawImage(video, 0, 0);
-      video.currentTime = 0;
-    });
-    for (const event of ['loadedmetadata', 'timeupdate', 'pause', 'ended']) video.addEventListener(event, sync);
-    sync();
   </script>
 </body>
 </html>
