@@ -136,6 +136,15 @@
   padding: 34px 0 24px;
 }
 
+.contact-menu .dropdown-inner {
+  width: max-content;
+  max-width: calc(100vw - 32px);
+}
+
+.contact-menu .dropdown-links a {
+  white-space: nowrap;
+}
+
 .dropdown-links {
   display: flex;
   flex-direction: column;
@@ -619,15 +628,26 @@ main a:hover {
         <div class="dropdown-inner">
           <div class="dropdown-links">
             <a href="/">个人网站</a>
-            <a href="/projects/blender/">Blender</a>
-            <a href="/projects/ai/">AI 项目</a>
+            <a href="/有趣的小玩具展示/">可视化项目</a>
           </div>
         </div>
       </div>
     </div>
 
     <a href="/notes/">随笔</a>
-    <a href="/contact/">联系</a>
+    <div class="nav-dropdown">
+      <button class="nav-link" type="button" aria-haspopup="true" aria-controls="contact-menu">联系</button>
+
+      <div class="dropdown-menu contact-menu" id="contact-menu">
+        <div class="dropdown-inner">
+          <div class="dropdown-links">
+            <a href="mailto:2096612213@qq.com">2096612213@qq.com</a>
+            <a href="mailto:zonghetl70@outlook.com">zonghetl70@outlook.com</a>
+            <a href="mailto:bol940170@gmail.com">bol940170@gmail.com</a>
+          </div>
+        </div>
+      </div>
+    </div>
   </nav>
 </header>
 
@@ -692,10 +712,10 @@ main a:hover {
    class="archive-card"
    target="_blank">
 
-  <img src="images/toys_main.jpg" alt="有趣的小玩具">
+  <img src="images/toys_main.jpg" alt="可视化项目">
 
   <div class="archive-title">
-    有趣的小玩具
+    可视化项目
   </div>
 
 </a>
