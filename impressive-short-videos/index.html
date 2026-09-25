@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>impressive short videos | 庞博约</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { background: #000; }
+    body { margin: 0; color: #f7f9f9; background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+    button, input { font: inherit; }
+    .column { width: min(100%, 730px); min-height: 100vh; margin: 0 auto; border-left: 1px solid #2f3336; border-right: 1px solid #2f3336; }
+    .column-header { height: 57px; display: flex; align-items: center; gap: 29px; padding: 0 19px; border-bottom: 1px solid #2f3336; }
+    .back { display: grid; place-items: center; width: 32px; height: 32px; margin-left: -7px; color: inherit; text-decoration: none; border-radius: 50%; font-size: 28px; line-height: 1; }
+    .back:hover, .back:focus-visible { background: #202327; }
+    .column-header h1 { margin: 0; font-size: 21px; font-weight: 750; }
+    .post { padding: 17px 19px 23px; }
+    .author { display: flex; align-items: center; gap: 10px; margin-bottom: 17px; }
+    .avatar { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #584c50, #18181b 70%); color: #eee; font-weight: 700; }
+    .name { font-weight: 750; line-height: 1.25; }
+    .handle { color: #71767b; font-size: 15px; line-height: 1.3; }
+    .intro { margin: 0 0 17px; max-width: 100%; font-size: 19px; line-height: 1.45; overflow-wrap: anywhere; }
+    .player { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #33383b; border-radius: 17px; background: #142ccf; }
+    video { display: block; width: 100%; height: 100%; object-fit: cover; background: #142ccf; }
+    .preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+    .preview[hidden] { display: none; }
+    .controls { position: absolute; inset: auto 0 0; display: flex; align-items: center; gap: 10px; padding: 23px 12px 10px; background: linear-gradient(transparent, rgba(0,0,0,.76)); }
+    .icon-button { display: grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; color: white; background: rgba(0,0,0,.55); cursor: pointer; }
+    .icon-button:hover, .icon-button:focus-visible { background: rgba(255,255,255,.24); outline: 2px solid transparent; }
+    .icon-button svg { width: 19px; height: 19px; fill: currentColor; }
+    .time { flex: none; color: #f7f9f9; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 1px 3px #000; }
+    .progress { flex: 1; min-width: 30px; height: 18px; margin: 0; accent-color: #fff; cursor: pointer; }
+    .caption { padding-top: 16px; color: #71767b; font-size: 13px; }
+    @media (max-width: 520px) { .post { padding: 13px 12px 20px; } .intro { font-size: 17px; } .controls { gap: 6px; padding-left: 7px; padding-right: 7px; } .time { font-size: 11px; } }
+  </style>
+</head>
+<body>
+  <main class="column">
+    <header class="column-header">
+      <a class="back" href="/" aria-label="返回首页">←</a>
+      <h1>Post</h1>
+    </header>
+    <article class="post">
+      <div class="author">
+        <div class="avatar" aria-hidden="true">S</div>
+        <div><div class="name">Stephan Livera</div><div class="handle">@stephanlivera</div></div>
+      </div>
+      <p class="intro">Opus 5.5 on Max effort - "make a dynamic 15-second motion graphics video that shows what an incredible motion designer you are, like it's your showreel for a résumé. go all out."</p>
+      <div class="player" aria-label="视频播放器">
+        <video id="showreel" src="media/opus-5-5-showreel.mp4" preload="metadata" playsinline></video>
+        <canvas class="preview" id="preview" aria-hidden="true"></canvas>
+        <div class="controls">
+          <button class="icon-button" id="play-toggle" type="button" aria-label="播放视频" title="播放视频">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.7a1 1 0 0 1 1.5-.86l11 7.3a1 1 0 0 1 0 1.72l-11 7.3A1 1 0 0 1 7 19.3z"/></svg>
+          </button>
+          <span class="time" id="time">0:00 / 0:15</span>
+          <input class="progress" id="progress" type="range" min="0" max="1000" value="0" aria-label="视频播放进度">
+          <button class="icon-button" id="mute-toggle" type="button" aria-label="静音" title="静音">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm12.5-1.5v9a5 5 0 0 0 0-9zm1.8-2.3v2.1a7 7 0 0 1 0 9.4v2.1a9 9 0 0 0 0-13.6z"/></svg>
+          </button>
+          <button class="icon-button" id="fullscreen-toggle" type="button" aria-label="全屏" title="全屏">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10V4h6v2H6v4zm14 0V6h-4V4h6v6zM6 14v4h4v2H4v-6zm12 0h2v6h-6v-2h4z"/></svg>
+          </button>
+        </div>
+      </div>
+    </article>
+  </main>
+  <script>
+    const video = document.getElementById('showreel');
+    const playToggle = document.getElementById('play-toggle');
+    const muteToggle = document.getElementById('mute-toggle');
+    const fullscreenToggle = document.getElementById('fullscreen-toggle');
+    const progress = document.getElementById('progress');
+    const time = document.getElementById('time');
+    const preview = document.getElementById('preview');
+    let manuallyStarted = false;
+    video.autoplay = false;
+    video.pause();
+    const formatTime = seconds => {
+      if (!Number.isFinite(seconds)) return '0:00';
+      const whole = Math.floor(seconds);
+      return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+    };
+    const sync = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : 15;
+      const position = manuallyStarted ? video.currentTime : 0;
+      time.textContent = `${formatTime(position)} / ${formatTime(duration)}`;
+      progress.value = duration ? Math.round(position / duration * 1000) : 0;
+      playToggle.setAttribute('aria-label', video.paused ? '播放视频' : '暂停视频');
+      playToggle.title = video.paused ? '播放视频' : '暂停视频';
+      playToggle.innerHTML = video.paused
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.7a1 1 0 0 1 1.5-.86l11 7.3a1 1 0 0 1 0 1.72l-11 7.3A1 1 0 0 1 7 19.3z"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+    };
+    playToggle.addEventListener('click', async () => {
+      if (video.paused) {
+        if (!manuallyStarted) video.currentTime = 0;
+        manuallyStarted = true;
+        preview.hidden = true;
+        try { await video.play(); } catch { sync(); }
+      } else video.pause();
+    });
+    progress.addEventListener('input', () => {
+      if (Number.isFinite(video.duration)) video.currentTime = video.duration * Number(progress.value) / 1000;
+    });
+    muteToggle.addEventListener('click', () => {
+      video.muted = !video.muted;
+      muteToggle.setAttribute('aria-label', video.muted ? '取消静音' : '静音');
+      muteToggle.title = video.muted ? '取消静音' : '静音';
+    });
+    fullscreenToggle.addEventListener('click', () => {
+      const player = document.querySelector('.player');
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (player.requestFullscreen) player.requestFullscreen();
+      else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+    });
+    video.addEventListener('play', () => {
+      if (!manuallyStarted) {
+        video.pause();
+        video.currentTime = 0;
+      }
+      sync();
+    });
+    video.addEventListener('loadedmetadata', () => {
+      if (!manuallyStarted && video.duration > 2) video.currentTime = 1;
+    }, { once: true });
+    video.addEventListener('seeked', () => {
+      if (manuallyStarted || video.currentTime < .5) return;
+      preview.width = video.videoWidth;
+      preview.height = video.videoHeight;
+      preview.getContext('2d').drawImage(video, 0, 0);
+      video.currentTime = 0;
+    });
+    for (const event of ['loadedmetadata', 'timeupdate', 'pause', 'ended']) video.addEventListener(event, sync);
+    sync();
+  </script>
+</body>
+</html>
