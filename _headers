@@ -1,0 +1,19 @@
+# Cloudflare Pages browser caching. HTML and journal data can change frequently.
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/thoughts/*.json
+  Cache-Control: public, max-age=0, must-revalidate
+/thoughts/:week/thoughts.md
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/*
+  Cache-Control: public, max-age=86400
+/images/*
+  Cache-Control: public, max-age=86400
+/有趣的小玩具展示/assets/*
+  Cache-Control: public, max-age=86400
+/sample/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/有趣的小玩具展示/rhine/assets/index-*.js
+  Cache-Control: public, max-age=31536000, immutable

@@ -9,594 +9,17 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="庞博约的个人网站：记录日常、想法与认识，展示可视化项目、电子书和短片。">
+  <link rel="canonical" href="https://pangboyue.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="庞博约 | Boyue Pang">
+  <meta property="og:description" content="记录日常、想法与认识，展示可视化项目、电子书和短片。">
+  <meta property="og:url" content="https://pangboyue.com/">
+  <meta property="og:image" content="https://pangboyue.com/images/toys_main.jpg">
 
    <title>庞博约 | Boyue Pang</title>
 
-   <style>
-
-   /* ===== 顶部导航栏 ===== */
-
-.top-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-
-  width: 100%;
-  height: 64px;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  padding: 0 36px;
-
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-
-  z-index: 9999;
-
-  box-sizing: border-box;
-}
-
-/* 左侧名字 */
-
-.brand {
-  font-size: 19px;
-  font-weight: 600;
-
-  color: #111;
-  text-decoration: none;
-
-  letter-spacing: -0.02em;
-}
-
-/* 导航 */
-
-.nav-menu {
-  display: flex;
-  align-items: center;
-  gap: 30px;
-}
-
-.nav-menu > a,
-.nav-link {
-  font-family: inherit;
-
-  font-size: 14px;
-  font-weight: 450;
-
-  color: #222;
-
-  text-decoration: none;
-
-  background: none;
-  border: none;
-
-  padding: 22px 0;
-
-  cursor: pointer;
-
-  transition: opacity 0.2s ease;
-}
-
-.nav-menu > a:hover,
-.nav-link:hover {
-  opacity: 0.55;
-}
-
-
-/* ===== 下拉菜单 ===== */
-
-.nav-dropdown {
-  position: static;
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: calc(100% - 1px);
-  left: 0;
-  width: 100%;
-  box-sizing: border-box;
-  background: rgba(8, 10, 13, 0.84);
-  backdrop-filter: blur(32px) saturate(155%);
-  -webkit-backdrop-filter: blur(32px) saturate(155%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-top-color: rgba(255, 255, 255, 0.18);
-  border-radius: 0 0 24px 24px;
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.09),
-    0 28px 70px rgba(0, 0, 0, 0.38);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(-10px) scaleY(.94);
-  transform-origin: top center;
-  clip-path: inset(0 0 100% 0);
-  transition: opacity .28s ease,
-    transform .42s cubic-bezier(.22, 1, .36, 1),
-    clip-path .42s cubic-bezier(.22, 1, .36, 1),
-    visibility 0s linear .42s;
-}
-
-.dropdown-menu::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(125deg, rgba(255, 255, 255, .055), transparent 40%, rgba(255, 255, 255, .018));
-  pointer-events: none;
-}
-
-.dropdown-inner {
-  position: relative;
-  left: var(--menu-x, 40px);
-  width: 156px;
-  padding: 34px 0 24px;
-}
-
-#projects-menu .dropdown-inner,
-.contact-menu .dropdown-inner {
-  width: max-content;
-  max-width: calc(100vw - 32px);
-}
-
-#projects-menu .dropdown-links a,
-.contact-menu .dropdown-links a {
-  white-space: nowrap;
-}
-
-.dropdown-links {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.dropdown-links a {
-  width: fit-content;
-  color: #f5f5f5;
-  text-decoration: none;
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1.3;
-  transition: color .2s ease, transform .2s ease;
-}
-
-.dropdown-links a:hover,
-.dropdown-links a:focus-visible {
-  color: #fff;
-  transform: translateX(5px);
-  text-shadow: 0 0 18px rgba(255, 255, 255, .35);
-}
-
-
-/* 鼠标放上去展开 */
-
-.nav-dropdown:hover .dropdown-menu,
-.nav-dropdown:focus-within .dropdown-menu {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0) scaleY(1);
-  clip-path: inset(0 0 0 0);
-  transition: opacity .28s ease,
-    transform .42s cubic-bezier(.22, 1, .36, 1),
-    clip-path .42s cubic-bezier(.22, 1, .36, 1),
-    visibility 0s;
-}
-
-@media (max-width: 768px) {
-  .dropdown-menu { max-height: calc(100vh - 64px); overflow-y: auto; }
-  .dropdown-inner { padding: 28px 0 24px; }
-  .dropdown-links { gap: 18px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dropdown-menu, .dropdown-links a { transition: none; }
-}
-
-
-/* 防止导航挡住网页顶部 */
-
-body {
-  padding-top: 64px;
-}
-
-    .music-box {
-  width: 320px;
-  margin-top: 30px;
-  font-size: 14px;
-}
-
-.track {
-  margin-bottom: 18px;
-}
-
-.track span {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.track audio {
-  width: 100%;
-  height: 32px;
-}
-    html,
-    body {
-      margin: 0;
-      min-height: 100%;
-      overscroll-behavior-y: none;
-    }
-
-    body {
-      padding-top: 64px;
-
-
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    main {
-      flex: 1;
-      padding: 30px;
-      min-height: 150vh;
-    }
-
-    .footer-image {
-      width: 100%;
-      height: auto;
-      aspect-ratio: 2170 / 725;
-      object-fit: contain;
-      display: block;
-    }
-
-    /* ===== 全站深色主题 ===== */
-
-html,
-body {
-  background: #0f0f0f;
-  color: #f2f2f2;
-}
-
-/* 正文 */
-
-main {
-  background: #0f0f0f;
-  color: #f2f2f2;
-}
-
-/* 标题 */
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: #ffffff;
-}
-
-/* 普通文字 */
-
-p {
-  color: #d6d6d6;
-}
-
-/* 链接 */
-
-a {
-  color: #e8e8e8;
-}
-
-main a {
-  color: #b8b8b8;
-  text-decoration-color: rgba(255, 255, 255, 0.35);
-
-  transition:
-    color 0.2s ease,
-    opacity 0.2s ease;
-}
-
-main a:hover {
-  color: #ffffff;
-}
-
-
-/* ===== 顶部导航栏深色化 ===== */
-
-.top-nav {
-  background: rgba(15, 15, 15, 0.82);
-
-  border-bottom:
-    1px solid rgba(255, 255, 255, 0.10);
-
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-
-/* 左侧名字 */
-
-.brand {
-  color: #ffffff;
-}
-
-
-/* 导航文字 */
-
-.nav-menu > a,
-.nav-link {
-  color: #e5e5e5;
-}
-
-
-  body {
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Display",
-    "SF Pro Text",
-    "PingFang SC",
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
-}
-
-/* ===== 立体资料馆入口 ===== */
-
-.archive-card {
-  display: block;
-
-  width: calc(100% - 120px);
-  max-width: 1200px;
-
-  margin: 50px auto 70px auto;
-
-  color: #f2f2f2;
-  text-decoration: none;
-
-  cursor: pointer;
-}
-
-/* 图片 */
-
-.archive-card img {
-  display: block;
-
-  width: 100%;
-  height: auto;
-
-  border-radius: 18px;
-
-  transition:
-    transform 0.45s ease,
-    box-shadow 0.45s ease,
-    filter 0.45s ease;
-
-  transform: scale(1);
-}
-
-/* 鼠标移上去 */
-
-.archive-card:hover img {
-  transform: scale(1.025);
-
-  box-shadow:
-    0 0 24px rgba(255, 255, 255, 0.16),
-    0 0 60px rgba(255, 255, 255, 0.08);
-
-  filter: brightness(1.03);
-}
-
-/* 图片下面的文字 */
-
-/* 整个卡片一起动画 */
-.archive-card {
-  display: block;
-
-  width: calc(100% - 120px);
-  max-width: 1200px;
-
-  margin: 50px auto 70px auto;
-
-  color: #f2f2f2;
-  text-decoration: none;
-  cursor: pointer;
-
-  transition:
-    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.9s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-
-/* 图片本身不再单独缩放 */
-.archive-card img {
-  display: block;
-
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1844 / 853;
-  object-fit: cover;
-  background: #1c2023;
-
-  border-radius: 18px;
-
-  transition:
-    box-shadow 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.9s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-
-/* 鼠标进入图片或者文字区域
-   整个卡片一起放大 */
-.archive-card:hover {
-  transform: scale(1.015);
-}
-
-
-/* 同时让图片出现白色光晕 */
-.archive-card:hover img {
-  box-shadow:
-    0 0 24px rgba(255, 255, 255, 0.16),
-    0 0 60px rgba(255, 255, 255, 0.08);
-
-  filter: brightness(1.03);
-}
-
-
-/* 标题 */
-.archive-title {
-  margin-top: 18px;
-
-  font-size: 22px;
-  font-weight: 500;
-
-  color: #f2f2f2;
-  text-decoration: none;
-
-  transition: opacity 0.25s ease;
-}
-
-
-/* hover 时文字稍微亮一点即可 */
-.archive-card:hover .archive-title {
-  opacity: 1;
-}
-
-
-/* 手机适配 */
-
-@media (max-width: 768px) {
-  .archive-card {
-    width: calc(100% - 32px);
-
-    margin-top: 35px;
-    margin-bottom: 50px;
-  }
-
-  .archive-title {
-    font-size: 17px;
-  }
-
-  .archive-card img {
-    border-radius: 12px;
-  }
-}
-
-.music-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #f2f2f2;
-
-  margin-top: 60px;
-  margin-bottom: 24px;
-
-  letter-spacing: 0.02em;
-}
-
-.music-star {
-  color: #ff3b30;
-  font-size: 18px;
-
-  margin-left: 6px;
-
-  vertical-align: 3px;
-}
-
-.welcome-text {
-  text-align: center;
-  font-size: 42px;
-  font-weight: 400;
-
-  color: #f2f2f2;
-
-  font-family:
-    "STXingkai",
-    "华文行楷",
-    "KaiTi",
-    "楷体",
-    cursive;
-
-  margin: 60px 0 50px 0;
-  font-size: 46px;
-  letter-spacing: 0.08em;
-}
-
-/* ===== 修复 Safari 顶部导航按钮偶尔消失 ===== */
-
-.top-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-
-  z-index: 99999;
-
-  isolation: isolate;
-}
-
-.nav-menu {
-  position: static;
-  z-index: 2;
-}
-
-.nav-dropdown {
-  position: static;
-  z-index: 3;
-}
-
-.nav-link {
-  display: block;
-
-  color: #e5e5e5 !important;
-
-  opacity: 1 !important;
-  visibility: visible !important;
-
-  background: transparent !important;
-  border: 0;
-
-  -webkit-appearance: none;
-  appearance: none;
-
-  position: relative;
-  z-index: 4;
-
-  cursor: pointer;
-}
-
-@media (max-width: 768px) {
-  .top-nav { padding: 0 14px; }
-  .brand { font-size: 16px; white-space: nowrap; }
-  .nav-menu { gap: 9px; }
-  .nav-menu > a, .nav-link { font-size: 12px; white-space: nowrap; }
-}
-
-.beijing-time {
-  text-align: center;
-
-  margin-top: -25px;
-  margin-bottom: 55px;
-
-  font-size: 17px;
-  font-weight: 400;
-
-  letter-spacing: 0.08em;
-
-  color: rgba(255, 255, 255, 0.58);
-
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "PingFang SC",
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
-}
-
-  </style>
+  <link rel="stylesheet" href="assets/home.css?v=20260926-2">
   <link rel="stylesheet" href="assets/fluid-tank.css?v=20260924-thunder-4">
   <script defer src="assets/astronomy.browser.min.js?v=1"></script>
   <script defer src="assets/storm-sound.js?v=20260924-rumble-3"></script>
@@ -658,12 +81,12 @@ main a:hover {
         </button></div>
       </div>
     </section>
-    
+
    <a href="daily/daily.html"
    class="archive-card"
    target="_blank">
 
-  <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/daily_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我现在每天正在做的事">
+  <picture><source type="image/avif" data-srcset="images/daily_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/daily_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我现在每天正在做的事"></picture>
 
   <div class="archive-title">
     我现在每天正在做的事
@@ -673,31 +96,31 @@ main a:hover {
 
     <br>
     <a href="thoughts/index.html" class="archive-card" target="_blank">
-  <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/thoughts_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="各种想法和认识">
+  <picture><source type="image/avif" data-srcset="images/thoughts_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/thoughts_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="各种想法和认识"></picture>
 
   <div class="archive-title">
     各种想法与认识
   </div>
-</a> 
+</a>
     <br>
 
-    <a href="sample/index.html" 
-    target="_blank" 
+    <a href="sample/index.html"
+    target="_blank"
     class="archive-card">
 
-    <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/book_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我的电子书">
+    <picture><source type="image/avif" data-srcset="images/book_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/book_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我的电子书"></picture>
 <div class="archive-title">
     我的电子书
   </div>
 
-  </a>  
+  </a>
 
     <br>
     <a href="有趣的小玩具展示/"
    class="archive-card"
    target="_blank">
 
-  <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/toys_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="可视化项目">
+  <picture><source type="image/avif" data-srcset="images/toys_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/toys_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="可视化项目"></picture>
 
   <div class="archive-title">
     可视化项目
@@ -711,7 +134,7 @@ main a:hover {
    class="archive-card"
    target="_blank">
 
-  <img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/music_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="最爱的歌曲">
+  <picture><source type="image/avif" data-srcset="images/music_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/music_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="最爱的歌曲"></picture>
 
   <div class="archive-title">
     最爱的歌曲 <span class="music-star">★</span>
@@ -721,123 +144,12 @@ main a:hover {
     <br>
   </main>
 
-  <img
+  <picture><source type="image/avif" data-srcset="images/footer.avif"><img
     src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/footer.png" width="2170" height="725" loading="lazy" decoding="async" fetchpriority="low"
     alt="Cloudflare 托管"
     class="footer-image"
-  >
-<script>
-  // Keep the page at its true top edge in Safari while allowing normal scrolling.
-  function preventTopOverscroll(event, pullingDown) {
-    if (!pullingDown || window.scrollY > 0 || !event.cancelable) return;
-    const menu = event.target instanceof Element ? event.target.closest('.dropdown-menu') : null;
-    if (menu && menu.scrollTop > 0) return;
-    event.preventDefault();
-  }
-
-  window.addEventListener('wheel', event => {
-    if (!event.ctrlKey) preventTopOverscroll(event, event.deltaY < 0);
-  }, { passive: false });
-
-  let touchStartY = 0;
-  window.addEventListener('touchstart', event => {
-    if (event.touches.length === 1) touchStartY = event.touches[0].clientY;
-  }, { passive: true });
-  window.addEventListener('touchmove', event => {
-    if (event.touches.length === 1) {
-      preventTopOverscroll(event, event.touches[0].clientY > touchStartY);
-    }
-  }, { passive: false });
-
-  function alignDropdowns() {
-    const header = document.querySelector('.top-nav');
-    const headerLeft = header.getBoundingClientRect().left;
-    header.querySelectorAll('.nav-dropdown').forEach(dropdown => {
-      const trigger = dropdown.querySelector('.nav-link');
-      const menu = dropdown.querySelector('.dropdown-menu');
-      const contentWidth = menu.querySelector('.dropdown-inner').offsetWidth;
-      const triggerLeft = trigger.getBoundingClientRect().left - headerLeft;
-      const left = Math.max(16, Math.min(triggerLeft, header.clientWidth - contentWidth - 16));
-      menu.style.setProperty('--menu-x', `${left}px`);
-    });
-  }
-
-  // Only fetch large archive artwork shortly before it enters the viewport.
-  const deferredImages = document.querySelectorAll('img[data-src]');
-  const revealImage = image => {
-    image.src = image.dataset.src;
-    delete image.dataset.src;
-  };
-  if ('IntersectionObserver' in window) {
-    const imageObserver = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        revealImage(entry.target);
-        imageObserver.unobserve(entry.target);
-      }
-    }, { rootMargin: '0px 0px 50px 0px' });
-    deferredImages.forEach(image => imageObserver.observe(image));
-  } else {
-    deferredImages.forEach(revealImage);
-  }
-
-  // Warm up only the HTML of a destination the visitor is about to choose.
-  const prefetchedPages = new Set();
-  function prefetchDestination(link) {
-    if (navigator.connection?.saveData) return;
-    const url = new URL(link.href, location.href);
-    if (url.origin !== location.origin || (url.pathname === location.pathname && url.search === location.search) || prefetchedPages.has(url.href)) return;
-    prefetchedPages.add(url.href);
-    const hint = document.createElement('link');
-    hint.rel = 'prefetch';
-    hint.href = url.href;
-    document.head.append(hint);
-  }
-  document.querySelectorAll('a[href]').forEach(link => {
-    link.addEventListener('pointerenter', () => prefetchDestination(link), { once: true });
-    link.addEventListener('focus', () => prefetchDestination(link), { once: true });
-  });
-
-  alignDropdowns();
-  window.addEventListener('resize', alignDropdowns);
-
-  function updateBeijingTime() {
-
-    const now = new Date();
-
-    const formatter = new Intl.DateTimeFormat("zh-CN", {
-      timeZone: "Asia/Shanghai",
-
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-
-      weekday: "long",
-
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-
-      hour12: false
-    });
-
-    const timeText = formatter.format(now);
-
-    const clock = document.getElementById("beijing-time");
-    clock.textContent = "北京时间 · " + timeText;
-    // Reserve the clock's width once so changing seconds never shifts the icon.
-    if (!clock.style.width) clock.style.width = Math.ceil(clock.getBoundingClientRect().width) + "px";
-  }
-
-  updateBeijingTime();
-  window.addEventListener('resize', () => {
-    const clock = document.getElementById('beijing-time');
-    clock.style.width = '';
-    clock.style.width = Math.ceil(clock.getBoundingClientRect().width) + 'px';
-  });
-
-  setInterval(updateBeijingTime, 1000);
-</script>
+  ></picture>
+<script defer src="assets/home.js?v=20260926-2"></script>
 </body>
 
 </html>
