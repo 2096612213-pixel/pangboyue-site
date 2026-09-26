@@ -31,4 +31,5 @@ H400000v40H845.2724
 s-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7
 c-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z
 M834 80h400000v40h-400000z`})})})]})]}),(0,b.jsx)(t.span,{className:`vlist-s`,children:`​`})]}),(0,b.jsx)(t.span,{className:`vlist-r`,children:(0,b.jsx)(t.span,{className:`vlist`,style:{height:`0.2397em`},children:(0,b.jsx)(t.span,{})})})]})})})]})]}),(0,b.jsx)(t.span,{className:`vlist-s`,children:`​`})]}),(0,b.jsx)(t.span,{className:`vlist-r`,children:(0,b.jsx)(t.span,{className:`vlist`,style:{height:`0.686em`},children:(0,b.jsx)(t.span,{})})})]})}),(0,b.jsx)(t.span,{className:`mclose nulldelimiter`})]})]})]})]})}),`
-`,(0,b.jsx)(t.p,{children:`测试mdx文件更新功能`})]})}function te(e={}){let{wrapper:t}=e.components||{};return t?(0,b.jsx)(t,{...e,children:(0,b.jsx)(ee,{...e})}):ee(e)}function ne(){return(0,b.jsx)(`main`,{className:`book-page`,children:(0,b.jsx)(te,{})})}y.createRoot(document.getElementById(`root`)).render((0,b.jsx)(ne,{}));
+`,(0,b.jsx)(t.p,{children:`测试mdx文件更新功能`}),`
+`,(0,b.jsx)(t.p,{children:`测试mdx文件更新功能2`})]})}function te(e={}){let{wrapper:t}=e.components||{};return t?(0,b.jsx)(t,{...e,children:(0,b.jsx)(ee,{...e})}):ee(e)}function ne(){return(0,b.jsx)(`main`,{className:`book-page`,children:(0,b.jsx)(te,{})})}y.createRoot(document.getElementById(`root`)).render((0,b.jsx)(ne,{}));
