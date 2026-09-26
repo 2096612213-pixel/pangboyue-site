@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
+  <meta name="description" content="按周阅读庞博约的想法、认识与日记。">
+  <link rel="canonical" href="https://pangboyue.com/thoughts/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
@@ -38,13 +40,10 @@
       <div class="weeks" id="weeks"><p class="status">正在加载周记……</p></div>
     </section>
   </main>
-  <script>
+  <script type="module">
+    import { getWeeks } from "./api.js";
     const container = document.getElementById('weeks');
-    fetch('weeks.json')
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-      })
+    getWeeks()
       .then(weeks => {
         container.replaceChildren();
         weeks.sort((a, b) => b.week.localeCompare(a.week));

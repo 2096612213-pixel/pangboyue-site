@@ -38,26 +38,20 @@
     <article id="content">正在加载……</article>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script>
+  <script type="module">
+    import { getWeek, getWeekMarkdown } from "./api.js";
     const content = document.getElementById('content');
     const week = new URLSearchParams(location.search).get('week');
-    fetch('weeks.json')
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-      })
-      .then(weeks => {
-        const entry = weeks.find(item => item.week === week);
-        if (!entry) throw new Error('找不到这周的日记');
+    getWeek(week)
+      .then(async entry => {
         document.title = `${entry.title} | 各种想法与认识`;
         document.getElementById('week-label').textContent = `${entry.title} · ${entry.dateRange}`;
-        return fetch(entry.file);
+        return getWeekMarkdown(entry);
       })
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.text();
+      .then(markdown => {
+        content.innerHTML = marked.parse(markdown);
+        content.querySelectorAll('img').forEach(image => { image.loading = 'lazy'; image.decoding = 'async'; });
       })
-      .then(markdown => { content.innerHTML = marked.parse(markdown); })
       .catch(error => { content.textContent = `日记加载失败：${error.message}`; });
   </script>
 </body>
