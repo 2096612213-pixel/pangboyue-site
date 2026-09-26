@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/x-icon" href="../site-icon-v2.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="../site-icon-v2-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../site-icon-v2-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+  <title>周记 | 各种想法与认识</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #111; color: #ddd; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
+    main { width: min(1000px, calc(100% - 48px)); margin: 0 auto; padding: 56px 0 120px; }
+    .back { color: #aaa; text-decoration: none; font-size: 14px; }
+    .back:hover, .back:focus-visible { color: #fff; }
+    .week-label { margin: 56px 0 34px; padding-bottom: 20px; border-bottom: 1px solid #333; color: #999; font-size: 15px; }
+    #content { overflow-wrap: break-word; }
+    #content h1, #content h2, #content h3 { color: #fff; line-height: 1.4; }
+    #content h1 { font-size: clamp(30px, 5vw, 44px); }
+    #content h2 { margin-top: 1.8em; font-size: 26px; }
+    #content h3 { margin-top: 1.6em; font-size: 21px; }
+    #content p, #content li { font-size: 17px; line-height: 1.9; }
+    #content a { color: #b9d7ff; }
+    #content hr { margin: 42px 0; border: 0; border-top: 1px solid #333; }
+    #content blockquote { margin: 26px 0; padding: 1px 20px; border-left: 3px solid #666; color: #bbb; }
+    #content img { max-width: 100%; height: auto; }
+    #content pre { overflow-x: auto; padding: 16px; border-radius: 10px; background: #1d1d1d; }
+    #content code { overflow-wrap: anywhere; }
+    @media (max-width: 600px) { main { width: calc(100% - 32px); padding-top: 32px; } .week-label { margin-top: 44px; } #content p, #content li { font-size: 16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="index.html">← 返回周记目录</a>
+    <p class="week-label" id="week-label"></p>
+    <article id="content">正在加载……</article>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    const content = document.getElementById('content');
+    const week = new URLSearchParams(location.search).get('week');
+    fetch('weeks.json')
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(weeks => {
+        const entry = weeks.find(item => item.week === week);
+        if (!entry) throw new Error('找不到这周的日记');
+        document.title = `${entry.title} | 各种想法与认识`;
+        document.getElementById('week-label').textContent = `${entry.title} · ${entry.dateRange}`;
+        return fetch(entry.file);
+      })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.text();
+      })
+      .then(markdown => { content.innerHTML = marked.parse(markdown); })
+      .catch(error => { content.textContent = `日记加载失败：${error.message}`; });
+  </script>
+</body>
+</html>
