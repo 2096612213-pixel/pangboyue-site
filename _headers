@@ -7,6 +7,10 @@
   Cache-Control: public, max-age=0, must-revalidate
 /thoughts/:week/thoughts.md
   Cache-Control: public, max-age=0, must-revalidate
+/favorsongs/playlist.js
+  Cache-Control: public, max-age=0, must-revalidate
+/favorsongs/songs.js
+  Cache-Control: public, max-age=0, must-revalidate
 /assets/*
   Cache-Control: public, max-age=86400
 /images/*

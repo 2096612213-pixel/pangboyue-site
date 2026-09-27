@@ -1,4 +1,4 @@
-import { songs } from './songs.js';
+import { songs } from './songs.js?v=20260927-40';
 
 const list = document.querySelector('#songs');
 const cards = new Map();
