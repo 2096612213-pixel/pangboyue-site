@@ -1,4 +1,5 @@
-import { songs } from './songs.js?v=20260927-40';
+// The song list is tiny; give it a fresh URL so Safari never keeps an old list.
+const { songs } = await import(`./songs.js?v=${Date.now()}`);
 
 const list = document.querySelector('#songs');
 const cards = new Map();
