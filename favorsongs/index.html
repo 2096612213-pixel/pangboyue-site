@@ -92,13 +92,16 @@
     }
 
     .songs {
-      display: flex;
-      flex-direction: column;
-
-      gap: 24px;
+      --card-height: 166px;
+      --card-gap: 24px;
+      position: relative;
     }
 
     .song {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: var(--card-height);
       padding: 28px 30px;
 
       border:
@@ -134,10 +137,54 @@
       font-weight: 500;
     }
 
+    .player {
+      position: relative;
+    }
+
     audio {
       display: block;
-
       width: 100%;
+    }
+
+    audio[hidden] {
+      display: none;
+    }
+
+    .load-play {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      height: 54px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 28px;
+      background: #f1f3f4;
+      color: #202124;
+      font: 13px -apple-system, BlinkMacSystemFont, sans-serif;
+      cursor: pointer;
+    }
+
+    .play-triangle {
+      font-size: 15px;
+    }
+
+    .play-progress {
+      flex: 1;
+      height: 4px;
+      border-radius: 4px;
+      background: #bdc1c6;
+    }
+
+    .play-volume,
+    .play-more {
+      font-size: 18px;
+      color: #666;
+    }
+
+    .load-play:focus-visible {
+      outline: 2px solid #75b8ff;
+      outline-offset: 2px;
     }
 
 
@@ -150,6 +197,10 @@
 
       .title {
         font-size: 38px;
+      }
+
+      .songs {
+        --card-height: 184px;
       }
 
       .song {
@@ -183,125 +234,11 @@
     </p>
 
 
-    <section class="songs">
-
-      <div class="song">
-
-        <span class="song-name">
-          千千阙歌 — 陈慧娴
-        </span>
-
-        <audio controls preload="none">
-          <source
-            src="qianqianquege.mp3"
-            type="audio/mpeg">
-
-          你的浏览器不支持 audio。
-        </audio>
-
-      </div>
-
-
-      <div class="song">
-
-        <span class="song-name">
-          我只在乎你 — 邓丽君
-        </span>
-
-        <audio controls preload="none">
-          <source
-            src="wozhizaihuni.mp3"
-            type="audio/mpeg">
-
-          你的浏览器不支持 audio。
-        </audio>
-
-      </div>
-
-      <div class="song">
-        <span class="song-name">Bubblegum Trash — Starjunk 95</span>
-        <audio controls preload="none">
-          <source src="bubblegum-trash-starjunk-95.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">Error 4 On The Floor — Starjunk 95</span>
-        <audio controls preload="none">
-          <source src="error-4-on-the-floor-starjunk-95.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">Magic (feat. Mylk) — Moe Shop</span>
-        <audio controls preload="none">
-          <source src="magic-moe-shop-feat-mylk.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">Stardust Circuit — Starjunk 95</span>
-        <audio controls preload="none">
-          <source src="stardust-circuit-starjunk-95.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">State Your Name — Starjunk 95</span>
-        <audio controls preload="none">
-          <source src="state-your-name-starjunk-95.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">圣诞星 (feat. 杨瑞代) — 周杰伦</span>
-        <audio controls preload="none">
-          <source src="shengdanxing-jay-chou.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">爱的飞行日记 (feat. 杨瑞代) — 周杰伦</span>
-        <audio controls preload="none">
-          <source src="aidefeixingriji-jay-chou.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">等你下课 (with 杨瑞代) — 周杰伦</span>
-        <audio controls preload="none">
-          <source src="dengnixiake-jay-chou.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">莫再提 — 徐良</span>
-        <audio controls preload="none">
-          <source src="mozaiti-xu-liang.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-      <div class="song">
-        <span class="song-name">被风吹过的夏天 (Live) — 林俊杰</span>
-        <audio controls preload="none">
-          <source src="beifengchuiguodexiatian-live-lin-junjie.mp3" type="audio/mpeg">
-          你的浏览器不支持 audio。
-        </audio>
-      </div>
-
-    </section>
+    <section class="songs" id="songs" role="list" aria-label="最爱的歌曲"></section>
 
   </main>
 
+  <script type="module" src="playlist.js"></script>
 </body>
 
 </html>
