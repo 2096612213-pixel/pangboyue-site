@@ -2,6 +2,6 @@
 
 ## 2026-09-28
 
-这周目前还是是测试周 在这里写第39周要提前测试更新的内容
+time flys like an arrow and fruit flies like bananas
 
-测试内容2
+![时间过得真快 转眼就10月了](/images/how_time_flies.jpg)
