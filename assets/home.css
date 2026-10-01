@@ -230,26 +230,39 @@ body {
       min-height: 150vh;
     }
 
+    .site-landscape {
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      background: #000000;
+      line-height: 0;
+    }
+
     .footer-image {
       width: 100%;
       height: auto;
-      aspect-ratio: 2170 / 725;
-      object-fit: contain;
+      aspect-ratio: 2159 / 728;
       display: block;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
     }
 
     /* ===== 全站深色主题 ===== */
 
 html,
 body {
-  background: #0f0f0f;
+  background: #000000;
   color: #f2f2f2;
 }
 
 /* 正文 */
 
 main {
-  background: #0f0f0f;
+  background: #000000;
   color: #f2f2f2;
 }
 
