@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050609"><meta name="description" content="An equation, iterated into infinity. An interactive, real-time Julia set artwork rendered with native WebGL.">
+<title>Julia Set — A living equation</title>
+<!-- BUILD:STYLE -->
+</head>
+<body>
+<canvas id="stage" tabindex="0" aria-label="Interactive Julia set. Drag to pan, scroll to zoom. Double-click to explore. Arrow keys pan; plus and minus zoom; R resets; H hides controls; D toggles drift; F fullscreen."></canvas>
+<header class="ui masthead"><p class="eyebrow"><span class="spark"></span>A living equation</p><h1>Julia Set</h1><p class="equation">zₙ₊₁ = zₙ² + c</p><p class="subline">Real-time complex dynamics</p></header>
+<dl class="ui telemetry" aria-label="Live rendering statistics"><div class="metric"><dt>FPS</dt><dd id="fps">—</dd></div><div class="metric"><dt>Iterations</dt><dd id="iterations">220</dd></div><div class="metric"><dt>Zoom</dt><dd id="zoom">1.00<small>×</small></dd></div></dl>
+<p class="ui quiet-copy">An equation, iterated into infinity.</p>
+<p class="ui hint" id="hint">Drag to wander<span>·</span>Scroll to dive<span>·</span>Double-click to explore</p>
+<nav class="ui tools" aria-label="Artwork controls">
+<button class="tool" id="reset" title="Reset · R" aria-label="Reset parameter and view"><svg viewBox="0 0 20 20"><path d="M4 7a6.4 6.4 0 1 1-.4 6M4 3v4h4"/></svg></button>
+<button class="tool" id="fullscreen" title="Fullscreen · F" aria-label="Enter fullscreen"><svg viewBox="0 0 20 20"><path d="M3 8V3h5m4 0h5v5m0 4v5h-5m-4 0H3v-5"/></svg></button>
+<button class="tool" id="hide" title="Hide controls · H" aria-label="Hide controls" aria-pressed="false"><svg viewBox="0 0 20 20"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2.1"/><path d="m3 3 14 14"/></svg></button>
+<span class="divider"></span>
+<button class="tool has-label" id="drift" title="Drift mode · D" aria-label="Toggle slow parameter drift" aria-pressed="false"><svg viewBox="0 0 20 20"><path d="M2 12c4-10 5 7 9-3s5 2 7-1"/></svg><span id="drift-label">Drift</span></button>
+<button class="quality" id="quality" title="Rendering quality: Auto. Click to change." aria-label="Rendering quality: Auto">Auto</button>
+</nav>
+<nav class="ui presets" id="presets" aria-label="Julia parameter presets"></nav>
+<section class="ui parameter" aria-label="Complex parameter controller">
+<div class="panel-top"><h2>Complex plane</h2><span class="panel-status" id="parameter-status">c</span></div>
+<div class="parameter-pad" id="parameter-pad" role="group" tabindex="0" aria-label="Complex parameter pad. Horizontal: real part, vertical: imaginary part, both from minus 1.2 to plus 1.2. Drag or use arrow keys. Hold Shift for fine adjustment.">
+<span class="pad-ring"></span><span class="axis-x"></span><span class="axis-y"></span><span class="axis-label re">Re(c)</span><span class="axis-label im">Im(c)</span><span class="crosshair" id="parameter-dot"></span>
+</div><p class="coordinate" id="coordinate">c = −0.8000 + 0.1560i</p><p class="pad-help">Drag the point. Change the universe.</p>
+</section>
+<button class="peek-button" id="show" title="Show controls · H" aria-label="Show controls"><svg viewBox="0 0 20 20"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg></button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<p id="announcement" class="sr-only" aria-live="polite"></p>
+<section class="fallback" id="fallback" hidden><article><p class="eyebrow">Julia Set</p><h1>A little more light.</h1><p id="fallback-message">This artwork needs WebGL and high-precision fragment shaders. Please enable hardware acceleration or open it in another modern browser.</p><button id="retry">Try again</button></article></section>
+<noscript><section class="fallback"><article><h1>An equation, waiting.</h1><p>Enable JavaScript to explore this real-time Julia set.</p></article></section></noscript>
+<!-- BUILD:SCRIPTS -->
+</body></html>

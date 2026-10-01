@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050609"><meta name="description" content="An equation, iterated into infinity. An interactive, real-time Julia set artwork rendered with native WebGL.">
+<title>Julia Set — A living equation</title>
+<style>
+:root{color-scheme:dark;--ink:#050609;--text:#e2e4ef;--muted:#8990a3;--line:rgba(207,219,255,.12);--glass:rgba(13,16,27,.50);--accent:#b9cbed}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink)}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter",sans-serif;color:var(--text);font-weight:400;-webkit-font-smoothing:antialiased}button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}button:focus-visible,[tabindex]:focus-visible{outline:2px solid #c5d7ff;outline-offset:5px}button:disabled{opacity:.4;cursor:not-allowed}[hidden]{display:none!important}button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;outline-offset:-6px}#stage:active{cursor:grabbing}.ui{position:fixed;z-index:2;transition:opacity .65s ease,transform .65s ease;opacity:0;pointer-events:none}body.ready .ui{opacity:1;pointer-events:auto}.masthead{left:max(34px,env(safe-area-inset-left));top:max(28px,env(safe-area-inset-top))}.eyebrow{display:flex;align-items:center;gap:8px;color:#898fa4;font-size:10px;letter-spacing:.22em;text-transform:uppercase;margin:0 0 14px}.spark{width:5px;height:5px;background:#b5c7ed;border-radius:50%;box-shadow:0 0 10px #b5c7ed30}.masthead h1{font-size:27px;letter-spacing:-.05em;font-weight:500;line-height:1;margin:0 0 12px}.equation{font-family:Georgia,serif;font-size:16px;letter-spacing:.025em;color:#acb2c5;margin:0 0 7px}.subline{font-size:10px;color:#737b91;letter-spacing:.07em;margin:0}.telemetry{right:34px;top:31px;display:flex;gap:25px;text-align:right;align-items:start}.metric{display:flex;flex-direction:column;gap:6px}.metric dt{font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:#777f94}.metric dd{font-size:12px;line-height:1;font-variant-numeric:tabular-nums;margin:0;color:#c5cad9}.metric small{font-size:9px;color:#777f94;margin-left:2px}
+.tools{left:34px;bottom:33px;display:flex;align-items:center;gap:4px}.tool{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:transparent;color:#949cb1;transition:background .2s,color .2s}.tool:hover{background:#c8d6ff0b;color:#edf3ff}.tool[aria-pressed=true]{color:#dae5ff;background:#c8d6ff0d}.tool.has-label{width:auto;padding:0 12px;gap:7px;display:flex;font-size:10px;letter-spacing:.025em}.divider{width:1px;height:17px;background:var(--line);margin:0 6px}.quality{font-size:9px;letter-spacing:.04em;color:#939caf;border:1px solid #b6c4f317;background:#10152344;border-radius:10px;padding:6px 8px;min-width:47px}.quiet-copy{position:fixed;left:34px;bottom:83px;font-size:10px;letter-spacing:.045em;color:#676f83;margin:0;pointer-events:none}.hint{font-size:10px;letter-spacing:.035em;color:#7e869c;position:fixed;bottom:106px;left:50%;transform:translateX(-50%);white-space:nowrap;margin:0;transition:opacity .4s}.hint span{margin:0 7px;color:#424a60}
+.presets{bottom:31px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:9px;padding:9px 12px;border:1px solid var(--line);border-radius:18px;background:var(--glass);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 8px 30px #0000001a}.preset{position:relative;width:39px;height:39px;padding:0;background:#070910;border-radius:50%;outline:1px solid #ffffff09;outline-offset:2px;transition:outline-color .25s,transform .25s;overflow:visible}.preset canvas{width:39px;height:39px;display:block;border-radius:50%;opacity:.6;transition:opacity .3s}.preset:hover{transform:translateY(-2px)}.preset:hover canvas,.preset[aria-pressed=true] canvas{opacity:1}.preset[aria-pressed=true]{outline-color:#b6c7e288}.preset:after{content:attr(data-name);position:absolute;bottom:53px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.05em;white-space:nowrap;color:#d2d8e9;opacity:0;pointer-events:none;transition:opacity .2s}.preset:hover:after,.preset:focus-visible:after{opacity:1}
+.parameter{right:30px;bottom:28px;width:212px;padding:17px 17px 12px;border:1px solid var(--line);border-radius:18px;background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:0 12px 40px #00000012}.panel-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.panel-top h2{font-size:10px;text-transform:uppercase;letter-spacing:.17em;color:#a8b0c6;font-weight:400;margin:0}.panel-status{font-size:9px;color:#767f96;letter-spacing:.04em}.parameter-pad{position:relative;width:176px;height:176px;border:1px solid #c6d9ff10;border-radius:9px;background:linear-gradient(#bad1ff05 1px,transparent 1px),linear-gradient(90deg,#bad1ff05 1px,transparent 1px),radial-gradient(ellipse at 50% 50%,#2d2b4925,transparent 75%);background-size:25% 25%,25% 25%,100% 100%;touch-action:none;cursor:crosshair;overflow:hidden}.axis-x,.axis-y{position:absolute;pointer-events:none;background:#b6c8ee20}.axis-x{left:0;right:0;top:50%;height:1px}.axis-y{top:0;bottom:0;left:50%;width:1px}.axis-label{position:absolute;color:#69738c;font-size:8px;letter-spacing:.04em;pointer-events:none}.axis-label.re{right:6px;top:calc(50% + 5px)}.axis-label.im{left:calc(50% + 6px);top:5px}.pad-ring{position:absolute;left:8.333%;top:8.333%;width:83.333%;height:83.333%;border:1px solid #c4d0ee0a;border-radius:50%;pointer-events:none}.crosshair{position:absolute;width:16px;height:16px;border:1px solid #c3d9ff66;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 15px #769fd333}.crosshair:after{content:"";position:absolute;inset:5px;background:#d6e4ff;border-radius:50%}.coordinate{font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#b9c3d9;font-variant-numeric:tabular-nums;text-align:center;margin:12px -8px 0}.pad-help{text-align:center;font-size:9px;color:#687289;margin:5px 0 0}.peek-button{position:fixed;right:18px;top:16px;z-index:4;width:38px;height:38px;background:#13192799;border:1px solid var(--line);border-radius:12px;color:#c8d2e7;display:none;place-items:center;opacity:0;transition:opacity .45s}
+body.ui-hidden .ui{opacity:0;pointer-events:none}body.ui-hidden .peek-button{display:grid}body.ui-hidden.peek .peek-button,body.ui-hidden .peek-button:focus-visible{opacity:.6}body.ui-hidden.peek .ui{opacity:.16;pointer-events:none}body.ui-hidden.peek .tools{opacity:.7;pointer-events:auto}body.immersive:not(.ui-hidden) .masthead .subline,body.immersive:not(.ui-hidden) .quiet-copy,body.immersive:not(.ui-hidden) .hint{opacity:0}body.immersive:not(.ui-hidden) .telemetry{opacity:.35}body.immersive:not(.ui-hidden) .parameter{opacity:.65}body.immersive .parameter:hover{opacity:1}.toast{position:fixed;left:50%;top:28px;transform:translate(-50%,-10px);z-index:8;padding:10px 16px;background:#151927e6;border:1px solid var(--line);border-radius:14px;font-size:11px;color:#ccd3e6;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}.toast.on{opacity:1;transform:translate(-50%,0)}
+.fallback{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 55%,#151629,#06070c 65%);padding:30px}.fallback article{max-width:440px;border:1px solid var(--line);background:#10121b70;border-radius:18px;padding:38px;box-shadow:0 30px 100px #0003}.fallback h1{font-size:27px;font-weight:400;letter-spacing:-.04em}.fallback p{font-size:13px;line-height:1.8;color:#939caf}.fallback button{border:1px solid #b7c6e62a;background:#c3d2ff0a;border-radius:11px;padding:10px 17px;font-size:12px}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:760px){.masthead{left:22px;top:24px}.masthead h1{font-size:24px}.eyebrow{font-size:9px;margin-bottom:11px}.telemetry{right:22px;top:24px;gap:14px}.metric dt{font-size:8px}.metric dd{font-size:11px}.tools{left:20px;bottom:24px;flex-wrap:wrap;max-width:160px}.tool{width:34px;height:34px}.tools .divider{display:none}.quiet-copy{left:22px;bottom:111px;max-width:145px;line-height:1.8}.parameter{right:18px;bottom:21px;width:174px;padding:13px}.parameter-pad{width:146px;height:146px}.coordinate{font-size:9px}.panel-top h2{font-size:9px}.pad-help{font-size:8px}.presets{bottom:276px;gap:12px;padding:9px 12px}.hint{display:none}.preset,.preset canvas{width:34px;height:34px}.preset:after{bottom:48px}.subline{font-size:9px}.metric:nth-child(2){display:none}}
+@media(max-width:380px){.masthead{left:16px}.telemetry{right:16px;gap:10px}.tools{left:10px;max-width:135px}.parameter{right:10px;width:164px}.parameter-pad{width:136px;height:136px}.quiet-copy{left:16px;max-width:115px;font-size:9px}.tool.has-label{padding:0 7px}.presets{bottom:266px}.hint{bottom:302px}}
+@media(max-height:550px) and (min-width:761px){.parameter{width:170px;padding:12px;bottom:14px}.parameter-pad{width:144px;height:144px}.pad-help{display:none}.masthead{top:18px}.telemetry{top:20px}.tools,.presets{bottom:18px}.quiet-copy{bottom:64px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important}.ui{opacity:1}}
+
+</style>
+</head>
+<body>
+<canvas id="stage" tabindex="0" aria-label="Interactive Julia set. Drag to pan, scroll to zoom. Double-click to explore. Arrow keys pan; plus and minus zoom; R resets; H hides controls; D toggles drift; F fullscreen."></canvas>
+<header class="ui masthead"><p class="eyebrow"><span class="spark"></span>A living equation</p><h1>Julia Set</h1><p class="equation">zₙ₊₁ = zₙ² + c</p><p class="subline">Real-time complex dynamics</p></header>
+<dl class="ui telemetry" aria-label="Live rendering statistics"><div class="metric"><dt>FPS</dt><dd id="fps">—</dd></div><div class="metric"><dt>Iterations</dt><dd id="iterations">220</dd></div><div class="metric"><dt>Zoom</dt><dd id="zoom">1.00<small>×</small></dd></div></dl>
+<p class="ui quiet-copy">An equation, iterated into infinity.</p>
+<p class="ui hint" id="hint">Drag to wander<span>·</span>Scroll to dive<span>·</span>Double-click to explore</p>
+<nav class="ui tools" aria-label="Artwork controls">
+<button class="tool" id="reset" title="Reset · R" aria-label="Reset parameter and view"><svg viewBox="0 0 20 20"><path d="M4 7a6.4 6.4 0 1 1-.4 6M4 3v4h4"/></svg></button>
+<button class="tool" id="fullscreen" title="Fullscreen · F" aria-label="Enter fullscreen"><svg viewBox="0 0 20 20"><path d="M3 8V3h5m4 0h5v5m0 4v5h-5m-4 0H3v-5"/></svg></button>
+<button class="tool" id="hide" title="Hide controls · H" aria-label="Hide controls" aria-pressed="false"><svg viewBox="0 0 20 20"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2.1"/><path d="m3 3 14 14"/></svg></button>
+<span class="divider"></span>
+<button class="tool has-label" id="drift" title="Drift mode · D" aria-label="Toggle slow parameter drift" aria-pressed="false"><svg viewBox="0 0 20 20"><path d="M2 12c4-10 5 7 9-3s5 2 7-1"/></svg><span id="drift-label">Drift</span></button>
+<button class="quality" id="quality" title="Rendering quality: Auto. Click to change." aria-label="Rendering quality: Auto">Auto</button>
+</nav>
+<nav class="ui presets" id="presets" aria-label="Julia parameter presets"></nav>
+<section class="ui parameter" aria-label="Complex parameter controller">
+<div class="panel-top"><h2>Complex plane</h2><span class="panel-status" id="parameter-status">c</span></div>
+<div class="parameter-pad" id="parameter-pad" role="group" tabindex="0" aria-label="Complex parameter pad. Horizontal: real part, vertical: imaginary part, both from minus 1.2 to plus 1.2. Drag or use arrow keys. Hold Shift for fine adjustment.">
+<span class="pad-ring"></span><span class="axis-x"></span><span class="axis-y"></span><span class="axis-label re">Re(c)</span><span class="axis-label im">Im(c)</span><span class="crosshair" id="parameter-dot"></span>
+</div><p class="coordinate" id="coordinate">c = −0.8000 + 0.1560i</p><p class="pad-help">Drag the point. Change the universe.</p>
+</section>
+<button class="peek-button" id="show" title="Show controls · H" aria-label="Show controls"><svg viewBox="0 0 20 20"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg></button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<p id="announcement" class="sr-only" aria-live="polite"></p>
+<section class="fallback" id="fallback" hidden><article><p class="eyebrow">Julia Set</p><h1>A little more light.</h1><p id="fallback-message">This artwork needs WebGL and high-precision fragment shaders. Please enable hardware acceleration or open it in another modern browser.</p><button id="retry">Try again</button></article></section>
+<noscript><section class="fallback"><article><h1>An equation, waiting.</h1><p>Enable JavaScript to explore this real-time Julia set.</p></article></section></noscript>
+<script>
+(()=>{
+'use strict';
+// 1. CONSTANTS — the same values are used by controls, renderer and documentation.
+const CONFIG=Object.freeze({
+  defaultSpan:3.65, minZoom:.45, maxZoom:4096,
+  baseIterations:220, maxIterations:700, iterationsPerOctave:40,
+  maxDPR:2, maxPixels:5200000, idleResumeMs:10000,
+  revealSeconds:1.85, paletteSpeed:.0016, glow:.30, exposure:1.32,
+  driftAmplitude:.014, driftSpeed:.065
+});
+const PRESETS=Object.freeze([
+  {name:'Nocturne',c:[-.8,.156]},
+  {name:'Coral',c:[-.4,.6]},
+  {name:'Filigree',c:[.285,.01]},
+  {name:'Ember',c:[-.835,-.2321]},
+  {name:'Nautilus',c:[-.70176,-.3842]}
+]);
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const mix=(a,b,t)=>a+(b-a)*t;
+const ease=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
+const near=(a,b,eps=1e-9)=>Math.abs(a-b)<eps;
+const $=id=>document.getElementById(id);
+
+// 2. STATE — view coordinates remain JavaScript doubles; GPU uses highp floats.
+function createState(){return{
+  c:PRESETS[0].c.slice(),targetC:PRESETS[0].c.slice(),center:[0,0],targetCenter:[0,0],
+  logZoom:0,targetLogZoom:0,zoomAnchor:null,preset:0,
+  drift:false,driftBase:PRESETS[0].c.slice(),driftClock:0,lastInteraction:performance.now(),
+  hidden:false,quality:'auto',samples:1,resolutionFactor:1,iterations:220,
+  width:innerWidth,height:innerHeight,dpr:1,fps:0,renderTime:0,
+  animate:!matchMedia('(prefers-reduced-motion: reduce)').matches,
+  reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,contextLost:false,
+  time:0,reveal:0,interacting:false,dirty:true
+}}
+function screenVector(x,y,width,height){const m=Math.min(width,height);return[(x-width*.5)/m,(height*.5-y)/m]}
+function complexAt(x,y,state){const v=screenVector(x,y,state.width,state.height),s=CONFIG.defaultSpan/Math.exp(state.logZoom);return[state.center[0]+v[0]*s,state.center[1]+v[1]*s]}
+function iterationBudget(logZoom){return Math.min(CONFIG.maxIterations,CONFIG.baseIterations+Math.ceil(Math.max(0,logZoom/Math.LN2)*CONFIG.iterationsPerOctave))}
+
+// CPU reference for mathematical verification of a few points, never image rendering.
+function referenceEscape(z0,c,limit=220){let x=z0[0],y=z0[1],n=0;while(n<limit&&x*x+y*y<=4){const nx=x*x-y*y+c[0];y=2*x*y+c[1];x=nx;n++}return{escaped:x*x+y*y>4,iterations:n}}
+
+// 3. SHADERS — GLSL sources embedded for offline file:// operation.
+const VERTEX_SHADER="attribute vec2 aPosition;\nvoid main() { gl_Position = vec4(aPosition, 0.0, 1.0); }\n";
+const FRAGMENT_SHADER="precision highp float;\nuniform vec2 uResolution;\nuniform vec2 uCenter;\nuniform vec2 uC;\nuniform float uSpan;\nuniform float uTime;\nuniform float uReveal;\nuniform int uIterations;\nuniform int uSamples;\nuniform float uPaletteSpeed;\nuniform float uGlow;\nuniform float uExposure;\nuniform int uDebug;\nconst float LN2 = 0.6931471805599453;\n\nvec2 squareComplex(vec2 z) { return vec2(z.x*z.x-z.y*z.y, 2.0*z.x*z.y); }\nvec2 multiplyComplex(vec2 a, vec2 b) { return vec2(a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x); }\n\n// A closed, piecewise-interpolated pigment ramp; not a sine RGB palette.\n// Stops are authored in linear light. Smooth joins keep the cycle continuous.\nvec3 pigment(float t) {\n    float x=fract(t)*7.0;\n    float f=fract(x); f=f*f*(3.0-2.0*f);\n    vec3 a; vec3 b;\n    if(x<1.0) { a=vec3(.018,.026,.085); b=vec3(.055,.105,.235); }\n    else if(x<2.0) { a=vec3(.055,.105,.235); b=vec3(.165,.090,.280); }\n    else if(x<3.0) { a=vec3(.165,.090,.280); b=vec3(.340,.105,.220); }\n    else if(x<4.0) { a=vec3(.340,.105,.220); b=vec3(.220,.420,.550); }\n    else if(x<5.0) { a=vec3(.220,.420,.550); b=vec3(.570,.650,.690); }\n    else if(x<6.0) { a=vec3(.570,.650,.690); b=vec3(.360,.240,.135); }\n    else { a=vec3(.360,.240,.135); b=vec3(.018,.026,.085); }\n    return mix(a,b,f);\n}\n\nvec3 background(vec2 uv) {\n    float haze=exp(-1.3*dot(uv-vec2(.25,-.1),uv-vec2(.25,-.1)));\n    return vec3(.00010,.00015,.00035)+haze*vec3(.00010,.00008,.00030);\n}\n\nvec3 julia(vec2 pixel) {\n    float minSide=min(uResolution.x,uResolution.y);\n    vec2 screen=(pixel-.5*uResolution)/minSide;\n    vec2 z=screen*uSpan+uCenter;\n    vec2 derivative=vec2(1.0,0.0);\n    float derivativeLogScale=0.0;\n    float n=0.0;\n    float radius2=dot(z,z);\n    for(int i=0;i<700;i++) {\n        if(i>=uIterations || radius2>4.0) break;\n        // Both expressions use the old z, exactly z(n+1) = z(n)^2 + c.\n        derivative=2.0*multiplyComplex(z,derivative);\n        float d2=dot(derivative,derivative);\n        if(d2>1.0e28) { derivative*=1.0e-14; derivativeLogScale+=32.2361913; }\n        z=squareComplex(z)+uC;\n        radius2=dot(z,z);\n        n+=1.0;\n    }\n    bool escaped=radius2>4.0;\n    if(uDebug==1) return escaped ? vec3(n/255.0,1.0,0.0) : vec3(0.0);\n    vec3 bg=background(screen);\n    // Finite-budget non-escape is shaded dark; it is not a proof of membership.\n    if(!escaped) return bg*.64;\n\n    // Refine the SAME escaped orbit to stabilize smooth count / distance near R=2.\n    // The escape decision has already been made; this does not alter the set.\n    for(int j=0;j<4;j++) {\n        if(radius2>1.0e12) break;\n        derivative=2.0*multiplyComplex(z,derivative);\n        if(dot(derivative,derivative)>1.0e28) {\n            derivative*=1.0e-14; derivativeLogScale+=32.2361913;\n        }\n        z=squareComplex(z)+uC;\n        radius2=dot(z,z);\n        n+=1.0;\n    }\n    float logRadius=.5*log(max(radius2,4.00001));\n    float smoothIter=n+1.0-log(logRadius)/LN2;\n    float derivativeLength=max(length(derivative),1.0e-24);\n    float logDistance=logRadius+log(logRadius)-log(derivativeLength)-derivativeLogScale;\n    float distanceEstimate=exp(clamp(logDistance,-75.0,10.0));\n    float pixelWorld=uSpan/minSide;\n    float pixelDistance=distanceEstimate/pixelWorld;\n\n    // Coloring only: distance is an exterior estimate, not a changed escape rule.\n    float t=log(1.0+max(smoothIter,0.0))*.42 + .16 + uTime*uPaletteSpeed;\n    vec3 base=pigment(t);\n    vec2 normal=vec2(dot(z,derivative),z.y*derivative.x-z.x*derivative.y);\n    normal/=max(length(normal),1.0e-20);\n    float light=.54+.46*dot(normal,normalize(vec2(-.6,.8)));\n    float close=exp(-4.8*pow(max(distanceEstimate,0.0),.42));\n    float silk=.90+.10*cos(smoothIter*.57);\n    float edge=exp(-.58*sqrt(max(pixelDistance,0.0)));\n    float breath=1.0+.035*sin(uTime*.24);\n    vec3 body=base*close*(.48+.60*light)*silk;\n    vec3 pearl=mix(vec3(.42,.66,.82),vec3(.93,.78,.56),smoothstep(.72,.99,light));\n    vec3 color=bg+body+pearl*edge*uGlow*breath*(.3+.7*light);\n    // Far exterior returns to ink; fine filaments keep their natural topology.\n    color=mix(bg,color,smoothstep(0.0,3.0,max(smoothIter,0.0)));\n    return color;\n}\n\nvoid main() {\n    vec3 color=vec3(0.0);\n    for(int i=0;i<4;i++) {\n        if(i>=uSamples) break;\n        vec2 offset=vec2(0.0);\n        if(uSamples==2) offset=(i==0 ? vec2(-.25,-.25) : vec2(.25,.25));\n        if(uSamples==4) {\n            if(i==0) offset=vec2(-.25,-.25);\n            else if(i==1) offset=vec2(.25,-.25);\n            else if(i==2) offset=vec2(-.25,.25);\n            else offset=vec2(.25,.25);\n        }\n        color+=julia(gl_FragCoord.xy+offset);\n    }\n    color/=float(uSamples);\n    if(uDebug==1) { gl_FragColor=vec4(color,1.0); return; }\n    vec2 uv=gl_FragCoord.xy/uResolution;\n    float vignette=1.0-.18*smoothstep(.23,.85,length(uv-.5));\n    color*=vignette*uExposure;\n    color=1.0-exp(-color); // restrained exponential tone mapping\n    color=pow(max(color,vec3(0.0)),vec3(1.0/2.2));\n    // Sub-LSB static dither suppresses quantization bands, not visible film grain.\n    float dither=fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))-.5;\n    color=max(vec3(0.0),color+dither/255.0);\n    gl_FragColor=vec4(color*uReveal,1.0);\n}\n";
+
+// 4. RENDERER — a full-screen triangle, native GPU iteration, no runtime dependencies.
+class JuliaRenderer {
+  constructor(canvas,state){
+    this.canvas=canvas;this.state=state;
+    const options={alpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:false,powerPreference:'high-performance'};
+    this.gl=canvas.getContext('webgl2',options);this.webgl2=!!this.gl;
+    if(!this.gl)this.gl=canvas.getContext('webgl',options);
+    if(!this.gl)throw Error('WebGL is unavailable. Enable hardware acceleration, then reload this artwork.');
+    const precision=this.gl.getShaderPrecisionFormat(this.gl.FRAGMENT_SHADER,this.gl.HIGH_FLOAT);
+    if(!precision||precision.precision<23)throw Error('This GPU does not expose the fragment precision needed for accurate Julia rendering. Try a browser with hardware acceleration enabled.');
+    this.precision=precision.precision;this.initialize();
+  }
+  compile(type,source){const gl=this.gl,s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){const error=gl.getShaderInfoLog(s);gl.deleteShader(s);throw Error(error)}return s}
+  initialize(){
+    const gl=this.gl;let vs=VERTEX_SHADER,fs=FRAGMENT_SHADER;
+    if(this.webgl2){vs='#version 300 es\n'+vs.replace('attribute vec2','in vec2');fs='#version 300 es\n'+fs.replace('precision highp float;','precision highp float;\nout vec4 fragColor;').replaceAll('gl_FragColor','fragColor')}
+    const vert=this.compile(gl.VERTEX_SHADER,vs),frag=this.compile(gl.FRAGMENT_SHADER,fs),p=gl.createProgram();
+    gl.attachShader(p,vert);gl.attachShader(p,frag);gl.linkProgram(p);gl.deleteShader(vert);gl.deleteShader(frag);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));
+    this.program=p;gl.useProgram(p);this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    const attribute=gl.getAttribLocation(p,'aPosition');gl.enableVertexAttribArray(attribute);gl.vertexAttribPointer(attribute,2,gl.FLOAT,false,0,0);
+    this.uniforms={};for(const name of ['Resolution','Center','C','Span','Time','Reveal','Iterations','Samples','PaletteSpeed','Glow','Exposure','Debug'])this.uniforms[name]=gl.getUniformLocation(p,'u'+name);
+    gl.disable(gl.BLEND);gl.disable(gl.DEPTH_TEST);gl.disable(gl.DITHER);
+  }
+  resize(){
+    const s=this.state,gl=this.gl;
+    let ratio=Math.min(devicePixelRatio||1,CONFIG.maxDPR);
+    if(s.quality==='eco')ratio=Math.min(ratio,1);
+    else if(s.quality==='auto')ratio*=s.resolutionFactor;
+    ratio=Math.min(ratio,Math.sqrt(CONFIG.maxPixels/(s.width*s.height)));
+    ratio=Math.min(ratio,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)/Math.max(s.width,s.height));
+    s.dpr=ratio;
+    const w=Math.max(1,Math.round(s.width*ratio)),h=Math.max(1,Math.round(s.height*ratio));
+    if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h}
+    gl.viewport(0,0,w,h);s.dirty=true;
+  }
+  draw(overrides={}){
+    const gl=this.gl,s=this.state,u=this.uniforms;
+    gl.useProgram(this.program);
+    gl.uniform2f(u.Resolution,overrides.width||this.canvas.width,overrides.height||this.canvas.height);
+    gl.uniform2fv(u.Center,overrides.center||s.center);gl.uniform2fv(u.C,overrides.c||s.c);
+    gl.uniform1f(u.Span,overrides.span??CONFIG.defaultSpan/Math.exp(s.logZoom));
+    gl.uniform1f(u.Time,overrides.time??s.time);gl.uniform1f(u.Reveal,overrides.reveal??s.reveal);
+    gl.uniform1i(u.Iterations,overrides.iterations??s.iterations);gl.uniform1i(u.Samples,overrides.samples??s.samples);
+    gl.uniform1f(u.PaletteSpeed,CONFIG.paletteSpeed);gl.uniform1f(u.Glow,CONFIG.glow);gl.uniform1f(u.Exposure,CONFIG.exposure);
+    gl.uniform1i(u.Debug,overrides.debug||0);gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+  offscreen(width,height,overrides){
+    const gl=this.gl,texture=gl.createTexture(),fb=gl.createFramebuffer();
+    gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texture,0);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Offscreen framebuffer unavailable');
+    gl.viewport(0,0,width,height);this.draw({...overrides,width,height});
+    const pixels=new Uint8Array(width*height*4);gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.deleteFramebuffer(fb);gl.deleteTexture(texture);gl.viewport(0,0,this.canvas.width,this.canvas.height);
+    return pixels;
+  }
+  thumbnail(c,canvas){
+    const size=96,pixels=this.offscreen(size,size,{c,center:[0,0],span:3.8,time:0,reveal:1,iterations:220,samples:2});
+    canvas.width=size;canvas.height=size;const ctx=canvas.getContext('2d'),data=ctx.createImageData(size,size);
+    for(let y=0;y<size;y++)data.data.set(pixels.subarray((size-1-y)*size*4,(size-y)*size*4),y*size*4);
+    ctx.putImageData(data,0,0);
+  }
+  probe(z0,c,iterations=220){
+    const p=this.offscreen(1,1,{center:z0,c,span:1,reveal:1,time:0,iterations,samples:1,debug:1});
+    return{escaped:p[1]>127,iterations:p[1]>127?p[0]:iterations};
+  }
+}
+
+// 5. INTERACTION — pointer capture, anchored smooth wheel zoom, pan and touch pinch.
+class Controls {
+  constructor(state,renderer,notify){
+    this.s=state;this.renderer=renderer;this.notify=notify;this.points=new Map();this.gesture=null;this.uiTimer=0;this.padDragging=false;
+    this.bindCanvas();this.bindParameter();this.bindButtons();this.buildPresets();this.bindKeyboard();
+  }
+  manual(){const s=this.s;s.lastInteraction=performance.now();s.driftBase=s.c.slice();s.driftClock=0;s.dirty=true;this.wakeUI()}
+  wakeUI(){if(!this.s.hidden)return;document.body.classList.add('peek');clearTimeout(this.uiTimer);this.uiTimer=setTimeout(()=>document.body.classList.remove('peek'),1600)}
+  local(event){const r=this.renderer.canvas.getBoundingClientRect();return[event.clientX-r.left,event.clientY-r.top]}
+  zoomAt(x,y,delta){
+    this.manual();const s=this.s;
+    s.zoomAnchor={world:complexAt(x,y,s),vector:screenVector(x,y,s.width,s.height)};
+    s.targetLogZoom=clamp(s.targetLogZoom+delta,Math.log(CONFIG.minZoom),Math.log(CONFIG.maxZoom));
+    this.renderer.canvas.dataset.lastZoomRequest=JSON.stringify({x,y,delta,target:s.targetLogZoom});
+    if(s.targetLogZoom===Math.log(CONFIG.maxZoom))this.notify('Precision limit · 4096×');
+  }
+  beginGesture(){
+    const s=this.s,a=[...this.points.values()];s.targetLogZoom=s.logZoom;s.zoomAnchor=null;s.targetCenter=s.center.slice();
+    if(a.length>=2){const mid=[(a[0][0]+a[1][0])/2,(a[0][1]+a[1][1])/2];this.gesture={kind:'pinch',distance:Math.max(1,Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])),world:complexAt(...mid,s),zoom:s.logZoom}}
+    else if(a.length)this.gesture={kind:'pan',point:a[0].slice(),center:s.center.slice()};else this.gesture=null;
+  }
+  bindCanvas(){
+    const canvas=this.renderer.canvas,s=this.s;
+    canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.manual();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);this.points.set(e.pointerId,this.local(e));s.interacting=true;this.beginGesture()});
+    canvas.addEventListener('pointermove',e=>{this.wakeUI();if(!this.points.has(e.pointerId))return;this.manual();this.points.set(e.pointerId,this.local(e));const a=[...this.points.values()],g=this.gesture;if(!g)return;
+      if(g.kind==='pinch'&&a.length>=2){const d=Math.max(1,Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])),mid=[(a[0][0]+a[1][0])/2,(a[0][1]+a[1][1])/2];s.logZoom=s.targetLogZoom=clamp(g.zoom+Math.log(d/g.distance),Math.log(CONFIG.minZoom),Math.log(CONFIG.maxZoom));const v=screenVector(...mid,s.width,s.height),span=CONFIG.defaultSpan/Math.exp(s.logZoom);s.center=[g.world[0]-v[0]*span,g.world[1]-v[1]*span]}
+      else if(g.kind==='pan'){const span=CONFIG.defaultSpan/Math.exp(s.logZoom)/Math.min(s.width,s.height);s.center=[g.center[0]-(a[0][0]-g.point[0])*span,g.center[1]+(a[0][1]-g.point[1])*span]}
+      s.targetCenter=s.center.slice();
+    });
+    const release=e=>{if(!this.points.has(e.pointerId))return;this.points.delete(e.pointerId);s.interacting=this.points.size>0;if(this.points.size)this.beginGesture();else this.gesture=null;s.lastInteraction=performance.now()};
+    for(const type of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(type,release);
+    canvas.addEventListener('wheel',e=>{e.preventDefault();let d=e.deltaY;if(e.deltaMode===1)d*=16;if(e.deltaMode===2)d*=s.height;this.zoomAt(...this.local(e),-clamp(d,-160,160)*.0025)},{passive:false});
+    canvas.addEventListener('dblclick',e=>{e.preventDefault();this.zoomAt(...this.local(e),Math.log(2.4))});
+    window.addEventListener('pointermove',()=>this.wakeUI(),{passive:true});
+  }
+  // 6. PARAMETER CONTROLS — an actual complex-coordinate pad, keyboard accessible.
+  setParameter(c,immediate=true){this.manual();const s=this.s;s.preset=-1;s.targetC=c.map(v=>clamp(v,-1.2,1.2));if(immediate)s.c=s.targetC.slice();s.driftBase=s.targetC.slice();this.updatePresetButtons()}
+  bindParameter(){const pad=$('parameter-pad'),s=this.s;
+    const set=e=>{const r=pad.getBoundingClientRect();this.setParameter([(e.clientX-r.left)/r.width*2.4-1.2,1.2-(e.clientY-r.top)/r.height*2.4])};
+    pad.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();pad.focus({preventScroll:true});pad.setPointerCapture(e.pointerId);this.padDragging=true;s.interacting=true;set(e)});
+    pad.addEventListener('pointermove',e=>{if(this.padDragging)set(e)});
+    const release=()=>{this.padDragging=false;s.interacting=false;s.lastInteraction=performance.now()};for(const type of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(type,release);
+    pad.addEventListener('keydown',e=>{const delta=e.shiftKey?.0005:.005;const c=s.c.slice();if(e.key==='ArrowLeft')c[0]-=delta;else if(e.key==='ArrowRight')c[0]+=delta;else if(e.key==='ArrowUp')c[1]+=delta;else if(e.key==='ArrowDown')c[1]-=delta;else return;e.preventDefault();e.stopPropagation();this.setParameter(c)});
+  }
+  // 7. PRESETS — every tiny preview was computed by the same Julia shader.
+  buildPresets(){const host=$('presets');host.replaceChildren();PRESETS.forEach((p,i)=>{const b=document.createElement('button');b.type='button';b.className='preset';b.dataset.name=p.name;b.title=`${p.name} · c = ${p.c[0]} ${p.c[1]<0?'−':'+'} ${Math.abs(p.c[1])}i`;b.setAttribute('aria-label',b.title);b.setAttribute('aria-pressed',String(i===this.s.preset));const canvas=document.createElement('canvas');canvas.setAttribute('aria-hidden','true');b.append(canvas);host.append(b);this.renderer.thumbnail(p.c,canvas);b.addEventListener('click',()=>this.selectPreset(i))})}
+  selectPreset(i){this.manual();const s=this.s,p=PRESETS[i];s.targetC=p.c.slice();s.targetCenter=[0,0];s.targetLogZoom=0;s.zoomAnchor=null;s.preset=i;s.driftBase=p.c.slice();s.driftClock=0;this.updatePresetButtons();$('announcement').textContent=p.name+' preset selected.'}
+  updatePresetButtons(){[...$('presets').children].forEach((b,i)=>b.setAttribute('aria-pressed',String(i===this.s.preset)))}
+  reset(){this.selectPreset(0);this.s.drift=false;this.s.driftClock=0;this.notify('Back to the beginning')}
+  toggleDrift(){const s=this.s;this.manual();s.drift=!s.drift;s.driftBase=s.c.slice();s.driftClock=0;if(s.drift){s.lastInteraction=performance.now()-CONFIG.idleResumeMs;s.targetC=s.c.slice()}this.notify(s.drift?'Drift on · touch to pause':'Drift off')}
+  setQuality(value){const s=this.s;this.manual();s.quality=value;s.resolutionFactor=1;s.samples=value==='fine'?4:1;this.renderer.resize();$('quality').textContent={auto:'Auto',fine:'Fine',eco:'Eco'}[value];$('quality').title=`Rendering quality: ${value}. Click to change.`;$('quality').setAttribute('aria-label','Rendering quality: '+value);this.notify({auto:'Adaptive quality',fine:'Fine · 2 × 2 supersampling',eco:'Eco · native 1× pixels'}[value])}
+  hideUI(value=!this.s.hidden){this.s.hidden=value;document.body.classList.toggle('ui-hidden',value);document.body.classList.remove('peek');document.querySelectorAll('.ui').forEach(el=>el.inert=value);$('hide').setAttribute('aria-pressed',String(value));if(!value)$('hide').focus({preventScroll:true});else document.activeElement.blur()}
+  async fullscreen(){this.manual();const el=document.documentElement,active=document.fullscreenElement||document.webkitFullscreenElement;
+    try{if(active){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)await exit.call(document)}else{const enter=el.requestFullscreen||el.webkitRequestFullscreen;if(!enter){this.notify('Fullscreen is unavailable in this browser');return}await enter.call(el)}}catch{this.notify('Fullscreen was not granted by this browser')}
+  }
+  bindButtons(){
+    $('reset').onclick=()=>this.reset();$('drift').onclick=()=>this.toggleDrift();$('hide').onclick=()=>this.hideUI();$('show').onclick=()=>this.hideUI(false);$('fullscreen').onclick=()=>this.fullscreen();
+    $('quality').onclick=()=>{const a=['auto','fine','eco'];this.setQuality(a[(a.indexOf(this.s.quality)+1)%3])};
+    const sync=()=>{const on=!!(document.fullscreenElement||document.webkitFullscreenElement);document.body.classList.toggle('immersive',on);$('fullscreen').setAttribute('aria-label',on?'Exit fullscreen':'Enter fullscreen')};
+    document.addEventListener('fullscreenchange',sync);document.addEventListener('webkitfullscreenchange',sync);
+    if(!document.documentElement.requestFullscreen&&!document.documentElement.webkitRequestFullscreen){$('fullscreen').disabled=true;$('fullscreen').title='Fullscreen unavailable in this browser'}
+  }
+  bindKeyboard(){window.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const key=e.key.toLowerCase();
+    if(key==='h'){e.preventDefault();this.hideUI();return}if(key==='escape'&&this.s.hidden){this.hideUI(false);return}
+    if(e.target.closest('input,textarea,select,#parameter-pad'))return;
+    if(key==='r')this.reset();else if(key==='d')this.toggleDrift();else if(key==='f')this.fullscreen();
+    else if(key==='+'||key==='=')this.zoomAt(this.s.width/2,this.s.height/2,.25);
+    else if(key==='-')this.zoomAt(this.s.width/2,this.s.height/2,-.25);
+    else if(key.startsWith('arrow')){this.manual();this.s.zoomAnchor=null;const d=CONFIG.defaultSpan/Math.exp(this.s.logZoom)*.08;if(key==='arrowleft')this.s.targetCenter[0]-=d;if(key==='arrowright')this.s.targetCenter[0]+=d;if(key==='arrowup')this.s.targetCenter[1]+=d;if(key==='arrowdown')this.s.targetCenter[1]-=d}else return;e.preventDefault();})}
+}
+
+// 8. ANIMATION — exponentially damped navigation; time is suspended off screen.
+function startJulia(){
+  const state=createState();let renderer,controls,raf=0,last=0,elapsed=0,fpsElapsed=0,fpsFrames=0,qualityClock=0,toastTimer=0,frameAverage=16.67;
+  const notify=message=>{$('toast').textContent=message;$('toast').classList.add('on');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('on'),2200)};
+  const fail=message=>{cancelAnimationFrame(raf);$('fallback-message').textContent=message;$('fallback').hidden=false;document.body.classList.remove('ready')};
+  try{renderer=new JuliaRenderer($('stage'),state);renderer.resize();controls=new Controls(state,renderer,notify)}catch(error){console.error(error);fail(error.message);return}
+  setTimeout(()=>document.body.classList.add('ready'),state.reduced?0:650);
+  function navigation(dt){
+    const k=state.reduced?1:1-Math.exp(-10*dt);
+    state.logZoom=mix(state.logZoom,state.targetLogZoom,k);
+    if(near(state.logZoom,state.targetLogZoom,1e-7))state.logZoom=state.targetLogZoom;
+    if(state.zoomAnchor){const a=state.zoomAnchor,span=CONFIG.defaultSpan/Math.exp(state.logZoom);state.center=[a.world[0]-a.vector[0]*span,a.world[1]-a.vector[1]*span];state.targetCenter=state.center.slice();if(near(state.logZoom,state.targetLogZoom,1e-7))state.zoomAnchor=null}
+    else for(let i=0;i<2;i++){state.center[i]=mix(state.center[i],state.targetCenter[i],k);if(near(state.center[i],state.targetCenter[i]))state.center[i]=state.targetCenter[i]}
+  }
+  function evolve(dt,now){
+    const running=state.drift&&!state.interacting&&now-state.lastInteraction>=CONFIG.idleResumeMs;
+    if(running){state.driftClock+=dt;const t=state.driftClock,a=CONFIG.driftAmplitude*ease(t/3),w=CONFIG.driftSpeed;
+      state.targetC=[clamp(state.driftBase[0]+a*Math.sin(t*w),-1.2,1.2),clamp(state.driftBase[1]+a*.76*(Math.cos(t*w*.73)-1),-1.2,1.2)];state.preset=-1;
+    }
+    const k=state.reduced?1:1-Math.exp(-6*dt);
+    for(let i=0;i<2;i++){state.c[i]=mix(state.c[i],state.targetC[i],k);if(near(state.c[i],state.targetC[i]))state.c[i]=state.targetC[i]}
+    return running;
+  }
+  // Adaptive quality never changes the escape recurrence or silently lowers iteration budget.
+  function adapt(dt){
+    if(state.quality!=='auto'||elapsed<3)return;qualityClock+=dt;
+    const fast=frameAverage<18,slow=frameAverage>22;
+    if(slow&&qualityClock>1.6){
+      if(state.samples>1)state.samples=1;
+      else{const floor=Math.min(1,1/Math.min(devicePixelRatio||1,CONFIG.maxDPR));state.resolutionFactor=Math.max(floor,state.resolutionFactor*.86);renderer.resize()}
+      qualityClock=0;
+    }else if(fast&&qualityClock>5&&!state.interacting){
+      if(state.resolutionFactor<.999){state.resolutionFactor=Math.min(1,state.resolutionFactor+.07);renderer.resize()}
+      else if(state.samples===1)state.samples=2;
+      else if(state.samples===2&&frameAverage<16.9)state.samples=4;
+      qualityClock=0;
+    }
+    if(state.interacting&&state.samples>1){state.samples=1;qualityClock=0}
+  }
+  function frame(now){
+    if(document.hidden||state.contextLost)return;
+    const raw=last?now-last:16.667;last=now;const dt=Math.min(raw/1000,.05);elapsed+=dt;
+    if(raw<150)frameAverage=mix(frameAverage,raw,.06);
+    navigation(dt);const drifting=evolve(dt,now);
+    if(state.animate)state.time+=dt;
+    state.reveal=state.reduced?1:ease(elapsed/CONFIG.revealSeconds);
+    state.iterations=iterationBudget(state.logZoom);
+    adapt(dt);
+    const moving=!near(state.logZoom,state.targetLogZoom)||state.center.some((v,i)=>!near(v,state.targetCenter[i]))||state.c.some((v,i)=>!near(v,state.targetC[i]));
+    if(state.animate||drifting||moving||state.dirty||state.reveal<1){const t=performance.now();renderer.draw();state.renderTime=performance.now()-t;state.dirty=false}
+    fpsElapsed+=raw;fpsFrames++;
+    if(fpsElapsed>=500){state.fps=Math.round(fpsFrames*1000/fpsElapsed);fpsElapsed=0;fpsFrames=0;updateUI(drifting,now)}
+    updatePad();raf=requestAnimationFrame(frame);
+  }
+  // 9. RESIZE — CSS coordinates and physical framebuffer coordinates stay separate.
+  function resize(){state.width=Math.max(1,innerWidth);state.height=Math.max(1,innerHeight);state.zoomAnchor=null;renderer.resize()}
+  addEventListener('resize',resize);if(window.visualViewport)visualViewport.addEventListener('resize',resize);
+  document.addEventListener('visibilitychange',()=>{cancelAnimationFrame(raf);last=0;fpsFrames=0;fpsElapsed=0;if(!document.hidden&&!state.contextLost){state.lastInteraction=performance.now();state.driftBase=state.c.slice();state.driftClock=0;raf=requestAnimationFrame(frame)}});
+  $('stage').addEventListener('webglcontextlost',event=>{event.preventDefault();state.contextLost=true;cancelAnimationFrame(raf);fail('The graphics context was interrupted. Waiting for the GPU to return…')});
+  $('stage').addEventListener('webglcontextrestored',()=>{try{renderer.initialize();renderer.resize();controls.buildPresets();state.contextLost=false;$('fallback').hidden=true;document.body.classList.add('ready');last=0;state.dirty=true;raf=requestAnimationFrame(frame)}catch(e){fail(e.message)}});
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',e=>{state.reduced=e.matches;state.animate=!e.matches;if(e.matches)state.drift=false;state.dirty=true});
+  // 10. UI — deliberately slower statistics; no live-region chatter every frame.
+  function updatePad(){const x=(state.c[0]+1.2)/2.4*100,y=(1.2-state.c[1])/2.4*100;$('parameter-dot').style.left=x+'%';$('parameter-dot').style.top=y+'%';const a=state.c[0]<0?'−'+Math.abs(state.c[0]).toFixed(4):state.c[0].toFixed(4),b=Math.abs(state.c[1]).toFixed(4);$('coordinate').textContent=`c = ${a} ${state.c[1]<0?'−':'+'} ${b}i`}
+  function updateUI(drifting,now){
+    $('stage').dataset.navigation=JSON.stringify({current:state.logZoom,target:state.targetLogZoom,center:state.center});
+    $('fps').textContent=state.fps;$('iterations').textContent=state.iterations;const z=Math.exp(state.logZoom);$('zoom').innerHTML=(z<100?z.toFixed(2):z.toFixed(0))+'<small>×</small>';
+    $('drift').setAttribute('aria-pressed',String(state.drift));$('drift-label').textContent=state.drift?(drifting?'Drifting':'Paused'):'Drift';
+    $('parameter-status').textContent=state.drift?(drifting?'drifting':Math.max(0,Math.ceil((CONFIG.idleResumeMs-now+state.lastInteraction)/1000))+'s'):'c';
+    $('quality').title=`${state.quality} · ${renderer.canvas.width} × ${renderer.canvas.height} · ${state.samples} sample${state.samples>1?'s':''} · DPR ${state.dpr.toFixed(2)}`;
+    controls.updatePresetButtons();
+  }
+  $('hint').textContent=matchMedia('(pointer: coarse)').matches?'Drag to wander · Pinch to dive':'Drag to wander · Scroll to dive · Double-click to explore';
+  // Small public integration / verification API. Never used to render pixels on the CPU.
+  window.JuliaArt=Object.freeze({
+    getState:()=>({c:state.c.slice(),center:state.center.slice(),zoom:Math.exp(state.logZoom),iterations:state.iterations,fps:state.fps,dpr:state.dpr,samples:state.samples,quality:state.quality,drift:state.drift,driftClock:state.driftClock,uiHidden:state.hidden,webgl:renderer.webgl2?2:1,precision:renderer.precision,resolution:[renderer.canvas.width,renderer.canvas.height]}),
+    setParameter:(a,b)=>{if(!Number.isFinite(a)||!Number.isFinite(b))throw Error('Finite parameters required');controls.setParameter([a,b])},
+    selectPreset:i=>{if(Number.isInteger(i)&&i>=0&&i<PRESETS.length)controls.selectPreset(i)},
+    setQuality:q=>{if(['auto','fine','eco'].includes(q))controls.setQuality(q)},reset:()=>controls.reset(),
+    pause:()=>{state.animate=false;state.drift=false;state.dirty=true},resume:()=>{state.animate=!state.reduced;state.dirty=true},
+    probe:(z,c,limit=220)=>{const result=renderer.probe(z,c,limit);state.dirty=true;return result},referenceEscape,
+    complexAt:(x,y)=>complexAt(x,y,state),getGLError:()=>renderer.gl.getError(),
+    renderNow:()=>renderer.draw({reveal:1})
+  });
+  updateUI(false,performance.now());updatePad();raf=requestAnimationFrame(frame);
+}
+$('retry').addEventListener('click',()=>location.reload());
+startJulia();
+
+})();
+</script>
+</body></html>
