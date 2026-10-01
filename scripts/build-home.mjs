@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const parts = [
@@ -10,7 +11,7 @@ const parts = [
   'archive-cards.html',
   'footer.html',
 ];
-const html = (await Promise.all(parts.map(name =>
+const htmlTemplate = (await Promise.all(parts.map(name =>
   readFile(join(root, 'src', 'home', name), 'utf8')))).join('');
 const scripts = [
   'overscroll.js',
@@ -21,6 +22,17 @@ const scripts = [
 ];
 const javascript = (await Promise.all(scripts.map(name =>
   readFile(join(root, 'src', 'home', 'scripts', name), 'utf8')))).join('');
+const fingerprint = content => createHash('sha256').update(content).digest('hex').slice(0, 12);
+const versions = {
+  __HOME_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'home.css'))),
+  __FLUID_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'fluid-tank.css'))),
+  __LANDSCAPE_SVG_HASH__: fingerprint(await readFile(join(root, 'images', 'changsha-xiangjiang-editable.svg'))),
+  __HOME_JS_HASH__: fingerprint(javascript),
+};
+const html = Object.entries(versions).reduce(
+  (page, [token, hash]) => page.replaceAll(token, hash),
+  htmlTemplate,
+);
 const targets = [
   [join(root, 'index.html'), html],
   [join(root, 'assets', 'home.js'), javascript],
