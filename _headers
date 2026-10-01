@@ -13,6 +13,10 @@
   Cache-Control: public, max-age=0, must-revalidate
 /assets/*
   Cache-Control: public, max-age=86400
+/assets/home.css
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/fluid-tank.css
+  Cache-Control: public, max-age=0, must-revalidate
 /images/*
   Cache-Control: public, max-age=86400
 /有趣的小玩具展示/assets/*
