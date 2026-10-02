@@ -70,12 +70,123 @@ time flys like an arrow and fruit flies like bananas
 在数学院三楼的墙上看到了Julia集 就把它顺手做进可视化项目集里面了
 
 今天再去了一次岳麓书院 爱晚亭 还有书院的校友书画展览 我都放在这里了
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
-![](/images/how_time_flies.jpg)
+
+### 岳麓山
+
+![岳麓山照片 1](/images/lushan202610.jpg)
+
+![岳麓山照片 2](/images/lushan2026101.jpg)
+
+![岳麓山照片 3](/images/lushan2026102.jpg)
+
+### 湖南大学
+
+![湖南大学照片 1](/images/huda202610.jpg)
+
+![湖南大学照片 2](/images/huda2026101.jpg)
+
+![湖南大学照片 3](/images/huda2026102.jpg)
+
+![湖南大学照片 4](/images/huda2026103.jpg)
+
+![湖南大学照片 5](/images/huda2026104.jpg)
+
+### 展览
+
+![展览照片 1](/images/zhanlan202610.jpg)
+
+![展览照片 2](/images/zhanlan2026101.jpg)
+
+![展览照片 3](/images/zhanlan2026102.jpg)
+
+![展览照片 4](/images/zhanlan2026103.jpg)
+
+![展览照片 5](/images/zhanlan2026104.jpg)
+
+![展览照片 6](/images/zhanlan2026105.jpg)
+
+![展览照片 7](/images/zhanlan2026106.jpg)
+
+![展览照片 8](/images/zhanlan2026107.jpg)
+
+![展览照片 9](/images/zhanlan2026108.jpg)
+
+![展览照片 10](/images/zhanlan2026109.jpg)
+
+![展览照片 11](/images/zhanlan20261010.jpg)
+
+![展览照片 12](/images/zhanlan20261011.jpg)
+
+![展览照片 13](/images/zhanlan20261012.jpg)
+
+![展览照片 14](/images/zhanlan20261013.jpg)
+
+![展览照片 15](/images/zhanlan20261014.jpg)
+
+![展览照片 16](/images/zhanlan20261015.jpg)
+
+![展览照片 17](/images/zhanlan20261016.jpg)
+
+![展览照片 18](/images/zhanlan20261017.jpg)
+
+![展览照片 19](/images/zhanlan20261018.jpg)
+
+![展览照片 20](/images/zhanlan20261019.jpg)
+
+![展览照片 21](/images/zhanlan20261020.jpg)
+
+![展览照片 22](/images/zhanlan20261021.jpg)
+
+![展览照片 23](/images/zhanlan20261022.jpg)
+
+![展览照片 24](/images/zhanlan20261023.jpg)
+
+![展览照片 25](/images/zhanlan20261024.jpg)
+
+![展览照片 26](/images/zhanlan20261025.jpg)
+
+![展览照片 27](/images/zhanlan20261026.jpg)
+
+![展览照片 28](/images/zhanlan20261027.jpg)
+
+![展览照片 29](/images/zhanlan20261028.jpg)
+
+![展览照片 30](/images/zhanlan20261029.jpg)
+
+![展览照片 31](/images/zhanlan20261030.jpg)
+
+![展览照片 32](/images/zhanlan20261031.jpg)
+
+![展览照片 33](/images/zhanlan20261032.jpg)
+
+![展览照片 34](/images/zhanlan20261034.jpg)
+
+![展览照片 35](/images/zhanlan20261035.jpg)
+
+![展览照片 36](/images/zhanlan20261036.jpg)
+
+![展览照片 37](/images/zhanlan20261037.jpg)
+
+![展览照片 38](/images/zhanlan20261038.jpg)
+
+![展览照片 39](/images/zhanlan20261039.jpg)
+
+![展览照片 40](/images/zhanlan20261040.jpg)
+
+### 书院池塘
+
+![书院池塘照片 1](/images/shuyuanchitang.jpg)
+
+### 爱晚亭
+
+![爱晚亭照片 1](/images/aiwanting202610.jpg)
+
+![爱晚亭照片 2](/images/aiwanting2026102.jpg)
+
+![爱晚亭照片 3](/images/aiwanting2026103.jpg)
+
+![爱晚亭照片 4](/images/aiwanting2026104.jpg)
+
+![爱晚亭照片 5](/images/aiwanting2026105.jpg)
+
+![爱晚亭照片 6](/images/aiwanting2026106.jpg)
