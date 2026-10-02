@@ -190,3 +190,7 @@ time flys like an arrow and fruit flies like bananas
 ![爱晚亭照片 5](/images/aiwanting2026105.jpg)
 
 ![爱晚亭照片 6](/images/aiwanting2026106.jpg)
+
+---
+
+发现了一家小众宝藏书店 叫镜中书店 在岳麓山北边 有功夫去看看
