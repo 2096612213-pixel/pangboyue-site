@@ -5,6 +5,9 @@ const list = document.querySelector('#songs');
 const cards = new Map();
 let activeIndex = -1;
 let scheduled = false;
+let searchIndex = -1;
+let previousQuery = "";
+let matchCursor = -1;
 
 function dimensions() {
   const styles = getComputedStyle(list);
@@ -17,6 +20,7 @@ function dimensions() {
 function makeCard(song, index) {
   const card = document.createElement('div');
   card.className = 'song';
+  card.tabIndex = -1;
   card.setAttribute('role', 'listitem');
   card.setAttribute('aria-posinset', String(index + 1));
   card.setAttribute('aria-setsize', String(songs.length));
@@ -78,6 +82,7 @@ function render() {
   const wanted = new Set();
   for (let index = start; index < end; index++) wanted.add(index);
   if (activeIndex !== -1) wanted.add(activeIndex);
+  if (searchIndex !== -1) wanted.add(searchIndex);
 
   for (const [index, card] of cards) {
     if (!wanted.has(index)) {
@@ -93,6 +98,7 @@ function render() {
       list.append(card);
     }
     card.style.top = `${index * stride}px`;
+    card.classList.toggle("search-match", index === searchIndex);
   }
 }
 
@@ -108,3 +114,50 @@ function scheduleRender() {
 addEventListener('scroll', scheduleRender, { passive: true });
 addEventListener('resize', scheduleRender);
 render();
+
+// Search navigates the virtual list without loading, starting, or pausing audio.
+const searchForm = document.querySelector('#song-search');
+const searchInput = document.querySelector('#song-query');
+const searchStatus = document.querySelector('#search-status');
+const normalizeSearch = value => value.normalize('NFKC').toLocaleLowerCase().trim().replace(/\s+/g, ' ');
+let composing = false;
+searchInput.addEventListener('compositionstart', () => { composing = true; });
+searchInput.addEventListener('compositionend', () => { composing = false; });
+searchInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && (event.isComposing || composing || event.keyCode === 229)) event.preventDefault();
+});
+searchInput.addEventListener('input', () => {
+  previousQuery = ''; matchCursor = -1; searchIndex = -1;
+  searchStatus.textContent = '搜索只定位歌曲，点击播放按钮开始听。';
+  render();
+});
+searchForm.addEventListener('submit', event => {
+  event.preventDefault();
+  if (composing) return;
+  const query = normalizeSearch(searchInput.value);
+  if (!query) {
+    searchStatus.textContent = '请输入歌名或歌手。';
+    searchInput.focus();
+    return;
+  }
+  const terms = query.split(' ');
+  const matches = songs.map((song, index) => ({ title: normalizeSearch(song.title), index }))
+    .filter(song => terms.every(term => song.title.includes(term)));
+  if (!matches.length) {
+    searchIndex = -1; previousQuery = ''; matchCursor = -1;
+    searchStatus.textContent = `没有找到“${searchInput.value.trim()}”，试试部分歌名或歌手名。`;
+    render();
+    return;
+  }
+  matchCursor = query === previousQuery ? (matchCursor + 1) % matches.length : 0;
+  previousQuery = query;
+  searchIndex = matches[matchCursor].index;
+  searchStatus.textContent = `已定位：${songs[searchIndex].title}` +
+    (matches.length > 1 ? `（${matchCursor + 1}/${matches.length}，回到搜索框再次按 Enter 定位下一首）` : '');
+  render(); // Materialize even a far-off card before scrolling to it.
+  const card = cards.get(searchIndex);
+  card.focus({ preventScroll: true });
+  requestAnimationFrame(() => {
+    card.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
+  });
+});

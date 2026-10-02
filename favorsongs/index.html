@@ -91,6 +91,33 @@
       line-height: 1.8;
     }
 
+    .song-search { margin: -28px 0 26px; }
+    .search-glass {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 64px;
+      padding: 0 22px;
+      border: 1px solid rgba(255,255,255,.24);
+      border-radius: 24px;
+      background: radial-gradient(ellipse at 12% 0%, rgba(178,219,255,.16), transparent 65%), linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.025) 55%, rgba(184,208,255,.08));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(255,255,255,.07), 0 12px 34px rgba(0,0,0,.22);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      backdrop-filter: blur(24px) saturate(160%);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .search-glass:focus-within { border-color: rgba(174,219,255,.7); box-shadow: inset 0 1px 0 #ffffff55, 0 0 0 3px #8bc9ff16, 0 12px 34px #00000038; }
+    .search-glass svg { width: 21px; height: 21px; flex: none; color: #c4d3df; }
+    .search-glass input { flex: 1; min-width: 0; width: 100%; padding: 20px 0; border: 0; outline: 0; background: transparent; color: #f2f2f2; font: inherit; font-size: 16px; color-scheme: dark; }
+    .search-glass input::placeholder { color: #aab1ba; }
+    .search-enter { flex: none; padding: 4px 8px; border: 1px solid #ffffff20; border-radius: 7px; color: #c5ccd3; font: 12px inherit; }
+    .search-status { min-height: 22px; margin: 10px 8px 0; color: #aab5c2; font-size: 13px; line-height: 1.7; }
+    .song.search-match { border-color: #a6d8ff99; background: #99caff12; box-shadow: 0 0 0 2px #a6d8ff16; }
+    .song:focus-visible { outline: 2px solid #a6d8ff; outline-offset: 4px; }
+    @media (max-width: 700px) { .search-glass { padding: 0 16px; gap: 10px; border-radius: 21px; } .search-enter { display: none; } }
+    @media (prefers-reduced-motion: reduce) { .search-glass, .song { transition: none; } }
+
     .songs {
       --card-height: 166px;
       --card-gap: 24px;
@@ -234,11 +261,20 @@
     </p>
 
 
+    <form class="song-search" id="song-search" role="search" aria-label="搜索歌单">
+      <div class="search-glass">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5" stroke-linecap="round"/></svg>
+        <input id="song-query" type="search" aria-label="搜索歌名或歌手" aria-describedby="search-status" placeholder="搜索歌名或歌手，按 Enter 跳转" autocomplete="off" enterkeyhint="search">
+        <span class="search-enter" aria-hidden="true">Enter ↵</span>
+      </div>
+      <p class="search-status" id="search-status" role="status" aria-live="polite">搜索只定位歌曲，点击播放按钮开始听。</p>
+    </form>
+
     <section class="songs" id="songs" role="list" aria-label="最爱的歌曲"></section>
 
   </main>
 
-  <script type="module" src="playlist.js?v=20260927-fresh-list"></script>
+  <script type="module" src="playlist.js?v=20261002-search"></script>
 </body>
 
 </html>
