@@ -4,6 +4,8 @@
 
 time flys like an arrow and fruit flies like bananas
 
+时间过得真快 转眼就10月了
+
 ![时间过得真快 转眼就10月了](/images/how_time_flies.jpg)
 
 ---
@@ -66,3 +68,14 @@ time flys like an arrow and fruit flies like bananas
 ## 2026-10-02
 
 在数学院三楼的墙上看到了Julia集 就把它顺手做进可视化项目集里面了
+
+今天再去了一次岳麓书院 爱晚亭 还有书院的校友书画展览 我都放在这里了
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
+![](/images/how_time_flies.jpg)
