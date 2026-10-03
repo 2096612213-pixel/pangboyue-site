@@ -91,6 +91,8 @@ time flys like an arrow and fruit flies like bananas
 
 ![湖南大学照片 5](/images/huda2026104.jpg)
 
+![湖南大学照片 6](/images/huda20261005.jpg)
+
 ### 展览
 
 ![展览照片 1](/images/zhanlan202610.jpg)
