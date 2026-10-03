@@ -1,0 +1,37 @@
+/* Shared heading hierarchy for all current and future weekly journals. */
+.reading-headings {
+  --heading-row-height: 36px;
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 10px max(24px, calc((100% - 1000px) / 2)) 8px;
+  border-bottom: 1px solid #343434;
+  background: #111;
+  box-shadow: 0 6px 20px #0003;
+}
+.reading-headings[hidden] { display: none; }
+.reading-heading {
+  display: block;
+  height: var(--heading-row-height);
+  line-height: var(--heading-row-height);
+  padding-left: calc(var(--heading-depth) * 14px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #e5e5e5;
+  text-decoration: none;
+}
+.reading-heading-1 { font-size: 19px; font-weight: 650; color: #fff; }
+.reading-heading-2 { font-size: 16px; font-weight: 600; }
+.reading-heading-3 { font-size: 14px; color: #aaa; }
+.reading-heading:hover { color: #b9d7ff; }
+.reading-heading:focus-visible { outline: 2px solid #b9d7ff; outline-offset: -2px; border-radius: 4px; }
+#content :is(h1, h2, h3) { scroll-margin-top: 138px; }
+@media (max-width: 600px) {
+  .reading-headings { padding-left: 16px; padding-right: 16px; }
+  .reading-heading-1 { font-size: 17px; }
+  .reading-heading-2 { font-size: 15px; }
+  .reading-heading-3 { font-size: 13px; }
+}

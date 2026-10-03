@@ -9,6 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../site-icon-v2-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
   <title>周记 | 各种想法与认识</title>
+  <link rel="stylesheet" href="reading-headings.css?v=20261003-1">
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #111; color: #ddd; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
@@ -32,6 +33,7 @@
   </style>
 </head>
 <body>
+  <nav class="reading-headings" id="reading-headings" aria-label="当前阅读位置" hidden></nav>
   <main>
     <a class="back" href="index.html">← 返回周记目录</a>
     <p class="week-label" id="week-label"></p>
@@ -40,6 +42,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script type="module">
     import { getWeek, getWeekMarkdown } from "./api.js";
+    import { mountReadingHeadings } from "./reading-headings.js?v=20261003-1";
     const content = document.getElementById('content');
     const week = new URLSearchParams(location.search).get('week');
     getWeek(week)
@@ -51,6 +54,7 @@
       .then(markdown => {
         content.innerHTML = marked.parse(markdown);
         content.querySelectorAll('img').forEach(image => { image.loading = 'lazy'; image.decoding = 'async'; });
+        mountReadingHeadings(content, document.getElementById('reading-headings'));
       })
       .catch(error => { content.textContent = `日记加载失败：${error.message}`; });
   </script>
