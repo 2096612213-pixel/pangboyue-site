@@ -354,3 +354,24 @@ OK 上面就是无害化处理之后的内容 我希望别人看到这些内容 
 再进一步说：
 
 我想去一个不需要刻意合群，也能自然成为其中一员的地方。
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/dialect-classmates-poster.jpg" aria-label="零零后的同学不会说方言~">
+  <source src="/thoughts/2026-W40/media/dialect-classmates.mp4" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/dialect-classmates.mp4">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/youth-music-memories-poster.jpg" aria-label="“卧槽！音乐一响，多少人的青春回来了！”">
+  <source src="/thoughts/2026-W40/media/youth-music-memories.mp4" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/youth-music-memories.mp4">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/shape-of-you-poster.jpg" aria-label="最有名的小黄歌没有之一!‖《Shape ofYou》">
+  <source src="/thoughts/2026-W40/media/shape-of-you.mp4" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/shape-of-you.mp4">打开视频</a>观看。
+</video>
