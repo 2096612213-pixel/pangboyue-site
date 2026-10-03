@@ -1,0 +1,29 @@
+#content.journal-images-collapsed img,
+#content.journal-images-collapsed .journal-image-only { display: none !important; }
+.journal-image-toggle {
+  position: fixed;
+  z-index: 30;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid #ffffff30;
+  border-radius: 16px;
+  background: #262a30f5;
+  color: #f2f5fa;
+  box-shadow: 0 6px 24px #0006, inset 0 1px 0 #ffffff14;
+  font: 500 14px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  cursor: pointer;
+}
+.journal-image-toggle[hidden] { display: none; }
+.journal-image-toggle svg { width: 20px; height: 20px; flex: none; }
+.journal-image-toggle:hover { background: #353c45; border-color: #a6c6e766; }
+.journal-image-toggle:focus-visible { outline: 2px solid #b9d7ff; outline-offset: 4px; }
+.journal-image-toggle[aria-expanded="false"] { color: #b9d7ff; border-color: #b9d7ff66; }
+@media (max-width: 600px) {
+  .journal-image-toggle { right: max(12px, env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); padding: 11px 13px; font-size: 13px; }
+}
+@media print { .journal-image-toggle { display: none; } }
