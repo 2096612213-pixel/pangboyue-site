@@ -208,7 +208,7 @@ time flys like an arrow and fruit flies like bananas
 
 ---
 
-**一个工具罢了，丢了就丢了… 为何我却如此心痛** 视频时长：4 分 44 秒
+### 一个工具罢了，丢了就丢了… 为何我却如此心痛** 视频时长：4 分 44 秒
 
 <video controls playsinline preload="none" width="640" height="480" poster="/thoughts/2026-W40/media/ai-account-story-poster.jpg" aria-label="一个工具罢了，丢了就丢了… 为何我却如此心痛">
   <source src="/thoughts/2026-W40/media/ai-account-story.mp4" type="video/mp4">
