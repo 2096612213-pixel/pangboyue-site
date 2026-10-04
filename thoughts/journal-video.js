@@ -111,6 +111,14 @@ export function renderJournalContent(content, html) {
       button.hidden = true;
       
       videoNode.hidden = false;
+      
+      // FORCE WEBKIT LAYOUT:
+      // iOS Safari's AVPlayer layer is only attached after the element gets a layout.
+      // Since it was hidden (display: none), we must force a synchronous layout
+      // calculation before assigning src and calling play(), otherwise the media 
+      // engine stalls at -00:00.
+      void videoNode.offsetWidth;
+      
       videoNode.preload = 'auto';
       videoNode.src = url;
       videoNode.load(); // Force iOS to fetch
