@@ -357,6 +357,10 @@ OK 上面就是无害化处理之后的内容 我希望别人看到这些内容 
 
 ---
 
+ # <span style="color: crimson;">Safari浏览器播放视频需要点两下播放 其他浏览器能正常播放 目前还没找到原因</span> 
+
+---
+
 <video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/dialect-classmates-poster.jpg" aria-label="零零后的同学不会说方言~">
   <source src="/thoughts/2026-W40/media/dialect-classmates.mp4?v=be9977599b46" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/dialect-classmates.mp4?v=be9977599b46">打开视频</a>观看。
