@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta name="description" content="庞博约的可视化项目集：在平面上拧魔方、立体资料馆、相机对焦与 Julia 集。">
+  <meta name="description" content="庞博约的可视化项目集：在线拼乐高、在平面上拧魔方、立体资料馆、相机对焦与 Julia 集。">
   <link rel="canonical" href="https://pangboyue.com/有趣的小玩具展示/">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -31,7 +31,7 @@
     .source-icons img { display: block; height: 48px; width: auto; }
     .source-icons .bilibili-icon { height: 43px; }
     .catalog { width: min(1500px, 100%); margin: 0 auto; padding: 26px clamp(22px, 5vw, 76px) 80px; }
-    .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; grid-auto-rows: minmax(392px, auto); }
     .toy-card { min-width: 0; min-height: 392px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a5863; border-radius: 8px; background: #1b2026; box-shadow: 0 10px 30px #080e1421; }
     a.toy-card { text-decoration: none; transition: border-color .22s, transform .22s, box-shadow .22s; }
     a.toy-card:hover { border-color: #8bd7eb; transform: translateY(-5px); box-shadow: 0 18px 38px #080e1455; }
@@ -43,6 +43,11 @@
     .card-art picture { position: absolute; inset: 0; display: grid; place-items: center; width: 100%; height: 100%; }
     .card-art img { display: block; width: 84%; height: 84%; min-width: 0; min-height: 0; object-fit: contain; }
     .card-bottom { height: 44px; flex: none; display: grid; place-items: center; background: #2a84ad; color: #fff; font: 600 18px ui-monospace, "SFMono-Regular", Menlo, sans-serif; letter-spacing: .02em; }
+    .toy-card.featured { grid-column: span 2; grid-row: span 2; }
+    .featured .card-title { height: auto; font-size: clamp(28px, 3vw, 42px); padding-top: 26px; }
+    .featured .card-art { flex: 1; aspect-ratio: auto; min-height: 0; margin-top: 22px; }
+    .featured .card-art img { width: 96%; height: 96%; }
+    @media (max-width: 620px) { .card-grid { grid-auto-rows: auto; } .toy-card.featured { grid-column: auto; grid-row: auto; min-height: 420px; } .featured .card-art { min-height: 260px; } }
     @media (max-width: 900px) { .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 620px) { .site-header { height: 62px; } .hero { min-height: 170px; } .hero-content { padding-top: 20px; } .hero-title { font-size: clamp(34px, 8vw, 48px); } .hero-source { font-size: clamp(25px, 6vw, 34px); margin-top: 10px; } .source-icons img { height: 38px; } .source-icons .bilibili-icon { height: 34px; } .catalog { padding-top: 20px; } .card-grid { grid-template-columns: 1fr; gap: 18px; } .toy-card { min-height: 350px; } }
     @media (prefers-reduced-motion: reduce) { a.toy-card { transition: none; } }
@@ -61,6 +66,11 @@
   </section>
   <main class="catalog">
     <div class="card-grid">
+      <a class="toy-card featured" href="lego/" aria-label="进入在线拼乐高">
+        <h2 class="card-title">在线拼乐高</h2>
+        <div class="card-art"><picture><img src="assets/lego-studio-cover.png" width="2058" height="1470" alt="在线拼乐高的三维工作区、零件库与属性面板" loading="eager" decoding="async"></picture></div>
+        <div class="card-bottom">开始拼搭</div>
+      </a>
       <a class="toy-card" href="cube/cube.html" aria-label="进入在平面上拧魔方">
         <h2 class="card-title">在平面上拧魔方</h2>
         <div class="card-empty-copy" aria-hidden="true"></div>

@@ -1,0 +1,15794 @@
+"use client";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import * as THREE from "three";
+import { LDrawLoader } from "./vendor/LDrawLoader.js";
+import { LDrawConditionalLineMaterial } from "three/addons/materials/LDrawConditionalLineMaterial.js";
+import { ldrawToScenePlacement, makeLDR, parseLDR, type LDrawPlacement } from "./ldraw";
+import { flattenLDrawRenderables } from "./ldraw-geometry";
+import { extractStudioLDraw } from "./studio-io";
+import {
+  approximateCollisionPrimitives,
+  approximateGearCollisionPrimitives,
+  generatePartConnectors,
+  straightAxleCollisionPrimitives,
+  straightAxleConnectors,
+  type CollisionPrimitive,
+  type MeshConnector,
+} from "./connectors";
+import {
+  annularCollisionSegments,
+  arcCollisionControlPoints,
+  type ArcControlPoints,
+} from "./collision-primitives";
+import {
+  automaticConnectorMatchIsBetter,
+  connectorAcceptsAdditionalConnection,
+  connectorPoliciesCompatible,
+  isChangeoverForkRingConnection,
+} from "./connector-policy";
+import {
+  cardanAssemblyLayout,
+  editorAssemblyMembers,
+  restoreLegacyCardanEditorAssemblies,
+} from "./editor-assembly";
+import {
+  cardanDirectionsFromCoordinates,
+  cardanEditorCoordinates,
+  cardanSecondaryAxis,
+  quaternionFromAxisPairs,
+  type CardanEditorCoordinates,
+} from "./cardan-kinematics";
+import { forceDragTarget } from "./editor/force-drag";
+import { paletteParts, paletteRequestAliases } from "./palette";
+import { preloadedConnectionMaps } from "./connection-maps";
+import {
+  preloadedCollisionMaps,
+  preloadedGearCollisionMaps,
+  preloadedSpecialGearParts,
+} from "./collision-maps";
+import {
+  buildConnectorContactExclusions,
+  contactPairKey,
+} from "./physics-contact-filter";
+import { gearSpecFor, type GearPose } from "./gears";
+import preloadedCatalog from "./preloaded-catalog.json";
+import {
+  PROJECT_EXTENSION,
+  PROJECT_MIME,
+  decodeProjectFile,
+  deleteBrowserProject,
+  encodeProjectFile,
+  listBrowserProjects,
+  loadBrowserProject,
+  loadRecoveryProject,
+  safeProjectFileName,
+  saveBrowserProject,
+  saveRecoveryProject,
+  type JsonObject,
+  type ProjectSummary,
+  type SavedCollisionPrimitive,
+  type SavedConnector,
+  type SavedMapBaseline,
+  type SavedRubberBand,
+  type SimStudioProjectDocument,
+} from "./project-format";
+import {
+  MAP_BASELINE_STORAGE_PREFIX,
+  changedMapLayers,
+  differentMapLayers,
+  fingerprintMapBundle,
+  mapLayerCounts,
+  preloadedMapBundle,
+  preloadedMapFingerprint,
+  preloadedMapProvenance,
+  correctionMapProvenance,
+  type MapFingerprintSnapshot,
+  type MapUpdateLayer,
+  type PartMapBundle,
+} from "./map-updates";
+import {
+  automaticMapProvenance,
+  normalizeMapProvenance,
+  normalizeMapProvenanceSnapshot,
+  readMapProvenance,
+  writeMapProvenance,
+  isStaleAutomaticMap,
+  type MapProvenance,
+  type MapProvenanceSnapshot,
+} from "./map-provenance";
+import {
+  disposeRubberBand,
+  drawRubberBand,
+  makeRubberBandLine,
+  makeRubberBandMarkers,
+  makeRubberBandVisual,
+  rubberBandLength,
+} from "./physics/rubber-band";
+import { createStudioGrid, GRID_RECENTER_STEP, GRID_SIZE } from "./renderer/studio-grid";
+import { configureDistanceScaledOutlineMaterial } from "./renderer/outline-material";
+import {
+  GpuRenderPrototype,
+  GpuSceneRenderer,
+  type GpuPrototypeResult,
+  type GpuSceneStats,
+} from "./renderer/gpu-runtime";
+import { RustPhysicsRuntime } from "./physics/rust-runtime";
+import {
+  buildRustGearConfigs,
+  buildRustJointConfig,
+  buildRustPhysicsScene,
+} from "./physics/rust-scene-builder";
+import {
+  detectGearLinks,
+  differentialCarrierGearExclusions,
+  gearLinkKey,
+} from "./physics/gear-topology";
+import {
+  detectGearboxLinks,
+  detectGearboxSelectorPairs,
+  gearboxContactExclusionPairs,
+  gearboxExtensionSeatingGap,
+  hasGearboxExtension,
+  hasGearboxRing,
+  isGearboxCarrierPair,
+  isGearboxRigidExtensionPair,
+  isGearboxRotatingExtensionPair,
+} from "./physics/gearbox";
+import { DEFAULT_PHYSICS_SETTINGS } from "./physics/settings";
+import { createProjectId, uniqueProjectName } from "./projects/naming";
+import { DeferredNumberInput } from "./components/DeferredNumberInput";
+import {
+  colorHex,
+  ldrawColorNames,
+  ldrawColorOptions,
+  palettePreviewFilter,
+  previewFilter,
+} from "./catalog/colors";
+import { translations, type Language } from "./i18n";
+import { displayPartName } from "./part-names.zh";
+import { loadCatalogGeometry } from "./catalog/load-geometry";
+import type {
+  AppState,
+  AxleSnapStep,
+  CatalogPart,
+  Connection,
+  ConnectionProfile,
+  DebugFlags,
+  EditorSnapshot,
+  FramePerformanceSample,
+  GridStep,
+  ImportDraft,
+  JointMode,
+  PhysicsSettings,
+  Piece,
+  PieceKind,
+  PreparedImportPlacement,
+  RotationSnapStep,
+  RuntimeGearLink,
+  RubberBand,
+  StructuralMode,
+  ViewportRendererPreference,
+} from "./editor/types";
+type FogSettings = {
+  enabled: boolean;
+  near: number;
+  far: number;
+};
+type MapUpdateCandidate = {
+  key: string;
+  part: string;
+  name: string;
+  thumb?: string;
+  layers: MapUpdateLayer[];
+  localCounts: ReturnType<typeof mapLayerCounts>;
+  preloadedCounts: ReturnType<typeof mapLayerCounts>;
+  sources: ("browser" | "project")[];
+};
+const DEFAULT_FOG_SETTINGS: FogSettings = {
+  enabled: true,
+  near: 30,
+  far: 100,
+};
+// --- Catalog sources and packaged metadata ---------------------------------
+// The older pybricks mirror does not contain newer official parts such as
+// 71708. Keep it as a fallback, but use the actively updated mirror first.
+const LDRAW = "https://cdn.jsdelivr.net/gh/remig/ldraw_parts@master/";
+const LEGACY_LDRAW = "https://cdn.jsdelivr.net/gh/pybricks/ldraw@master/";
+const MODEL_LOAD_TIMEOUT = 20000;
+const AUTO_CONNECTIONS_ENABLED = true;
+const CORRECTION_MAP_REVISION = "2026-08-24-corrections-2";
+const collisionMapRevision = (part: string) =>
+  part.toLowerCase() === "6573"
+    ? "2026-08-24-6573-special-gear-2"
+    : CORRECTION_MAP_REVISION;
+const parseStoredMap = (storage: Storage, key: string) => {
+  const value = storage.getItem(key);
+  if (value === null) return undefined;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
+  }
+};
+const storedMapBundle = (storage: Storage, part: string): PartMapBundle => {
+  const specialGear = parseStoredMap(storage, `sim-special-gear-v1:${part}`);
+  return {
+    connectors: parseStoredMap(storage, `sim-connectors-v4:${part}`),
+    colliders: parseStoredMap(storage, `sim-colliders-v1:${part}`),
+    gearColliders: parseStoredMap(storage, `sim-gear-colliders-v1:${part}`),
+    specialGear: typeof specialGear === "boolean" ? specialGear : undefined,
+  };
+};
+const readStoredMapBaseline = (
+  storage: Storage,
+  part: string,
+): MapFingerprintSnapshot | undefined => {
+  const value = parseStoredMap(storage, `${MAP_BASELINE_STORAGE_PREFIX}${part}`);
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as MapFingerprintSnapshot)
+    : undefined;
+};
+const writeStoredMapBaseline = (
+  storage: Storage,
+  part: string,
+  baseline = preloadedMapFingerprint(part),
+) => {
+  storage.setItem(`${MAP_BASELINE_STORAGE_PREFIX}${part}`, JSON.stringify(baseline));
+};
+const legacyMapBaseline = (
+  storage: Storage,
+  part: string,
+  current: MapFingerprintSnapshot,
+) => {
+  const result: MapFingerprintSnapshot = {};
+  if (storage.getItem(`sim-connectors-revision:${part}`) === CORRECTION_MAP_REVISION)
+    result.connectors = current.connectors;
+  if (storage.getItem(`sim-colliders-revision:${part}`) === collisionMapRevision(part)) {
+    result.colliders = current.colliders;
+    result.gearColliders = current.gearColliders;
+    result.specialGear = current.specialGear;
+  }
+  return result;
+};
+const runtimeConnectorFromStored = (value: unknown): MeshConnector => {
+  const connector = value as SavedConnector;
+  return {
+    ...connector,
+    role: connector.role ?? "socket",
+    connectionTarget: connector.connectionTarget
+      ? { ...connector.connectionTarget }
+      : undefined,
+    local: new THREE.Vector3().fromArray(connector.local),
+    axis: new THREE.Vector3().fromArray(connector.axis).normalize(),
+  };
+};
+const runtimeColliderFromStored = (value: unknown): CollisionPrimitive => {
+  const collider = value as SavedCollisionPrimitive & {
+    gearColision?: boolean;
+  };
+  if (
+    !["box", "cylinder", "sphere", "hollowCylinder", "arc"].includes(collider.shape) ||
+    !Array.isArray(collider.center) ||
+    collider.center.length < 3 ||
+    !Array.isArray(collider.rotation) ||
+    collider.rotation.length < 4
+  )
+    throw new Error("Collider incorrecto");
+  const radial = collider.shape !== "box";
+  const hollow = collider.shape === "hollowCylinder" || collider.shape === "arc";
+  const outerRadius = radial ? Math.max(0.02, collider.radius ?? 0.5) : undefined;
+  return {
+    ...collider,
+    center: new THREE.Vector3().fromArray(collider.center),
+    size:
+      collider.shape === "box"
+        ? new THREE.Vector3()
+            .fromArray(collider.size ?? [1, 1, 1])
+            .max(new THREE.Vector3(0.01, 0.01, 0.01))
+        : undefined,
+    radius: outerRadius,
+    innerRadius: hollow
+      ? THREE.MathUtils.clamp(
+          collider.innerRadius ?? (outerRadius ?? 0.5) * 0.55,
+          0.01,
+          (outerRadius ?? 0.5) - 0.01,
+        )
+      : undefined,
+    halfHeight:
+      collider.shape === "cylinder" || hollow
+        ? Math.max(0.01, collider.halfHeight ?? 0.5)
+        : undefined,
+    startAngle: collider.shape === "arc" ? (collider.startAngle ?? 0) : undefined,
+    arcAngle:
+      collider.shape === "arc"
+        ? THREE.MathUtils.clamp(collider.arcAngle ?? 90, -360, 360) || 1
+        : undefined,
+    arcPoints:
+      collider.shape === "arc" && Array.isArray(collider.arcPoints)
+        ? (collider.arcPoints.map((point) => [
+            Number(point[0]),
+            Number(point[1]),
+          ]) as ArcControlPoints)
+        : undefined,
+    arcThickness:
+      collider.shape === "arc"
+        ? Math.max(
+            0.01,
+            collider.arcThickness ??
+              (outerRadius ?? 0.5) - (collider.innerRadius ?? 0.25),
+          )
+        : undefined,
+    segments: hollow
+      ? THREE.MathUtils.clamp(Math.round(collider.segments ?? 24), 1, 64)
+      : undefined,
+    rotation: new THREE.Quaternion().fromArray(collider.rotation),
+    gearCollision: collider.gearCollision === true || collider.gearColision === true,
+  };
+};
+const invalidPackagedGeometry = new Set<string>();
+const packagedParts = preloadedCatalog.parts as Record<
+  string,
+  {
+    connectors: {
+      local: number[];
+      axis: number[];
+      kind: "round" | "axle" | "half";
+      role: "socket" | "shaft";
+      diameter: number;
+      length?: number;
+      rotationOnly?: boolean;
+      sliding?: boolean;
+      connectionTarget?: {
+        partId: string;
+        connectorId?: number;
+      };
+      singleConnection?: boolean;
+    }[];
+    colliders: {
+      shape: CollisionPrimitive["shape"];
+      center: number[];
+      size?: number[];
+      radius?: number;
+      innerRadius?: number;
+      halfHeight?: number;
+      startAngle?: number;
+      arcAngle?: number;
+      arcPoints?: ArcControlPoints;
+      arcThickness?: number;
+      segments?: number;
+      rotation: number[];
+      gearCollision?: boolean;
+      gearRatio?: number;
+    }[];
+    gearColliders?: {
+      shape: CollisionPrimitive["shape"];
+      center: number[];
+      size?: number[];
+      radius?: number;
+      innerRadius?: number;
+      halfHeight?: number;
+      startAngle?: number;
+      arcAngle?: number;
+      arcPoints?: ArcControlPoints;
+      arcThickness?: number;
+      segments?: number;
+      rotation: number[];
+      gearCollision?: boolean;
+      gearRatio?: number;
+    }[];
+  }
+>;
+const correctionStorageKeyFor = (p: CatalogPart) =>
+  correctionPartKeys(p).find(
+    (key) =>
+      preloadedConnectionMaps[key] || preloadedCollisionMaps[key] || packagedParts[key],
+  ) ?? p.part.toLowerCase();
+// Palette tabs are deliberately presentation-only; part data lives in
+// palette.ts and imported catalog entries live in the runtime state.
+const categories = [
+  { id: "beams", icon: "━" },
+  { id: "axles", icon: "╂" },
+  { id: "pins", icon: "●" },
+  { id: "connectors", icon: "⌘" },
+  { id: "gears", icon: "⚙" },
+  { id: "wheels", icon: "◉" },
+  { id: "specials", icon: "✦" },
+  { id: "imported", icon: "↓" },
+] as const;
+// --- Catalog classification and physics defaults ---------------------------
+const kindFor = (category: string, name = ""): PieceKind =>
+  category === "motors" || /motor/i.test(name)
+    ? "motor"
+    : category === "gears" ||
+        category === "wheels" ||
+        category === "specials" ||
+        /gear|wheel|tyre|tire|rubber/i.test(name)
+      ? "wheel"
+      : "beam";
+const modelText = (p: CatalogPart) =>
+  `0 FILE ${p.part}.ldr\n1 ${p.color} 0 0 0 1 0 0 0 1 0 0 0 1 ${p.modelPart ?? p.part}.dat\n0`;
+const frictionPinRefs = new Set(["2780", "6558", "32054", "43093"]);
+const isPinPart = (p: CatalogPart) =>
+  /^Technic (Axle )?Pin(?! Connector| Joiner| Hole)/i.test(p.name) ||
+  frictionPinRefs.has(p.part);
+const isAxlePart = (p: CatalogPart) => /^Technic Axle\s+\d/i.test(p.name);
+const paletteReferenceSet = new Set([
+  ...paletteParts.flatMap((part) =>
+    [part.part, part.modelPart].filter(Boolean).map((value) => value!.toLowerCase()),
+  ),
+  ...Object.keys(paletteRequestAliases),
+]);
+const resolvePaletteRequest = (reference: string) =>
+  paletteRequestAliases[reference.toLowerCase()] ?? reference.toLowerCase();
+const belongsToDefaultPalette = (part: CatalogPart) =>
+  [part.part, part.modelPart, part.resolvedPart]
+    .filter(Boolean)
+    .some((value) => paletteReferenceSet.has(value!.toLowerCase()));
+const editorTransformMembers = (state: AppState, selected: Piece) => {
+  const explicit = [...state.selectedPieces];
+  return explicit.length > 1 && explicit.includes(selected)
+    ? explicit
+    : editorAssemblyMembers(state.pieces, selected);
+};
+/** Pivot shown by the editor gizmo and used by every inspector transform. */
+const editorTransformPivot = (
+  state: AppState,
+  selected: Piece,
+  members = editorTransformMembers(state, selected),
+) => {
+  const cardan = cardanAssemblyLayout(members, state.connections);
+  if (cardan) return cardan.centre.mesh.getWorldPosition(new THREE.Vector3());
+  selected.mesh.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(selected.mesh);
+  return bounds.isEmpty()
+    ? selected.mesh.getWorldPosition(new THREE.Vector3())
+    : bounds.getCenter(new THREE.Vector3());
+};
+const nonPhysicalGearParts = new Set([
+  "6539",
+  "18947",
+  "32187",
+  "35186",
+  "35188",
+  "3584",
+  "4158",
+  "4159",
+  "7445",
+  "7446",
+  // These are the fixed/captive halves of complete turntables. They remain
+  // listed under Gears, while only their matching upper half meshes gears.
+  "99009",
+  "18939",
+]);
+const gearboxExtensionPartRefs = new Set(["32187", "35186"]);
+const isGearboxExtensionPart = (
+  piece: Pick<CatalogPart, "part" | "modelPart" | "resolvedPart">,
+) =>
+  [piece.part, piece.modelPart, piece.resolvedPart]
+    .filter(Boolean)
+    .some((reference) => gearboxExtensionPartRefs.has(reference!.toLowerCase()));
+const supportsDynamicAxleConnections = (piece: Piece) =>
+  piece.dynamicAxleConnections || isGearboxExtensionPart(piece);
+const isConcealedGearboxGuide = (connector: MeshConnector) =>
+  connector.role === "shaft" &&
+  connector.kind === "axle" &&
+  ["6539", "18947"].includes(connector.connectionTarget?.partId.toLowerCase() ?? "");
+const turntableCounterpart: Record<string, string> = {
+  "99009": "99010",
+  "18938u": "18939",
+};
+// Turntable halves share the same LDraw origin and are assembled there.
+const turntableCounterpartOffset: Record<string, THREE.Vector3> = {
+  "99009": new THREE.Vector3(),
+  "18938u": new THREE.Vector3(),
+};
+const compoundPreviewThumb: Record<string, string> = {
+  "99009": "catalog/renders/99010.png",
+  "18938u": "catalog/renders/18939.png",
+};
+const compoundPreviewColor: Record<string, number> = {
+  "99009": 0,
+  "18938u": 71,
+};
+const correctionPartKeys = (
+  p: Pick<CatalogPart, "part" | "modelPart" | "resolvedPart">,
+) => [
+  ...new Set(
+    [p.part, p.modelPart, p.resolvedPart]
+      .filter(Boolean)
+      .map((value) => value!.toLowerCase()),
+  ),
+];
+const correctionMapFor = <T,>(
+  maps: Record<string, T[]>,
+  p: Pick<CatalogPart, "part" | "modelPart" | "resolvedPart">,
+) =>
+  correctionPartKeys(p)
+    .map((key) => maps[key])
+    .find(Boolean);
+const isGearPart = (p: CatalogPart) =>
+  correctionPartKeys(p).some((key) => nonPhysicalGearParts.has(key))
+    ? false
+    : p.gear === true || p.family === "gears" || /\bgear\b/i.test(p.name);
+/** Physical rotation axis of a gear, taken from its cylindrical gear collider. */
+const gearAxisForPiece = (piece: Piece) => {
+  piece.mesh.updateMatrixWorld(true);
+  const cylinder = [...piece.gearColliders, ...piece.colliders].find(
+    (primitive) => primitive.shape === "cylinder",
+  );
+  const localAxis = cylinder
+    ? new THREE.Vector3(0, 1, 0).applyQuaternion(cylinder.rotation)
+    : (piece.connectors.find((connector) => connector.kind === "axle")?.axis.clone() ??
+      new THREE.Vector3(0, 1, 0));
+  return localAxis.transformDirection(piece.mesh.matrixWorld).normalize();
+};
+type CardanLayout = NonNullable<ReturnType<typeof cardanAssemblyLayout>>;
+const cardanPoseParts = (layout: CardanLayout) => {
+  const firstHinge = layout.first.connectors.find(
+      (connector) => connector.rotationOnly && connector.kind === "round",
+    ),
+    thirdHinge = layout.third.connectors.find(
+      (connector) => connector.rotationOnly && connector.kind === "round",
+    ),
+    firstOuter = layout.first.connectors.find(
+      (connector) => connector.role === "socket" && connector.kind === "axle",
+    ),
+    thirdOuter = layout.third.connectors.find(
+      (connector) => connector.role === "socket" && connector.kind === "axle",
+    ),
+    centreFirst = layout.centre.connectors[0],
+    centreThird = layout.centre.connectors[1];
+  return firstHinge &&
+    thirdHinge &&
+    firstOuter &&
+    thirdOuter &&
+    centreFirst &&
+    centreThird
+    ? { firstHinge, thirdHinge, firstOuter, thirdOuter, centreFirst, centreThird }
+    : undefined;
+};
+const measureCardanCoordinates = (layout: CardanLayout) => {
+  const pose = cardanPoseParts(layout);
+  if (!pose) return undefined;
+  layout.first.mesh.updateMatrixWorld(true);
+  layout.third.mesh.updateMatrixWorld(true);
+  const inputDirection = pose.firstHinge.local
+      .clone()
+      .sub(pose.firstOuter.local)
+      .transformDirection(layout.first.mesh.matrixWorld)
+      .normalize(),
+    outputDirection = pose.thirdOuter.local
+      .clone()
+      .sub(pose.thirdHinge.local)
+      .transformDirection(layout.third.mesh.matrixWorld)
+      .normalize(),
+    firstHingeAxis = pose.firstHinge.axis
+      .clone()
+      .transformDirection(layout.first.mesh.matrixWorld)
+      .normalize();
+  return cardanEditorCoordinates(inputDirection, outputDirection, firstHingeAxis);
+};
+const initialViewportRendererPreference = (): ViewportRendererPreference => {
+  if (typeof window === "undefined") return "auto";
+  const queryPreference = new URLSearchParams(window.location.search).get("renderer");
+  if (queryPreference === "webgpu" || queryPreference === "webgl") return queryPreference;
+  const stored = localStorage.getItem("sim-studio:viewport-renderer");
+  return stored === "webgpu" || stored === "webgl" ? stored : "auto";
+};
+const normalizeMotorKey = (key: string) => {
+  const value = key.trim();
+  if (/^Key[A-Z]$/i.test(value)) return `Key${value.at(-1)!.toUpperCase()}`;
+  if (/^[A-Z]$/i.test(value)) return `Key${value.toUpperCase()}`;
+  return value || "KeyM";
+};
+const motorKeyLabel = (key: string) => key.replace(/^Key/, "");
+const isHalfBeamPart = (p: CatalogPart) =>
+  /^Technic (Beam|Panel)/i.test(p.name) &&
+  /(?:\bx\s*0\.5\b|\b0\.5\b|\bhalf\b)/i.test(p.name);
+const hasPinFriction = (p: CatalogPart) =>
+  isPinPart(p) &&
+  !/without friction|frictionless/i.test(p.name) &&
+  (/friction/i.test(p.name) || p.color === 0 || frictionPinRefs.has(p.part));
+const connectorProfile = (
+  shaft: MeshConnector,
+  socket: MeshConnector,
+): ConnectionProfile | undefined =>
+  shaft.role !== "shaft" || socket.role !== "socket"
+    ? undefined
+    : shaft.kind !== "axle" && socket.kind !== "axle"
+      ? "pin-round"
+      : shaft.kind === "axle" && socket.kind === "axle"
+        ? "axle-cross"
+        : shaft.kind === "axle" && socket.kind !== "axle"
+          ? "axle-round"
+          : undefined;
+const connectorAxialOffsets = (shaft: MeshConnector, socket: MeshConnector) =>
+  shaft.kind !== "axle" &&
+  socket.kind !== "axle" &&
+  (shaft.kind === "half") !== (socket.kind === "half")
+    ? [-0.25, 0.25]
+    : [0];
+const closestConnectorOffset = (
+  shaft: MeshConnector,
+  socket: MeshConnector,
+  shaftPoint: THREE.Vector3,
+  socketPoint: THREE.Vector3,
+  axis: THREE.Vector3,
+) => {
+  const along = shaftPoint.clone().sub(socketPoint).dot(axis);
+  return connectorAxialOffsets(shaft, socket).reduce((best, candidate) =>
+    Math.abs(along - candidate) < Math.abs(along - best) ? candidate : best,
+  );
+};
+type AxleSnapPoint = {
+  local: THREE.Vector3;
+  important: boolean;
+};
+const axleSnapPoints = (
+  connector: MeshConnector,
+  includeSecondary = true,
+): AxleSnapPoint[] => {
+  if (connector.role !== "shaft" || connector.kind !== "axle") return [];
+  if (connector.rotationOnly)
+    return [{ local: connector.local.clone(), important: true }];
+  const sections = Math.max(1, Math.ceil(connector.length ?? 0.5)),
+    half = sections / 2,
+    axis = connector.axis.clone().normalize(),
+    points: AxleSnapPoint[] = [];
+  for (let section = 0; section < sections; section++)
+    points.push({
+      local: connector.local.clone().addScaledVector(axis, -half + section + 0.5),
+      important: true,
+    });
+  if (includeSecondary)
+    for (let gap = 1; gap < sections; gap++)
+      points.push({
+        local: connector.local.clone().addScaledVector(axis, -half + gap),
+        important: false,
+      });
+  return points;
+};
+const connectorMapReach = (connectors: MeshConnector[]) =>
+  Math.max(
+    1,
+    ...connectors.map(
+      (connector) => connector.local.length() + (connector.length ?? 0.5) / 2,
+    ),
+  );
+const connectorDefaultsForPart = (part: string, connectors: MeshConnector[]) => {
+  if (part.toLowerCase().replace(/\.dat$/, "") !== "4159") return connectors;
+  return connectors.map((connector) =>
+    connector.kind === "axle" &&
+    connector.role === "socket" &&
+    Math.abs(Math.abs(connector.local.x) - 1) < 0.05 &&
+    Math.abs(connector.local.y) < 0.05 &&
+    Math.abs(connector.local.z) < 0.05 &&
+    connector.sliding === undefined
+      ? { ...connector, sliding: true }
+      : connector,
+  );
+};
+const jointPivotKey = (connection: Connection) => `joint:${connection.id}`;
+const connectionPivotLocal = (piece: Piece, connection: Connection) => {
+  connection.a.mesh.updateMatrixWorld(true);
+  piece.mesh.updateMatrixWorld(true);
+  return piece.mesh.worldToLocal(
+    connection.a.mesh.localToWorld(connection.socket.local.clone()),
+  );
+};
+const ensurePieceRotationPivot = (piece: Piece, connections: Connection[]) => {
+  if (piece.rotationPivotKey === "center") {
+    piece.rotationPivotLocal = undefined;
+    return;
+  }
+  const pieceConnections = connections.filter(
+      (connection) => connection.a === piece || connection.b === piece,
+    ),
+    selectedConnection =
+      pieceConnections.find(
+        (connection) => jointPivotKey(connection) === piece.rotationPivotKey,
+      ) ?? pieceConnections[0];
+  if (!selectedConnection) {
+    piece.rotationPivotKey = undefined;
+    piece.rotationPivotLocal = undefined;
+    return;
+  }
+  piece.rotationPivotKey = jointPivotKey(selectedConnection);
+  piece.rotationPivotLocal = connectionPivotLocal(piece, selectedConnection);
+};
+const absoluteRotationAroundLocalAxis = (piece: Piece, localAxis: THREE.Vector3) => {
+  piece.mesh.updateMatrixWorld(true);
+  const normalizedLocalAxis = localAxis.clone().normalize(),
+    worldAxis = normalizedLocalAxis
+      .clone()
+      .transformDirection(piece.mesh.matrixWorld)
+      .normalize(),
+    bases = [
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, 1),
+    ],
+    localBase = bases
+      .map((base) => ({ base, alignment: Math.abs(base.dot(normalizedLocalAxis)) }))
+      .sort((left, right) => left.alignment - right.alignment)[0].base,
+    localReference = localBase
+      .clone()
+      .addScaledVector(normalizedLocalAxis, -localBase.dot(normalizedLocalAxis))
+      .normalize(),
+    pieceReference = localReference
+      .clone()
+      .transformDirection(piece.mesh.matrixWorld)
+      .normalize(),
+    globalBase = bases
+      .map((base) => ({ base, alignment: Math.abs(base.dot(worldAxis)) }))
+      .sort((left, right) => left.alignment - right.alignment)[0].base,
+    globalReference = globalBase
+      .clone()
+      .addScaledVector(worldAxis, -globalBase.dot(worldAxis))
+      .normalize();
+  return Math.atan2(
+    worldAxis.dot(globalReference.clone().cross(pieceReference)),
+    globalReference.dot(pieceReference),
+  );
+};
+const rotatePieceAroundLocalAxis = (
+  piece: Piece,
+  localAxis: THREE.Vector3,
+  radians: number,
+) => {
+  const pivotLocal = piece.rotationPivotLocal,
+    pivotBefore = pivotLocal ? piece.mesh.localToWorld(pivotLocal.clone()) : undefined;
+  piece.mesh.quaternion
+    .multiply(
+      new THREE.Quaternion().setFromAxisAngle(localAxis.clone().normalize(), radians),
+    )
+    .normalize();
+  piece.mesh.updateMatrixWorld(true);
+  if (pivotLocal && pivotBefore) {
+    const pivotAfter = piece.mesh.localToWorld(pivotLocal.clone());
+    piece.mesh.position.add(pivotBefore.sub(pivotAfter));
+    piece.mesh.updateMatrixWorld(true);
+  }
+};
+const rotatePieceAroundPivotWithGlobalSnap = (
+  piece: Piece,
+  axis: "x" | "y" | "z",
+  radians: number,
+  snapDegrees: RotationSnapStep,
+) => {
+  const localAxis =
+      axis === "x"
+        ? new THREE.Vector3(1, 0, 0)
+        : axis === "y"
+          ? new THREE.Vector3(0, 1, 0)
+          : new THREE.Vector3(0, 0, 1),
+    step = THREE.MathUtils.degToRad(snapDegrees),
+    current = absoluteRotationAroundLocalAxis(piece, localAxis),
+    appliedRadians = step
+      ? Math.round((current + radians) / step) * step - current
+      : radians;
+  rotatePieceAroundLocalAxis(piece, localAxis, appliedRadians);
+  return appliedRadians;
+};
+const forcedConnectionAxesAligned = (connection: Connection) => {
+  connection.a.mesh.updateMatrixWorld(true);
+  connection.b.mesh.updateMatrixWorld(true);
+  const socketAxis = connection.socket.axis
+      .clone()
+      .transformDirection(connection.a.mesh.matrixWorld)
+      .normalize(),
+    shaftAxis = connection.shaft.axis
+      .clone()
+      .transformDirection(connection.b.mesh.matrixWorld)
+      .normalize();
+  return Math.abs(socketAxis.dot(shaftAxis)) >= 0.985;
+};
+const removeMisalignedForcedConnections = (state: AppState, movedPiece: Piece) => {
+  const removed = state.connections.filter(
+    (connection) =>
+      connection.forced &&
+      (connection.a === movedPiece || connection.b === movedPiece) &&
+      !forcedConnectionAxesAligned(connection),
+  );
+  if (!removed.length) return 0;
+  const affected = new Set<Piece>([movedPiece]);
+  removed.forEach((connection) => {
+    affected.add(connection.a);
+    affected.add(connection.b);
+  });
+  const removedIds = new Set(removed.map((connection) => connection.id));
+  state.connections = state.connections.filter(
+    (connection) => !removedIds.has(connection.id),
+  );
+  affected.forEach((piece) => ensurePieceRotationPivot(piece, state.connections));
+  rebalanceAllSmartDefaults(state);
+  return removed.length;
+};
+const detectShaftTraversals = (pieces: Piece[]) => {
+  type SocketEntry = {
+    host: Piece;
+    connector: MeshConnector;
+    point: THREE.Vector3;
+    axis: THREE.Vector3;
+  };
+  const cellSize = 0.45,
+    cellKey = (point: THREE.Vector3) =>
+      `${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}:${Math.floor(point.z / cellSize)}`,
+    socketGrid = new Map<string, SocketEntry[]>(),
+    worldPose = (piece: Piece, connector: MeshConnector) => ({
+      point: connector.local.clone().applyMatrix4(piece.mesh.matrixWorld),
+      axis: connector.axis.clone().transformDirection(piece.mesh.matrixWorld).normalize(),
+    });
+  pieces.forEach((piece) => {
+    piece.mesh.updateMatrixWorld(true);
+    piece.connectors.forEach((connector) => {
+      if (connector.role !== "socket") return;
+      const pose = worldPose(piece, connector),
+        entry = { host: piece, connector, ...pose },
+        key = cellKey(pose.point),
+        entries = socketGrid.get(key) ?? [];
+      entries.push(entry);
+      socketGrid.set(key, entries);
+    });
+  });
+  const traversals: {
+      shaft: Piece;
+      host: Piece;
+    }[] = [],
+    traversedPairs = new Set<string>();
+  pieces.forEach((shaftPiece) => {
+    shaftPiece.mesh.updateMatrixWorld(true);
+    shaftPiece.connectors.forEach((shaft) => {
+      // Dedicated gearbox guides describe a mating face, not an axle passing
+      // through a hole. Excluding their collision before a real connection
+      // exists lets the clutch gear tunnel through the extension.
+      if (shaft.role !== "shaft" || shaft.connectionTarget) return;
+      const shaftPose = worldPose(shaftPiece, shaft),
+        halfLength = Math.max(0.08, (shaft.length ?? 0.5) / 2),
+        searchHalfLength = halfLength + 0.18,
+        steps = Math.max(1, Math.ceil((searchHalfLength * 2) / (cellSize * 0.5))),
+        candidates = new Set<SocketEntry>();
+      for (let step = 0; step <= steps; step++) {
+        const sample = shaftPose.point
+            .clone()
+            .addScaledVector(
+              shaftPose.axis,
+              -searchHalfLength + (step / steps) * searchHalfLength * 2,
+            ),
+          x = Math.floor(sample.x / cellSize),
+          y = Math.floor(sample.y / cellSize),
+          z = Math.floor(sample.z / cellSize);
+        for (let dx = -1; dx <= 1; dx++)
+          for (let dy = -1; dy <= 1; dy++)
+            for (let dz = -1; dz <= 1; dz++)
+              socketGrid
+                .get(`${x + dx}:${y + dy}:${z + dz}`)
+                ?.forEach((entry) => candidates.add(entry));
+      }
+      candidates.forEach((candidate) => {
+        if (
+          candidate.host === shaftPiece ||
+          candidate.connector.connectionTarget ||
+          !connectorProfile(shaft, candidate.connector) ||
+          Math.abs(candidate.axis.dot(shaftPose.axis)) < 0.94
+        )
+          return;
+        const delta = candidate.point.clone().sub(shaftPose.point),
+          along = delta.dot(shaftPose.axis),
+          radial = delta.clone().addScaledVector(shaftPose.axis, -along).length(),
+          radialTolerance = Math.max(
+            0.18,
+            Math.min(shaft.diameter, candidate.connector.diameter) * 0.22,
+          );
+        if (radial > radialTolerance || Math.abs(along) > searchHalfLength) return;
+        const pair = `${shaftPiece.id}:${candidate.host.id}`;
+        if (traversedPairs.has(pair)) return;
+        traversedPairs.add(pair);
+        traversals.push({ shaft: shaftPiece, host: candidate.host });
+      });
+    });
+  });
+  return traversals;
+};
+const pairProfile = (a: MeshConnector, b: MeshConnector) =>
+  a.role === "shaft" && b.role === "socket"
+    ? connectorProfile(a, b)
+    : b.role === "shaft" && a.role === "socket"
+      ? connectorProfile(b, a)
+      : undefined;
+const isRotationOnlyConnector = (connector: MeshConnector) =>
+  connector.rotationOnly === true;
+const isSlidingConnector = (connector: MeshConnector) => connector.sliding === true;
+const isSlidingConnection = (connection: Connection) =>
+  isSlidingConnector(connection.socket) || isSlidingConnector(connection.shaft);
+const isSpecialMechanicalConnection = (connection: Connection) =>
+  isGearboxCarrierPair(connection.a, connection.b) ||
+  isGearboxRigidExtensionPair(connection.a, connection.b) ||
+  isGearboxRotatingExtensionPair(connection.a, connection.b) ||
+  isChangeoverForkRingConnection(
+    connection.a,
+    connection.socket,
+    connection.b,
+    connection.shaft,
+  );
+const allowedModes = (profile: ConnectionProfile): JointMode[] =>
+  profile === "pin-round"
+    ? ["fixed", "rotation", "motor"]
+    : profile === "axle-cross"
+      ? ["fixed", "linear"]
+      : ["rotation", "linear", "rotation-linear", "motor"];
+const allowedModesForConnection = (connection: Connection): JointMode[] =>
+  isGearboxCarrierPair(connection.a, connection.b)
+    ? ["linear"]
+    : isGearboxRigidExtensionPair(connection.a, connection.b)
+      ? ["linear"]
+      : isGearboxRotatingExtensionPair(connection.a, connection.b)
+        ? ["rotation-linear"]
+        : isRotationOnlyConnector(connection.socket) ||
+            isRotationOnlyConnector(connection.shaft)
+          ? ["rotation"]
+          : allowedModes(connection.profile);
+const defaultMode = (profile: ConnectionProfile): JointMode =>
+  profile === "pin-round"
+    ? "fixed"
+    : profile === "axle-cross"
+      ? "linear"
+      : "rotation-linear";
+const freestAutomaticMode = (profile: ConnectionProfile): JointMode =>
+  profile === "pin-round"
+    ? "rotation"
+    : profile === "axle-round"
+      ? "rotation-linear"
+      : "fixed";
+const rebalanceSmartDefaults = (state: AppState, shaftPiece: Piece) => {
+  const connections = state.connections.filter(
+    (connection) => connection.b === shaftPiece,
+  );
+  if (!connections.length) return;
+  connections.forEach((connection) => {
+    if (!allowedModesForConnection(connection).includes(connection.mode)) {
+      connection.mode = isGearboxRigidExtensionPair(connection.a, connection.b)
+        ? "linear"
+        : isGearboxRotatingExtensionPair(connection.a, connection.b)
+          ? "rotation-linear"
+          : isRotationOnlyConnector(connection.socket) ||
+              isRotationOnlyConnector(connection.shaft)
+            ? "rotation"
+            : isSlidingConnection(connection)
+              ? "linear"
+              : defaultMode(connection.profile);
+      connection.userConfigured = false;
+      state.connectionModes.delete(connection.id);
+    }
+  });
+  connections.forEach((connection) => {
+    if (connection.userConfigured) return;
+    if (isGearboxCarrierPair(connection.a, connection.b)) connection.mode = "linear";
+    else if (isGearboxRigidExtensionPair(connection.a, connection.b))
+      connection.mode = "linear";
+    else if (isGearboxRotatingExtensionPair(connection.a, connection.b))
+      connection.mode = "rotation-linear";
+    else if (
+      isRotationOnlyConnector(connection.socket) ||
+      isRotationOnlyConnector(connection.shaft)
+    )
+      connection.mode = "rotation";
+    else if (isSlidingConnection(connection)) connection.mode = "linear";
+    else if (connection.profile === "axle-cross") connection.mode = "fixed";
+    else if (connection.profile === "axle-round") connection.mode = "rotation-linear";
+    else if (shaftPiece.frictionPin) connection.mode = "fixed";
+  });
+  let anchored = connections.some(
+    (connection) =>
+      connection.mode === "fixed" &&
+      (connection.userConfigured || connection.profile === "axle-cross"),
+  );
+  connections.forEach((connection) => {
+    if (
+      connection.userConfigured ||
+      isGearboxCarrierPair(connection.a, connection.b) ||
+      isGearboxRigidExtensionPair(connection.a, connection.b) ||
+      isGearboxRotatingExtensionPair(connection.a, connection.b) ||
+      isRotationOnlyConnector(connection.socket) ||
+      isRotationOnlyConnector(connection.shaft) ||
+      isSlidingConnection(connection) ||
+      connection.profile === "axle-cross" ||
+      connection.profile === "axle-round" ||
+      shaftPiece.frictionPin
+    )
+      return;
+    if (!anchored) {
+      connection.mode = "fixed";
+      anchored = true;
+    } else connection.mode = freestAutomaticMode(connection.profile);
+  });
+};
+const rebalanceAllSmartDefaults = (state: AppState) => {
+  new Set(state.connections.map((connection) => connection.b)).forEach((piece) =>
+    rebalanceSmartDefaults(state, piece),
+  );
+};
+const modeLabel: Record<JointMode, string> = {
+  fixed: "Fija",
+  rotation: "Rotación libre",
+  linear: "Lineal libre",
+  "rotation-linear": "Rotación y lineal libres",
+  motor: "Motor",
+};
+const profileLabel: Record<ConnectionProfile, string> = {
+  "pin-round": "Naranja ↔ azul",
+  "axle-cross": "Morado ↔ verde",
+  "axle-round": "Morado ↔ azul",
+};
+// --- React application shell ------------------------------------------------
+// Home coordinates the extracted subsystems and owns browser/UI state. The
+// Three.js/Rapier runtime is created once inside its main effect below.
+export default function Home() {
+  const [language, setLanguage] = useState<Language>("zh-CN");
+  const isChinese = language === "zh-CN";
+  const languageRef = useRef<Language>(language);
+  const isChineseLanguage = () => languageRef.current === "zh-CN";
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
+  // Three.js host elements and mutable runtime handles. These values should not
+  // trigger React renders, so they deliberately live in refs rather than state.
+  const studioRef = useRef<HTMLElement>(null);
+  const mountRef = useRef<HTMLDivElement>(null);
+  const fpsRef = useRef<HTMLDivElement>(null);
+  const appRef = useRef<AppState | null>(null);
+  // Hidden file inputs used by the import and map editors.
+  const fileRef = useRef<HTMLInputElement>(null);
+  const projectFileRef = useRef<HTMLInputElement>(null);
+  const connectorFileRef = useRef<HTMLInputElement>(null);
+  const colliderFileRef = useRef<HTMLInputElement>(null);
+  const projectNameInputRef = useRef<HTMLInputElement>(null);
+  const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
+  const gpuPrototypeRef = useRef<GpuRenderPrototype | null>(null);
+  const gpuPrototypeFrameRef = useRef(0);
+  // Mutable guards shared with asynchronous loaders and the simulation loop.
+  const importTokenRef = useRef(0);
+  const suppressProjectNameDirtyRef = useRef(false);
+  const projectRestoringRef = useRef(false);
+  const physicsTransitionRef = useRef(false);
+  const saveShortcutRef = useRef<() => void>(() => undefined);
+  const initialFogEffectRef = useRef(true);
+  // Project identity and revision bookkeeping are kept outside React state so
+  // recovery saves can read the latest values without recreating callbacks.
+  const activeProjectIdRef = useRef(createProjectId());
+  const projectNameRef = useRef(isChinese ? "未命名模型" : "Untitled mechanism");
+  const projectCreatedAtRef = useRef(new Date().toISOString());
+  const projectRevisionRef = useRef(0);
+  const savedProjectRevisionRef = useRef<number | null>(null);
+  const projectMapBaselinesRef = useRef<Record<string, SavedMapBaseline>>({});
+  // Physics preferences are mirrored in refs for the requestAnimationFrame loop.
+  const structuralModeRef = useRef<StructuralMode>("rigid");
+  const structuralStiffnessRef = useRef(85);
+  // Simulation and selection state.
+  const [running, setRunning] = useState(false);
+  const [physicsBusy, setPhysicsBusy] = useState(false);
+  const [count, setCount] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Palette and external catalog state.
+  const [category, setCategory] = useState("beams");
+  const [search, setSearch] = useState("");
+  const [reference, setReference] = useState("");
+  const [results, setResults] = useState<CatalogPart[]>([]);
+  const [imported, setImported] = useState<CatalogPart[]>([]);
+  const [, setCatalogBusy] = useState(false);
+  const [message, setMessage] = useState("catalog-ready");
+  // Technical overlays and map editors.
+  const [debugViews, setDebugViews] = useState<DebugFlags>({
+    colliders: false,
+    connectors: false,
+    physics: false,
+  });
+  const [lastLog, setLastLog] = useState("");
+  const [gpuPrototypeBusy, setGpuPrototypeBusy] = useState(false);
+  const [gpuPrototypeResult, setGpuPrototypeResult] = useState<GpuPrototypeResult | null>(
+    null,
+  );
+  const [gpuPrototypeError, setGpuPrototypeError] = useState("");
+  const [gpuPreviewRunning, setGpuPreviewRunning] = useState(false);
+  const [viewportRenderer, setViewportRenderer] = useState<"WebGPU" | "WebGL">("WebGL");
+  const [rendererPreference, setRendererPreference] =
+    useState<ViewportRendererPreference>("auto");
+  const rendererPreferenceRef = useRef(rendererPreference);
+  const rendererPreferenceInitializedRef = useRef(false);
+  rendererPreferenceRef.current = rendererPreference;
+  const [adaptiveRendering, setAdaptiveRendering] = useState(true);
+  const adaptiveRenderingRef = useRef(true);
+  const adaptiveRenderingInitializedRef = useRef(false);
+  const [, setConnectionRevision] = useState(0);
+  const [, setConnectorRevision] = useState(0);
+  const [, setColliderRevision] = useState(0);
+  const [connectionMapOpen, setConnectionMapOpen] = useState(false);
+  const [collisionMapOpen, setCollisionMapOpen] = useState(false);
+  const [collisionLayer, setCollisionLayer] = useState<"normal" | "gear">("normal");
+  const [mapUpdates, setMapUpdates] = useState<MapUpdateCandidate[]>([]);
+  const [mapUpdatesOpen, setMapUpdatesOpen] = useState(false);
+  // Placement, snapping and pending import controls.
+  const [rotationAngle, setRotationAngle] = useState(15);
+  const [gridStep, setGridStep] = useState<GridStep>(0.25);
+  const [axleSnapStep, setAxleSnapStep] = useState<AxleSnapStep>(0.25);
+  const [rotationSnapStep, setRotationSnapStep] = useState<RotationSnapStep>(22.5);
+  const [importDraft, setImportDraft] = useState<ImportDraft | null>(null);
+  // User interface preferences.
+  const [theme, setTheme] = useState<"dark" | "light">("light");
+  const [controlsHelpVisible, setControlsHelpVisible] = useState(true);
+  const [moveGizmoVisible, setMoveGizmoVisible] = useState(true);
+  const [rotateGizmoVisible, setRotateGizmoVisible] = useState(true);
+  const [gizmoScale, setGizmoScale] = useState(1);
+  const [gizmoThickness, setGizmoThickness] = useState(1);
+  const [modelOutlinesVisible, setModelOutlinesVisible] = useState(true);
+  const moveGizmoVisibleRef = useRef(true);
+  const rotateGizmoVisibleRef = useRef(true);
+  const gizmoScaleRef = useRef(1);
+  const gizmoThicknessRef = useRef(1);
+  const modelOutlinesVisibleRef = useRef(true);
+  const [inspectorWidth, setInspectorWidth] = useState(270);
+  const [fogSettings, setFogSettings] = useState<FogSettings>({
+    ...DEFAULT_FOG_SETTINGS,
+  });
+  // Global physics controls.
+  const [structuralMode, setStructuralMode] = useState<StructuralMode>("rigid");
+  const [structuralStiffness, setStructuralStiffness] = useState(85);
+  const [physicsSettings, setPhysicsSettings] = useState<PhysicsSettings>({
+    ...DEFAULT_PHYSICS_SETTINGS,
+  });
+  // Project manager and recovery-save state.
+  const [projectName, setProjectName] = useState(
+    isChinese ? "未命名模型" : "Untitled mechanism",
+  );
+  const [projectNameEditing, setProjectNameEditing] = useState(false);
+  const [projectNameDraft, setProjectNameDraft] = useState("");
+  const [duplicateProjectDocument, setDuplicateProjectDocument] =
+    useState<SimStudioProjectDocument | null>(null);
+  const [duplicateProjectName, setDuplicateProjectName] = useState("");
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectPage, setProjectPage] = useState(0);
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [currentProjectSaved, setCurrentProjectSaved] = useState(false);
+  const [projectDirty, setProjectDirty] = useState(false);
+  const [saveNamePrompt, setSaveNamePrompt] = useState(false);
+  const [projectConfirmation, setProjectConfirmation] = useState<
+    | {
+        kind: "new";
+      }
+    | {
+        kind: "open" | "delete";
+        project: ProjectSummary;
+      }
+    | {
+        kind: "import";
+        document: SimStudioProjectDocument;
+      }
+    | null
+  >(null);
+  const [recoveryStatus, setRecoveryStatus] = useState<"idle" | "saving" | "saved">(
+    "idle",
+  );
+  // Translated labels are computed once per render and shared by the inspector.
+  const t = translations[language];
+  const queueMapUpdates = (updates: MapUpdateCandidate[], openAutomatically = true) => {
+    if (!updates.length) return;
+    setMapUpdates((current) => {
+      const merged = new Map(current.map((item) => [item.key, item]));
+      for (const update of updates) {
+        const previous = merged.get(update.key);
+        merged.set(
+          update.key,
+          previous
+            ? {
+                ...previous,
+                layers: [...new Set([...previous.layers, ...update.layers])],
+                sources: [...new Set([...previous.sources, ...update.sources])],
+                localCounts: update.localCounts,
+                preloadedCounts: update.preloadedCounts,
+              }
+            : update,
+        );
+      }
+      return [...merged.values()].sort((left, right) =>
+        left.part.localeCompare(right.part, undefined, { numeric: true }),
+      );
+    });
+    if (openAutomatically) setMapUpdatesOpen(true);
+  };
+  const acknowledgeManualMapEdit = (key: string, layers: MapUpdateLayer[]) => {
+    const current = preloadedMapFingerprint(key),
+      storedBaseline =
+        readStoredMapBaseline(localStorage, key) ??
+        legacyMapBaseline(localStorage, key, current),
+      browserBaseline = { ...storedBaseline },
+      projectBaseline = {
+        ...(projectMapBaselinesRef.current[key] ?? current),
+      };
+    for (const layer of layers) {
+      if (current[layer] !== undefined) {
+        browserBaseline[layer] = current[layer];
+        projectBaseline[layer] = current[layer];
+      }
+    }
+    writeStoredMapBaseline(localStorage, key, browserBaseline);
+    projectMapBaselinesRef.current[key] = projectBaseline;
+    const actualBundle = storedMapBundle(localStorage, key),
+      browserDifferences = differentMapLayers(
+        current,
+        fingerprintMapBundle(actualBundle),
+      ),
+      editedDifferences = layers.filter((layer) => browserDifferences.includes(layer)),
+      catalog = paletteParts.find((part) => correctionStorageKeyFor(part) === key);
+    setMapUpdates((currentUpdates) => {
+      let found = false;
+      const remaining = currentUpdates.flatMap((candidate) => {
+        if (candidate.key !== key) return [candidate];
+        found = true;
+        const pendingLayers = [
+            ...new Set([
+              ...candidate.layers.filter((layer) => !layers.includes(layer)),
+              ...editedDifferences,
+            ]),
+          ],
+          sources: MapUpdateCandidate["sources"] = candidate.sources.filter(
+            (source) => source !== "browser",
+          );
+        if (pendingLayers.some((layer) => browserDifferences.includes(layer)))
+          sources.push("browser");
+        return pendingLayers.length
+          ? [
+              {
+                ...candidate,
+                layers: pendingLayers,
+                sources,
+                localCounts: mapLayerCounts(actualBundle),
+              },
+            ]
+          : [];
+      });
+      if (!found && editedDifferences.length) {
+        remaining.push({
+          key,
+          part: catalog?.part ?? key,
+          name: catalog?.name ?? `LEGO ${key}`,
+          thumb: catalog?.thumb,
+          layers: editedDifferences,
+          localCounts: mapLayerCounts(actualBundle),
+          preloadedCounts: mapLayerCounts(preloadedMapBundle(key)),
+          sources: ["browser"],
+        });
+      }
+      if (!remaining.length) setMapUpdatesOpen(false);
+      return remaining.sort((left, right) =>
+        left.part.localeCompare(right.part, undefined, { numeric: true }),
+      );
+    });
+  };
+  const modeLabels: Record<JointMode, string> =
+    language === "es"
+      ? modeLabel
+      : {
+          fixed: isChinese ? "固定" : "Fixed",
+          rotation: isChinese ? "自由旋转" : "Free rotation",
+          linear: isChinese ? "自由直线移动" : "Free linear travel",
+          "rotation-linear": isChinese
+            ? "自由旋转与直线移动"
+            : "Free rotation and linear travel",
+          motor: isChinese ? "电机" : "Motor",
+        };
+  const mapLayerLabel = (layer: MapUpdateLayer) =>
+    language === "es"
+      ? {
+          connectors: "conexiones",
+          colliders: "colisión",
+          gearColliders: "colisión de engranajes",
+          specialGear: "tipo de engranaje",
+        }[layer]
+      : {
+          connectors: isChinese ? "连接" : "connections",
+          colliders: isChinese ? "碰撞" : "collision",
+          gearColliders: isChinese ? "齿轮碰撞" : "gear collision",
+          specialGear: isChinese ? "齿轮类型" : "gear type",
+        }[layer];
+  const profileLabels: Record<ConnectionProfile, string> =
+    language === "es"
+      ? profileLabel
+      : {
+          "pin-round": isChinese ? "橙色 ↔ 蓝色" : "Orange ↔ blue",
+          "axle-cross": isChinese ? "紫色 ↔ 绿色" : "Purple ↔ green",
+          "axle-round": isChinese ? "紫色 ↔ 蓝色" : "Purple ↔ blue",
+        };
+  useEffect(() => {
+    try {
+      const parts = new Set<string>();
+      for (let index = 0; index < localStorage.length; index++) {
+        const storageKey = localStorage.key(index);
+        const prefix = [
+          "sim-connectors-v4:",
+          "sim-colliders-v1:",
+          "sim-gear-colliders-v1:",
+          "sim-special-gear-v1:",
+        ].find((candidate) => storageKey?.startsWith(candidate));
+        if (prefix && storageKey)
+          parts.add(storageKey.slice(prefix.length).toLowerCase());
+      }
+      const updates: MapUpdateCandidate[] = [];
+      let openAutomatically = false;
+      for (const key of parts) {
+        const actualBundle = storedMapBundle(localStorage, key),
+          actual = fingerprintMapBundle(actualBundle),
+          current = preloadedMapFingerprint(key),
+          storedBaseline = readStoredMapBaseline(localStorage, key),
+          baseline = storedBaseline ?? legacyMapBaseline(localStorage, key, current),
+          layers = differentMapLayers(current, actual),
+          automaticLayers = changedMapLayers(baseline, current, actual);
+        if (!storedBaseline) writeStoredMapBaseline(localStorage, key, baseline);
+        if (!layers.length) {
+          writeStoredMapBaseline(localStorage, key, current);
+          continue;
+        }
+        if (automaticLayers.length) openAutomatically = true;
+        const catalog = paletteParts.find(
+          (part) => correctionStorageKeyFor(part) === key,
+        );
+        updates.push({
+          key,
+          part: catalog?.part ?? key,
+          name: catalog?.name ?? `LEGO ${key}`,
+          thumb: catalog?.thumb,
+          layers,
+          localCounts: mapLayerCounts(actualBundle),
+          preloadedCounts: mapLayerCounts(preloadedMapBundle(key)),
+          sources: ["browser"],
+        });
+      }
+      queueMapUpdates(updates, openAutomatically);
+    } catch {
+      // Storage can be unavailable in private or hardened browser contexts.
+    }
+  }, []);
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(gpuPrototypeFrameRef.current);
+      gpuPrototypeRef.current?.dispose();
+      gpuPrototypeRef.current = null;
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!rendererPreferenceInitializedRef.current) {
+      rendererPreferenceInitializedRef.current = true;
+      const initialPreference = initialViewportRendererPreference();
+      rendererPreferenceRef.current = initialPreference;
+      if (initialPreference !== rendererPreference)
+        setRendererPreference(initialPreference);
+      return;
+    }
+    rendererPreferenceRef.current = rendererPreference;
+    try {
+      localStorage.setItem("sim-studio:viewport-renderer", rendererPreference);
+    } catch {
+      // Storage may be disabled; switching still works for this session.
+    }
+    appRef.current?.setViewportRendererPreference(rendererPreference);
+  }, [rendererPreference]);
+  useEffect(() => {
+    if (!adaptiveRenderingInitializedRef.current) {
+      adaptiveRenderingInitializedRef.current = true;
+      const initialAdaptive =
+        localStorage.getItem("sim-studio:adaptive-rendering") !== "0";
+      adaptiveRenderingRef.current = initialAdaptive;
+      if (initialAdaptive !== adaptiveRendering) setAdaptiveRendering(initialAdaptive);
+      return;
+    }
+    adaptiveRenderingRef.current = adaptiveRendering;
+    try {
+      localStorage.setItem(
+        "sim-studio:adaptive-rendering",
+        adaptiveRendering ? "1" : "0",
+      );
+    } catch {
+      // Storage may be disabled; the current session still keeps the choice.
+    }
+    appRef.current?.setAdaptiveRendering(adaptiveRendering);
+  }, [adaptiveRendering]);
+  useEffect(() => {
+    gizmoScaleRef.current = gizmoScale;
+    gizmoThicknessRef.current = gizmoThickness;
+    try {
+      localStorage.setItem("sim-studio:gizmo-scale", String(gizmoScale));
+      localStorage.setItem("sim-studio:gizmo-thickness", String(gizmoThickness));
+    } catch {}
+    appRef.current?.setGizmoAppearance(gizmoScale, gizmoThickness);
+  }, [gizmoScale, gizmoThickness]);
+  useEffect(() => {
+    try {
+      setLastLog(localStorage.getItem("sim-studio:physics-log") ?? "");
+      setTheme(localStorage.getItem("sim-studio:theme") === "dark" ? "dark" : "light");
+      const savedLanguage = localStorage.getItem("sim-studio:language");
+      setLanguage(
+        savedLanguage === "es" || savedLanguage === "en" ? savedLanguage : "zh-CN",
+      );
+      setControlsHelpVisible(
+        localStorage.getItem("sim-studio:controls-help-hidden") !== "1",
+      );
+      const savedModelOutlinesVisible =
+        localStorage.getItem("sim-studio:model-outlines") !== "0";
+      modelOutlinesVisibleRef.current = savedModelOutlinesVisible;
+      setModelOutlinesVisible(savedModelOutlinesVisible);
+      const savedGizmoScale = THREE.MathUtils.clamp(
+          Number(localStorage.getItem("sim-studio:gizmo-scale")) || 1,
+          0.5,
+          2,
+        ),
+        savedGizmoThickness = THREE.MathUtils.clamp(
+          Number(localStorage.getItem("sim-studio:gizmo-thickness")) || 1,
+          0.5,
+          2.5,
+        );
+      gizmoScaleRef.current = savedGizmoScale;
+      gizmoThicknessRef.current = savedGizmoThickness;
+      setGizmoScale(savedGizmoScale);
+      setGizmoThickness(savedGizmoThickness);
+      const savedGridStepText = localStorage.getItem("sim-studio:grid-step"),
+        savedGridStep = savedGridStepText === null ? NaN : Number(savedGridStepText);
+      if (
+        savedGridStep === 0 ||
+        savedGridStep === 0.25 ||
+        savedGridStep === 0.5 ||
+        savedGridStep === 1
+      )
+        setGridStep(savedGridStep);
+      const savedAxleSnapText = localStorage.getItem("sim-studio:axle-snap"),
+        savedAxleSnap = savedAxleSnapText === null ? NaN : Number(savedAxleSnapText);
+      if (
+        savedAxleSnap === 0 ||
+        savedAxleSnap === 0.0625 ||
+        savedAxleSnap === 0.125 ||
+        savedAxleSnap === 0.25
+      )
+        setAxleSnapStep(savedAxleSnap);
+      const savedRotationSnapText = localStorage.getItem("sim-studio:rotation-snap"),
+        savedRotationSnap =
+          savedRotationSnapText === null ? NaN : Number(savedRotationSnapText);
+      if (
+        savedRotationSnap === 0 ||
+        savedRotationSnap === 11.25 ||
+        savedRotationSnap === 22.5 ||
+        savedRotationSnap === 45
+      )
+        setRotationSnapStep(savedRotationSnap);
+      setStructuralMode(
+        localStorage.getItem("sim-studio:structural-mode") === "flexible"
+          ? "flexible"
+          : "rigid",
+      );
+      const savedStiffness = Number(
+        localStorage.getItem("sim-studio:structural-stiffness"),
+      );
+      if (Number.isFinite(savedStiffness) && savedStiffness >= 1)
+        setStructuralStiffness(THREE.MathUtils.clamp(savedStiffness, 1, 100));
+      const savedPhysics = JSON.parse(
+        localStorage.getItem("sim-studio:physics-settings") ?? "null",
+      ) as Partial<PhysicsSettings> | null;
+      if (savedPhysics) {
+        const restored = { ...DEFAULT_PHYSICS_SETTINGS };
+        (Object.keys(restored) as (keyof PhysicsSettings)[]).forEach((key) => {
+          const value = Number(savedPhysics[key]);
+          if (Number.isFinite(value) && value >= 0) restored[key] = value;
+        });
+        setPhysicsSettings(restored);
+      }
+      const savedFog = JSON.parse(
+        localStorage.getItem("sim-studio:fog-settings") ?? "null",
+      ) as Partial<FogSettings> | null;
+      if (savedFog) {
+        const near = THREE.MathUtils.clamp(
+            Number(savedFog.near) || DEFAULT_FOG_SETTINGS.near,
+            1,
+            149,
+          ),
+          far = THREE.MathUtils.clamp(
+            Number(savedFog.far) || DEFAULT_FOG_SETTINGS.far,
+            near + 1,
+            160,
+          );
+        setFogSettings({
+          enabled: savedFog.enabled !== false,
+          near,
+          far,
+        });
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sim-studio:theme", theme);
+    } catch {}
+  }, [theme]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sim-studio:language", language);
+    } catch {}
+    document.documentElement.lang = language;
+  }, [language]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sim-studio:grid-step", String(gridStep));
+    } catch {}
+    if (appRef.current) appRef.current.gridStep = gridStep;
+    appRef.current?.scheduleRecoverySave();
+  }, [gridStep]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sim-studio:axle-snap", String(axleSnapStep));
+    } catch {}
+    if (appRef.current) appRef.current.axleSnapStep = axleSnapStep;
+    appRef.current?.scheduleRecoverySave();
+  }, [axleSnapStep]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sim-studio:rotation-snap", String(rotationSnapStep));
+    } catch {}
+    if (appRef.current) appRef.current.rotationSnapStep = rotationSnapStep;
+    appRef.current?.scheduleRecoverySave();
+  }, [rotationSnapStep]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("sim-studio:structural-mode", structuralMode);
+      localStorage.setItem(
+        "sim-studio:structural-stiffness",
+        String(structuralStiffness),
+      );
+    } catch {}
+    structuralModeRef.current = structuralMode;
+    structuralStiffnessRef.current = structuralStiffness;
+    appRef.current?.scheduleRecoverySave();
+  }, [structuralMode, structuralStiffness]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "sim-studio:physics-settings",
+        JSON.stringify(physicsSettings),
+      );
+    } catch {}
+    if (appRef.current) appRef.current.physicsSettings = physicsSettings;
+    appRef.current?.scheduleRecoverySave();
+  }, [physicsSettings]);
+  useEffect(() => {
+    // The scene already starts with the defaults. Skipping this initial pass
+    // prevents a stored preference from being overwritten before it is read.
+    if (initialFogEffectRef.current) {
+      initialFogEffectRef.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem("sim-studio:fog-settings", JSON.stringify(fogSettings));
+    } catch {}
+    const state = appRef.current;
+    if (!state) return;
+    const color =
+      state.scene.background instanceof THREE.Color
+        ? state.scene.background.clone()
+        : new THREE.Color(theme === "dark" ? 0x202328 : 0xdfe7ed);
+    state.scene.fog = fogSettings.enabled
+      ? new THREE.Fog(color, fogSettings.near, fogSettings.far)
+      : null;
+    state.requestRender();
+  }, [fogSettings, theme]);
+  useEffect(() => {
+    projectNameRef.current =
+      projectName.trim() || (isChinese ? "未命名模型" : "Untitled mechanism");
+    const markDirty = !suppressProjectNameDirtyRef.current;
+    suppressProjectNameDirtyRef.current = false;
+    appRef.current?.scheduleRecoverySave(false, markDirty);
+  }, [projectName]);
+  useEffect(() => {
+    const source =
+        category === "imported"
+          ? imported
+          : paletteParts.filter((p) => p.family === category),
+      query = search.trim().toLowerCase();
+    setCatalogBusy(false);
+    setResults(
+      query
+        ? source.filter((p) =>
+            (p.part + " " + p.name + " " + displayPartName(p.name, "zh-CN"))
+              .toLowerCase()
+              .includes(query),
+          )
+        : source,
+    );
+  }, [category, search, imported]);
+  useEffect(() => {
+    results.slice(0, 4).forEach((p) => void appRef.current?.preloadPart(p));
+  }, [results]);
+  useEffect(() => {
+    const host = mountRef.current;
+    if (!host) return;
+    const darkTheme = theme === "dark",
+      sceneColor = darkTheme ? 0x202328 : 0xdfe7ed;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(sceneColor);
+    scene.fog = new THREE.Fog(
+      sceneColor,
+      DEFAULT_FOG_SETTINGS.near,
+      DEFAULT_FOG_SETTINGS.far,
+    );
+    const camera = new THREE.PerspectiveCamera(
+        43,
+        host.clientWidth / host.clientHeight,
+        0.1,
+        160,
+      ),
+      defaultCameraPosition = new THREE.Vector3(13, 12, 17),
+      defaultCameraTarget = new THREE.Vector3(0, 2, 0),
+      cameraTarget = defaultCameraTarget.clone();
+    camera.position.copy(defaultCameraPosition);
+    camera.lookAt(cameraTarget);
+    const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: "high-performance",
+      }),
+      nativePixelRatio = Math.min(devicePixelRatio, 2);
+    let renderScale = 1,
+      adaptiveRenderingEnabled = adaptiveRenderingRef.current,
+      healthyFpsWindows = 0,
+      lowFpsWindows = 0;
+    renderer.setPixelRatio(nativePixelRatio * renderScale);
+    renderer.setSize(host.clientWidth, host.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const gl = renderer.getContext() as WebGL2RenderingContext,
+      gpuTimerExtension = gl.getExtension("EXT_disjoint_timer_query_webgl2") as {
+        TIME_ELAPSED_EXT: number;
+        GPU_DISJOINT_EXT: number;
+      } | null,
+      rendererInfoExtension = gl.getExtension("WEBGL_debug_renderer_info") as {
+        UNMASKED_RENDERER_WEBGL: number;
+        UNMASKED_VENDOR_WEBGL: number;
+      } | null,
+      gpuRenderer = rendererInfoExtension
+        ? String(gl.getParameter(rendererInfoExtension.UNMASKED_RENDERER_WEBGL))
+        : String(gl.getParameter(gl.RENDERER)),
+      gpuVendor = rendererInfoExtension
+        ? String(gl.getParameter(rendererInfoExtension.UNMASKED_VENDOR_WEBGL))
+        : String(gl.getParameter(gl.VENDOR));
+    renderer.domElement.className = "viewport-webgl-canvas";
+    host.appendChild(renderer.domElement);
+    const gpuViewportCanvas = document.createElement("canvas");
+    gpuViewportCanvas.className = "viewport-webgpu-canvas";
+    gpuViewportCanvas.setAttribute("aria-hidden", "true");
+    let gpuSceneRenderer: GpuSceneRenderer | null = null,
+      gpuSceneStats: GpuSceneStats | null = null,
+      gpuInitializationCancelled = false;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x718090, 2.1));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.3);
+    sun.position.set(8, 16, 10);
+    sun.castShadow = true;
+    scene.add(sun);
+    const gizmoColors = { x: 0xef3f46, y: 0x46c85b, z: 0x2f86ff },
+      transformGizmoRoot = new THREE.Group(),
+      gizmoMoveGroups = new Map<"x" | "y" | "z", THREE.Group>(),
+      gizmoRotateMeshes = new Map<"x" | "y" | "z", THREE.Mesh>();
+    transformGizmoRoot.name = "transform-gizmo";
+    transformGizmoRoot.userData.gpuOverlay = true;
+    transformGizmoRoot.scale.setScalar(0);
+    transformGizmoRoot.renderOrder = 1000;
+    const gizmoMaterial = (axis: "x" | "y" | "z") =>
+      new THREE.MeshBasicMaterial({
+        color: gizmoColors[axis],
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        toneMapped: false,
+      });
+    (["x", "y", "z"] as const).forEach((axis) => {
+      const moveGroup = new THREE.Group(),
+        shaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.025, 0.72, 10),
+          gizmoMaterial(axis),
+        ),
+        head = new THREE.Mesh(
+          new THREE.ConeGeometry(0.085, 0.24, 12),
+          gizmoMaterial(axis),
+        ),
+        ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.72, 0.032, 12, 72),
+          gizmoMaterial(axis),
+        );
+      shaft.position.y = 0.36;
+      head.position.y = 0.84;
+      moveGroup.add(shaft, head);
+      moveGroup.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        axis === "x"
+          ? new THREE.Vector3(1, 0, 0)
+          : axis === "y"
+            ? new THREE.Vector3(0, 1, 0)
+            : new THREE.Vector3(0, 0, 1),
+      );
+      moveGroup.userData.gizmo = `move-${axis}`;
+      moveGroup.traverse((object) => {
+        object.userData.gizmo = `move-${axis}`;
+        object.userData.gpuLayer = 1;
+        object.renderOrder = 1010;
+      });
+      if (axis === "x") ring.rotation.y = Math.PI / 2;
+      else if (axis === "y") ring.rotation.x = Math.PI / 2;
+      ring.userData.gizmo = `rotate-${axis}`;
+      ring.userData.gpuLayer = 0;
+      ring.renderOrder = 1000;
+      transformGizmoRoot.add(ring, moveGroup);
+      gizmoMoveGroups.set(axis, moveGroup);
+      gizmoRotateMeshes.set(axis, ring);
+    });
+    const gizmoCenter = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 12, 8),
+      new THREE.MeshBasicMaterial({
+        color: 0xf4f7f9,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        toneMapped: false,
+      }),
+    );
+    gizmoCenter.userData.gpuLayer = 2;
+    gizmoCenter.renderOrder = 1020;
+    transformGizmoRoot.add(gizmoCenter);
+    // Preserve the same overlay order in WebGL and WebGPU: rings first,
+    // translation arrows second and the centre handle last.
+    gizmoRotateMeshes.forEach((ring) => transformGizmoRoot.add(ring));
+    gizmoMoveGroups.forEach((group) => transformGizmoRoot.add(group));
+    transformGizmoRoot.add(gizmoCenter);
+    scene.add(transformGizmoRoot);
+    const cardanReferenceMarker = new THREE.Mesh(
+      new THREE.TorusGeometry(0.24, 0.028, 10, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd83d,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        toneMapped: false,
+      }),
+    );
+    cardanReferenceMarker.name = "cardan-reference-end";
+    cardanReferenceMarker.userData.gpuOverlay = true;
+    cardanReferenceMarker.renderOrder = 1003;
+    cardanReferenceMarker.scale.setScalar(0);
+    scene.add(cardanReferenceMarker);
+    const grid = createStudioGrid(darkTheme);
+    scene.add(grid);
+    const floor = new THREE.Mesh(
+      new THREE.BoxGeometry(GRID_SIZE, 0.3, GRID_SIZE),
+      new THREE.MeshStandardMaterial({
+        color: darkTheme ? 0x2b3035 : 0xcbd6dd,
+        roughness: 0.86,
+        transparent: true,
+        opacity: 1,
+      }),
+    );
+    floor.position.y = -0.2;
+    floor.renderOrder = -1000;
+    floor.receiveShadow = true;
+    floor.userData.floor = true;
+    scene.add(floor);
+    let floorViewedFromBelow = false;
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string) =>
+        new Promise<T>((resolve, reject) => {
+          const timer = window.setTimeout(
+            () =>
+              reject(
+                new Error(
+                  isChineseLanguage()
+                    ? `${label} 超过 ${Math.round(ms / 1000)} s`
+                    : `${label} superó ${Math.round(ms / 1000)} s`,
+                ),
+              ),
+            ms,
+          );
+          promise.then(
+            (value) => {
+              window.clearTimeout(timer);
+              resolve(value);
+            },
+            (error) => {
+              window.clearTimeout(timer);
+              reject(error);
+            },
+          );
+        }),
+      makeLoader = (base: string) => {
+        const instance = new LDrawLoader();
+        instance.setConditionalLineMaterial(LDrawConditionalLineMaterial);
+        instance.setPartsLibraryPath(base);
+        const materials = withTimeout(
+          instance.preloadMaterials(new URL("ldraw/LDConfig.ldr", document.baseURI).href),
+          10000,
+          isChineseLanguage() ? "LDraw 材质库" : "La paleta de materiales LDraw",
+        ).catch(() => undefined);
+        return { instance, materials };
+      },
+      makeLoaderPool = (base: string, size: number) => {
+        const lanes = Array.from({ length: size }, () => ({
+          loader: makeLoader(base),
+          tail: Promise.resolve() as Promise<unknown>,
+        }));
+        let cursor = 0;
+        return {
+          primary: lanes[0].loader,
+          load(source: string, label: string) {
+            const lane = lanes[cursor++ % lanes.length],
+              result = lane.tail.then(async () => {
+                await lane.loader.materials;
+                return withTimeout(
+                  lane.loader.instance.loadAsync(source),
+                  MODEL_LOAD_TIMEOUT,
+                  label,
+                );
+              });
+            lane.tail = result.then(
+              () => undefined,
+              () => undefined,
+            );
+            return result;
+          },
+        };
+      },
+      primaryPool = makeLoaderPool(LDRAW, 3),
+      legacyPool = makeLoaderPool(LEGACY_LDRAW, 2),
+      primary = primaryPool.primary,
+      legacy = legacyPool.primary;
+    const preloaded = new Set<string>(),
+      preloading = new Map<string, Promise<void>>(),
+      modelCache = new Map<string, THREE.Object3D>(),
+      sourceModelCache = new Map<string, THREE.Object3D>(),
+      modelSourceCache = new Map<
+        string,
+        {
+          downloadUrl: string;
+          downloadSource: "local" | "primary" | "legacy";
+        }
+      >(),
+      connectorCache = new Map<string, MeshConnector[]>(),
+      collisionCache = new Map<string, CollisionPrimitive[]>(),
+      gearCollisionCache = new Map<string, CollisionPrimitive[]>();
+    const assetUrl = (path: string) => new URL(path, document.baseURI).href;
+    const modelSourceIdentity = (p: CatalogPart) =>
+      p.embeddedGeometry
+        ? `project:${p.projectAssetKey ?? p.part}`
+        : p.geometry
+          ? `asset:${p.geometry}`
+          : `ldraw:${p.modelPart ?? p.resolvedPart ?? p.part}`;
+    const modelRenderKey = (p: CatalogPart) =>
+      `${modelSourceIdentity(p)}:source-color:${p.sourceColor ?? p.color}:display-color:${p.color}`;
+    // --- Model loading and catalog analysis --------------------------------
+    const loadPartModel = async (p: CatalogPart) => {
+      if (p.geometry && invalidPackagedGeometry.has(p.part)) {
+        p.geometry = undefined;
+        p.sourceKind = "ldraw-network";
+      }
+      const sourceColor = p.sourceColor ?? p.color,
+        sourceIdentity = modelSourceIdentity(p),
+        sourceKey = `${sourceIdentity}:source-color:${sourceColor}`,
+        key = `${sourceKey}:display-color:${p.color}`,
+        cachedSource = modelSourceCache.get(sourceKey),
+        resolvedFile = `${p.modelPart ?? p.part}.dat`;
+      Object.assign(
+        p,
+        cachedSource ??
+          (p.embeddedGeometry
+            ? {}
+            : p.geometry
+              ? {
+                  downloadUrl: assetUrl(p.geometry),
+                  downloadSource: "local" as const,
+                }
+              : {
+                  downloadUrl: `${LDRAW}parts/${resolvedFile}`,
+                  downloadSource: "primary" as const,
+                }),
+      );
+      const cached = modelCache.get(key);
+      if (cached) return cached.clone(true);
+      let exact = sourceModelCache.get(sourceKey)?.clone(true);
+      if (!exact) {
+        if (p.embeddedGeometry)
+          try {
+            exact = new THREE.ObjectLoader().parse(p.embeddedGeometry);
+          } catch {}
+        if (!exact && p.geometry)
+          try {
+            exact = await loadCatalogGeometry(assetUrl(p.geometry));
+            const source = {
+              downloadUrl: assetUrl(p.geometry),
+              downloadSource: "local" as const,
+            };
+            Object.assign(p, source);
+            modelSourceCache.set(sourceKey, source);
+          } catch {}
+        if (!exact) {
+          const source = `data:text/plain;charset=utf-8,${encodeURIComponent(modelText({ ...p, color: sourceColor }))}`;
+          try {
+            exact = flattenLDrawRenderables(
+              await primaryPool.load(
+                source,
+                isChineseLanguage() ? `零件 ${p.part}` : `La pieza ${p.part}`,
+              ),
+            );
+            const loadedSource = {
+              downloadUrl: `${LDRAW}parts/${resolvedFile}`,
+              downloadSource: "primary" as const,
+            };
+            Object.assign(p, loadedSource);
+            modelSourceCache.set(sourceKey, loadedSource);
+          } catch (primaryError) {
+            try {
+              exact = flattenLDrawRenderables(
+                await legacyPool.load(
+                  source,
+                  isChineseLanguage() ? `零件 ${p.part}` : `La pieza ${p.part}`,
+                ),
+              );
+              const loadedSource = {
+                downloadUrl: `${LEGACY_LDRAW}parts/${resolvedFile}`,
+                downloadSource: "legacy" as const,
+              };
+              Object.assign(p, loadedSource);
+              modelSourceCache.set(sourceKey, loadedSource);
+            } catch {
+              throw primaryError;
+            }
+          }
+        }
+        sourceModelCache.set(sourceKey, exact.clone(true));
+      }
+      if (sourceColor !== p.color) {
+        await primary.materials;
+        const primaryReplacement = primary.instance.getMaterial(String(p.color)),
+          replacement =
+            primaryReplacement ?? legacy.instance.getMaterial(String(p.color)),
+          materialLoader = primaryReplacement ? primary.instance : legacy.instance,
+          materialCaches = materialLoader as LDrawLoader & {
+            edgeMaterialCache: WeakMap<THREE.Material, THREE.Material>;
+            conditionalEdgeMaterialCache: WeakMap<THREE.Material, THREE.Material>;
+          },
+          edgeReplacement = replacement
+            ? materialCaches.edgeMaterialCache.get(replacement)
+            : undefined,
+          conditionalReplacement = edgeReplacement
+            ? materialCaches.conditionalEdgeMaterialCache.get(edgeReplacement)
+            : undefined;
+        if (replacement) {
+          exact.traverse((child) => {
+            if (!(child instanceof THREE.Mesh) && !(child instanceof THREE.Line)) return;
+            const replace = (material: THREE.Material) => {
+              if (String(material.userData.code) !== String(sourceColor)) return material;
+              if (child instanceof THREE.Mesh) return replacement;
+              // ObjectLoader serializes LDrawConditionalLineMaterial as a plain
+              // ShaderMaterial. Detect it by its required geometry attributes too,
+              // otherwise recoloring turns every conditional edge into a normal
+              // line and exposes the polygon facets of cylinders and curved parts.
+              const conditional =
+                !!(
+                  material as THREE.Material & {
+                    isLDrawConditionalLineMaterial?: boolean;
+                  }
+                ).isLDrawConditionalLineMaterial ||
+                (child.geometry.hasAttribute("control0") &&
+                  child.geometry.hasAttribute("control1") &&
+                  child.geometry.hasAttribute("direction"));
+              return conditional
+                ? (conditionalReplacement ?? edgeReplacement ?? material)
+                : (edgeReplacement ?? material);
+            };
+            child.material = Array.isArray(child.material)
+              ? child.material.map(replace)
+              : replace(child.material);
+          });
+        }
+      }
+      if (p.color === 0) {
+        const blackOutline = new THREE.Color(0x505860);
+        exact.traverse((child) => {
+          if (!(child instanceof THREE.Line)) return;
+          const recolorLine = (source: THREE.Material) => {
+            const material = source.clone() as THREE.Material & {
+              color?: THREE.Color;
+              uniforms?: Record<
+                string,
+                {
+                  value?: unknown;
+                }
+              >;
+            };
+            material.color?.copy(blackOutline);
+            for (const uniformName of ["diffuse", "color"])
+              if (material.uniforms?.[uniformName]?.value instanceof THREE.Color)
+                material.uniforms[uniformName].value.copy(blackOutline);
+            material.needsUpdate = true;
+            return material;
+          };
+          child.material = Array.isArray(child.material)
+            ? child.material.map(recolorLine)
+            : recolorLine(child.material);
+        });
+      }
+      // WebGL line width stays at one screen pixel regardless of distance. If
+      // LDraw line materials do not participate in scene fog, distant pieces
+      // shrink while their outlines remain equally strong. This is especially
+      // common for conditional ShaderMaterials restored through ObjectLoader.
+      exact.traverse((child) => {
+        if (!(child instanceof THREE.Line)) return;
+        const enableLineFog = (material: THREE.Material) => {
+          const fogMaterial = material as THREE.Material & {
+            fog: boolean;
+          };
+          fogMaterial.fog = true;
+          return configureDistanceScaledOutlineMaterial(fogMaterial);
+        };
+        child.material = Array.isArray(child.material)
+          ? child.material.map(enableLineFog)
+          : enableLineFog(child.material);
+      });
+      modelCache.set(key, exact.clone(true));
+      return exact;
+    };
+    const prepareModel = (exact: THREE.Object3D) => {
+      exact.rotation.x = Math.PI;
+      exact.scale.setScalar(0.05);
+      exact.updateMatrixWorld(true);
+    };
+    const cloneConnectors = (connectors: MeshConnector[]) =>
+      connectors.map((connector) => ({
+        ...connector,
+        connectionTarget: connector.connectionTarget
+          ? { ...connector.connectionTarget }
+          : undefined,
+        local: connector.local.clone(),
+        axis: connector.axis.clone(),
+      }));
+    const analyzePart = (wrapper: THREE.Object3D, p: CatalogPart) => {
+      const correctionKeys = correctionPartKeys(p),
+        preloadedConnections = correctionMapFor(preloadedConnectionMaps, p),
+        preloadedCollisions = correctionMapFor(preloadedCollisionMaps, p),
+        preloadedGearCollisions = correctionMapFor(preloadedGearCollisionMaps, p),
+        packaged = correctionKeys.map((key) => packagedParts[key]).find(Boolean),
+        correctionStorageKey = correctionStorageKeyFor(p),
+        hasPreloadedConnectionMap = Boolean(preloadedConnections);
+      const localProvenance = readMapProvenance(localStorage, correctionStorageKey),
+        reviewedProvenance = correctionMapProvenance(correctionStorageKey),
+        packagedProvenance = normalizeMapProvenanceSnapshot(
+          (
+            packaged as
+              | {
+                  mapProvenance?: MapProvenanceSnapshot;
+                }
+              | undefined
+          )?.mapProvenance,
+        ),
+        mapProvenance: MapProvenanceSnapshot = {
+          connectors: automaticMapProvenance(),
+          colliders: automaticMapProvenance(),
+          gearColliders: automaticMapProvenance(),
+          specialGear: automaticMapProvenance(),
+        };
+      const storedSpecialGear = localStorage.getItem(
+          `sim-special-gear-v1:${correctionStorageKey}`,
+        ),
+        specialGear =
+          p.specialGear === true ||
+          (storedSpecialGear === null
+            ? correctionKeys.some((key) => preloadedSpecialGearParts.has(key))
+            : storedSpecialGear === "true");
+      let connectors: MeshConnector[] | undefined,
+        hasSavedConnectorMap = false;
+      try {
+        const saved = localStorage.getItem(`sim-connectors-v4:${correctionStorageKey}`);
+        if (saved && !isStaleAutomaticMap(localProvenance.connectors)) {
+          hasSavedConnectorMap = true;
+          mapProvenance.connectors = localProvenance.connectors;
+          connectors = (
+            JSON.parse(saved) as {
+              local: number[];
+              axis: number[];
+              kind: "round" | "axle" | "half";
+              role?: "socket" | "shaft";
+              diameter: number;
+              length?: number;
+              rotationOnly?: boolean;
+              sliding?: boolean;
+              connectionTarget?: {
+                partId: string;
+                connectorId?: number;
+              };
+              singleConnection?: boolean;
+            }[]
+          ).map((connector) => ({
+            ...connector,
+            role: connector.role ?? "socket",
+            local: new THREE.Vector3().fromArray(connector.local),
+            axis: new THREE.Vector3().fromArray(connector.axis).normalize(),
+          }));
+        }
+      } catch {}
+      if (
+        !connectors &&
+        preloadedConnections &&
+        !isStaleAutomaticMap(reviewedProvenance.connectors)
+      ) {
+        mapProvenance.connectors = reviewedProvenance.connectors;
+        connectors = preloadedConnections.map((connector) => ({
+          ...connector,
+          local: new THREE.Vector3().fromArray(connector.local),
+          axis: new THREE.Vector3().fromArray(connector.axis).normalize(),
+        }));
+      }
+      if (!connectors) connectors = straightAxleConnectors(p.name);
+      if (
+        !connectors &&
+        packaged &&
+        !isStaleAutomaticMap(packagedProvenance.connectors)
+      ) {
+        mapProvenance.connectors = packagedProvenance.connectors;
+        connectors = packaged.connectors.map((connector) => ({
+          ...connector,
+          local: new THREE.Vector3().fromArray(connector.local),
+          axis: new THREE.Vector3().fromArray(connector.axis).normalize(),
+        }));
+      }
+      if (!connectors)
+        connectors =
+          connectorCache.get(correctionStorageKey) &&
+          cloneConnectors(connectorCache.get(correctionStorageKey)!);
+      if (!connectors) {
+        connectors = generatePartConnectors(wrapper, p.name);
+        mapProvenance.connectors = automaticMapProvenance();
+        try {
+          localStorage.setItem(
+            `sim-connectors-v4:${correctionStorageKey}`,
+            JSON.stringify(
+              connectors.map((connector) => ({
+                ...connector,
+                local: connector.local.toArray(),
+                axis: connector.axis.toArray(),
+              })),
+            ),
+          );
+          writeMapProvenance(localStorage, correctionStorageKey, {
+            connectors: automaticMapProvenance(),
+          });
+        } catch {}
+      }
+      if (isHalfBeamPart(p) && mapProvenance.connectors?.origin === "automatic")
+        connectors = connectors.map((connector) => ({
+          ...connector,
+          kind:
+            connector.role === "socket" && connector.kind === "round"
+              ? "half"
+              : connector.kind,
+        }));
+      connectors = connectorDefaultsForPart(correctionStorageKey, connectors);
+      connectorCache.set(correctionStorageKey, cloneConnectors(connectors));
+      let colliders: CollisionPrimitive[] | undefined;
+      if (!colliders)
+        try {
+          const saved = localStorage.getItem(`sim-colliders-v1:${correctionStorageKey}`);
+          if (saved && !isStaleAutomaticMap(localProvenance.colliders)) {
+            mapProvenance.colliders = localProvenance.colliders;
+            const stored = JSON.parse(saved) as SavedCollisionPrimitive[];
+            if (Array.isArray(stored))
+              colliders = stored
+                .filter(
+                  (primitive) =>
+                    ["box", "cylinder", "sphere", "hollowCylinder", "arc"].includes(
+                      primitive.shape,
+                    ) &&
+                    primitive.center?.length >= 3 &&
+                    primitive.rotation?.length >= 4,
+                )
+                .map(runtimeColliderFromStored);
+          }
+        } catch {}
+      if (
+        !colliders &&
+        preloadedCollisions &&
+        !isStaleAutomaticMap(reviewedProvenance.colliders)
+      ) {
+        mapProvenance.colliders = reviewedProvenance.colliders;
+        colliders = preloadedCollisions.map((primitive) => ({
+          ...primitive,
+          center: new THREE.Vector3().fromArray(primitive.center),
+          size: primitive.size
+            ? new THREE.Vector3().fromArray(primitive.size)
+            : undefined,
+          rotation: new THREE.Quaternion().fromArray(primitive.rotation),
+        }));
+      }
+      if (
+        !colliders &&
+        packaged &&
+        packagedProvenance.colliders?.origin !== "automatic"
+      ) {
+        colliders = packaged.colliders.map(runtimeColliderFromStored);
+        mapProvenance.colliders = packagedProvenance.colliders;
+      }
+      if (!colliders) colliders = straightAxleCollisionPrimitives(p.name);
+      if (!colliders)
+        colliders = collisionCache.get(correctionStorageKey)?.map((primitive) => ({
+          ...primitive,
+          center: primitive.center.clone(),
+          size: primitive.size?.clone(),
+          rotation: primitive.rotation.clone(),
+        }));
+      // Corrected connection maps can change the topology used by the compound
+      // collider generator (notably small L beams). Do not reuse a collider that
+      // was packaged before that corrected map existed.
+      if (
+        !colliders &&
+        packaged &&
+        !isStaleAutomaticMap(packagedProvenance.colliders) &&
+        !/^Technic (Beam|Panel)/i.test(p.name) &&
+        !/wheel|tyre|tire|gear|bush/i.test(p.name) &&
+        !/^Technic Axle(?: and Pin)? (?:Joiner|Connector)/i.test(p.name) &&
+        !hasPreloadedConnectionMap &&
+        !hasSavedConnectorMap
+      ) {
+        mapProvenance.colliders = packagedProvenance.colliders;
+        colliders = packaged.colliders.map((primitive) => ({
+          ...primitive,
+          center: new THREE.Vector3().fromArray(primitive.center),
+          size: primitive.size
+            ? new THREE.Vector3().fromArray(primitive.size)
+            : undefined,
+          rotation: new THREE.Quaternion().fromArray(primitive.rotation),
+        }));
+      }
+      if (!colliders) {
+        mapProvenance.colliders = automaticMapProvenance();
+        colliders = approximateCollisionPrimitives(wrapper, p.name, connectors);
+        collisionCache.set(
+          correctionStorageKey,
+          colliders.map((primitive) => ({
+            ...primitive,
+            center: primitive.center.clone(),
+            size: primitive.size?.clone(),
+            rotation: primitive.rotation.clone(),
+          })),
+        );
+      }
+      let gearColliders: CollisionPrimitive[] = [];
+      let gearMapResolved = false;
+      if (isGearPart(p)) {
+        try {
+          const saved = localStorage.getItem(
+            `sim-gear-colliders-v1:${correctionStorageKey}`,
+          );
+          if (saved && !isStaleAutomaticMap(localProvenance.gearColliders)) {
+            const rows = JSON.parse(saved) as SavedCollisionPrimitive[];
+            if (Array.isArray(rows)) {
+              gearColliders = rows.map(runtimeColliderFromStored);
+              gearMapResolved = true;
+              mapProvenance.gearColliders = localProvenance.gearColliders;
+            }
+          }
+        } catch {}
+        if (
+          !gearMapResolved &&
+          preloadedGearCollisions &&
+          !isStaleAutomaticMap(reviewedProvenance.gearColliders)
+        ) {
+          gearMapResolved = true;
+          mapProvenance.gearColliders = reviewedProvenance.gearColliders;
+          gearColliders = preloadedGearCollisions.map((primitive) => ({
+            ...primitive,
+            center: new THREE.Vector3().fromArray(primitive.center),
+            size: primitive.size
+              ? new THREE.Vector3().fromArray(primitive.size)
+              : undefined,
+            rotation: new THREE.Quaternion().fromArray(primitive.rotation),
+          }));
+        }
+        if (!gearMapResolved && !gearColliders.length)
+          gearColliders =
+            gearCollisionCache.get(correctionStorageKey)?.map((primitive) => ({
+              ...primitive,
+              center: primitive.center.clone(),
+              size: primitive.size?.clone(),
+              rotation: primitive.rotation.clone(),
+            })) ?? [];
+        if (
+          !gearMapResolved &&
+          !gearColliders.length &&
+          packaged?.gearColliders &&
+          !isStaleAutomaticMap(packagedProvenance.gearColliders)
+        ) {
+          gearMapResolved = true;
+          mapProvenance.gearColliders = packagedProvenance.gearColliders;
+          gearColliders = packaged.gearColliders.map((primitive) => ({
+            ...primitive,
+            center: new THREE.Vector3().fromArray(primitive.center),
+            size: primitive.size
+              ? new THREE.Vector3().fromArray(primitive.size)
+              : undefined,
+            rotation: new THREE.Quaternion().fromArray(primitive.rotation),
+          }));
+        }
+        if (!gearMapResolved && !gearColliders.length) {
+          mapProvenance.gearColliders = automaticMapProvenance();
+          gearColliders = approximateGearCollisionPrimitives(colliders);
+          gearCollisionCache.set(
+            correctionStorageKey,
+            gearColliders.map((primitive) => ({
+              ...primitive,
+              center: primitive.center.clone(),
+              size: primitive.size?.clone(),
+              rotation: primitive.rotation.clone(),
+            })),
+          );
+        }
+      }
+      mapProvenance.specialGear =
+        storedSpecialGear !== null
+          ? localProvenance.specialGear
+          : reviewedProvenance.specialGear;
+      return { connectors, colliders, gearColliders, specialGear, mapProvenance };
+    };
+    const preloadPart = async (p: CatalogPart) => {
+      const preloadKey = modelRenderKey(p);
+      if (preloaded.has(preloadKey)) return;
+      if (preloading.has(preloadKey)) return preloading.get(preloadKey);
+      const task = loadPartModel(p)
+        .then((exact) => {
+          prepareModel(exact);
+          const wrapper = new THREE.Group();
+          wrapper.add(exact);
+          wrapper.updateMatrixWorld(true);
+          analyzePart(wrapper, p);
+          preloaded.add(preloadKey);
+        })
+        .catch(() => {})
+        .finally(() => preloading.delete(preloadKey));
+      preloading.set(preloadKey, task);
+      return task;
+    };
+    const renderImportPreview = async (parts: PreparedImportPlacement[]) => {
+      const previewScene = new THREE.Scene();
+      previewScene.background = new THREE.Color(darkTheme ? 0x202328 : 0xe8edf0);
+      previewScene.add(new THREE.HemisphereLight(0xffffff, 0x36404a, 2.4));
+      const light = new THREE.DirectionalLight(0xffffff, 3.2);
+      light.position.set(7, 10, 9);
+      previewScene.add(light);
+      const root = new THREE.Group();
+      previewScene.add(root);
+      const uniqueCatalogs = [
+          ...new Map(
+            parts.map((placement) => [
+              `${placement.catalog.part}:${placement.catalog.color}`,
+              placement.catalog,
+            ]),
+          ).entries(),
+        ],
+        previewModels = new Map<string, THREE.Object3D>();
+      let previewCursor = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(4, uniqueCatalogs.length) }, async () => {
+          while (previewCursor < uniqueCatalogs.length) {
+            const [key, catalog] = uniqueCatalogs[previewCursor++];
+            try {
+              previewModels.set(key, await loadPartModel(catalog));
+            } catch {
+              // A missing part must not keep the entire preview open forever.
+            }
+          }
+        }),
+      );
+      const detailedPreview = parts.length <= 180,
+        proxyTemplates = new Map<
+          string,
+          {
+            geometry: THREE.BoxGeometry;
+            material: THREE.MeshStandardMaterial;
+            center: THREE.Vector3;
+          }
+        >();
+      if (!detailedPreview)
+        for (const [key, catalog] of uniqueCatalogs) {
+          const source = previewModels.get(key);
+          if (!source) continue;
+          const measured = source.clone(true);
+          prepareModel(measured);
+          const bounds = new THREE.Box3().setFromObject(measured),
+            size = bounds.getSize(new THREE.Vector3()),
+            center = bounds.getCenter(new THREE.Vector3());
+          size.set(
+            Math.max(size.x, 0.08),
+            Math.max(size.y, 0.08),
+            Math.max(size.z, 0.08),
+          );
+          proxyTemplates.set(key, {
+            geometry: new THREE.BoxGeometry(size.x, size.y, size.z),
+            material: new THREE.MeshStandardMaterial({
+              color: colorHex[catalog.color] ?? colorHex[71],
+              roughness: 0.78,
+              metalness: 0,
+            }),
+            center,
+          });
+        }
+      for (let index = 0; index < parts.length; index++) {
+        const placement = parts[index],
+          key = `${placement.catalog.part}:${placement.catalog.color}`,
+          source = previewModels.get(key);
+        if (!source) continue;
+        const wrapper = new THREE.Group();
+        if (detailedPreview) {
+          const exact = source.clone(true);
+          prepareModel(exact);
+          wrapper.add(exact);
+        } else {
+          const template = proxyTemplates.get(key);
+          if (!template) continue;
+          const proxy = new THREE.Mesh(template.geometry, template.material);
+          proxy.position.copy(template.center);
+          wrapper.add(proxy);
+        }
+        wrapper.position.copy(placement.position);
+        wrapper.quaternion.copy(placement.rotation);
+        root.add(wrapper);
+        if (index % 80 === 79)
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+      if (!root.children.length)
+        throw new Error(
+          isChineseLanguage()
+            ? "无法为预览加载几何模型"
+            : "No se pudo cargar ninguna geometría para la vista previa",
+        );
+      root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(root),
+        center = box.getCenter(new THREE.Vector3()),
+        size = box.getSize(new THREE.Vector3()),
+        radius = Math.max(size.x, size.y, size.z, 1),
+        previewCamera = new THREE.PerspectiveCamera(32, 16 / 9, 0.01, radius * 20);
+      previewCamera.position
+        .copy(center)
+        .add(new THREE.Vector3(radius * 1.35, radius * 1.05, radius * 1.55));
+      previewCamera.lookAt(center);
+      const previewRenderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+        preserveDrawingBuffer: true,
+      });
+      previewRenderer.setPixelRatio(1);
+      previewRenderer.setSize(640, 360, false);
+      previewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+      previewRenderer.render(previewScene, previewCamera);
+      const image = previewRenderer.domElement.toDataURL("image/png");
+      previewRenderer.dispose();
+      proxyTemplates.forEach((template) => {
+        template.geometry.dispose();
+        template.material.dispose();
+      });
+      return image;
+    };
+    let renderRequested = true;
+    const requestRender = () => {
+      renderRequested = true;
+    };
+    const applyGizmoAppearance = (scale: number, thickness: number) => {
+      gizmoScaleRef.current = THREE.MathUtils.clamp(scale, 0.5, 2);
+      gizmoThicknessRef.current = THREE.MathUtils.clamp(thickness, 0.5, 2.5);
+      gizmoMoveGroups.forEach((group) => {
+        const shaft = group.children[0] as THREE.Mesh,
+          head = group.children[1] as THREE.Mesh;
+        shaft.geometry.dispose();
+        shaft.geometry = new THREE.CylinderGeometry(
+          0.025 * gizmoThicknessRef.current,
+          0.025 * gizmoThicknessRef.current,
+          0.72,
+          10,
+        );
+        head.geometry.dispose();
+        head.geometry = new THREE.ConeGeometry(
+          0.085 * gizmoThicknessRef.current,
+          0.24,
+          12,
+        );
+      });
+      gizmoRotateMeshes.forEach((ring) => {
+        ring.geometry.dispose();
+        ring.geometry = new THREE.TorusGeometry(
+          0.72,
+          0.032 * gizmoThicknessRef.current,
+          12,
+          72,
+        );
+      });
+      gizmoCenter.geometry.dispose();
+      gizmoCenter.geometry = new THREE.SphereGeometry(
+        0.06 * gizmoThicknessRef.current,
+        12,
+        8,
+      );
+      gpuSceneRenderer?.invalidate();
+      requestRender();
+    };
+    const highlightGizmoHandle = (active?: string) => {
+      transformGizmoRoot.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const handle = object.userData.gizmo as string | undefined,
+          axis = handle?.at(-1) as keyof typeof gizmoColors | undefined;
+        if (!handle || !axis || !(axis in gizmoColors)) return;
+        const material = object.material as THREE.MeshBasicMaterial,
+          selected = !active || handle === active;
+        material.color.setHex(active && selected ? 0xffd43b : gizmoColors[axis]);
+        if (active && !selected) material.color.multiplyScalar(0.35);
+        material.opacity = active && !selected ? 0.3 : 1;
+        material.needsUpdate = true;
+      });
+      requestRender();
+    };
+    const state = {} as AppState,
+      debugRoot = new THREE.Group();
+    applyGizmoAppearance(gizmoScaleRef.current, gizmoThicknessRef.current);
+    let showRotationPivot = false;
+    debugRoot.name = "Sim Studio diagnostics";
+    scene.add(debugRoot);
+    const disposeDebug = () => {
+      while (debugRoot.children.length) {
+        const object = debugRoot.children.pop()!;
+        object.traverse((child) => {
+          if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+            child.geometry.dispose();
+            const materials = Array.isArray(child.material)
+              ? child.material
+              : [child.material];
+            materials.forEach((m) => m.dispose());
+          }
+        });
+      }
+    };
+    const setDebugLineEndpoints = (
+      object: THREE.Line,
+      start: THREE.Vector3,
+      end: THREE.Vector3,
+    ) => {
+      if (!object.geometry.getAttribute("position"))
+        object.geometry.setFromPoints([
+          new THREE.Vector3(-0.5, 0, 0),
+          new THREE.Vector3(0.5, 0, 0),
+        ]);
+      const delta = end.clone().sub(start),
+        length = delta.length();
+      object.position.copy(start).add(end).multiplyScalar(0.5);
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(1, 0, 0),
+        length > 1.0e-8 ? delta.multiplyScalar(1 / length) : new THREE.Vector3(1, 0, 0),
+      );
+      object.scale.set(Math.max(length, 1.0e-8), 1, 1);
+      object.updateMatrixWorld(true);
+    };
+    const updateDebug = () => {
+      debugRoot.children.forEach((object) => {
+        const data = object.userData,
+          piece = data.piece as Piece | undefined;
+        if (
+          (data.debugKind === "collider" || data.debugKind === "connector-volume") &&
+          piece
+        ) {
+          piece.mesh.updateMatrixWorld(true);
+          object.position.copy(
+            piece.mesh.localToWorld((data.local as THREE.Vector3).clone()),
+          );
+          const worldRotation = piece.mesh.getWorldQuaternion(new THREE.Quaternion());
+          object.quaternion.copy(
+            worldRotation.multiply((data.localRotation as THREE.Quaternion).clone()),
+          );
+        } else if (data.debugKind === "exact-collider" && piece) {
+          piece.mesh.updateMatrixWorld(true);
+          object.matrixAutoUpdate = false;
+          object.matrix.copy(piece.mesh.matrixWorld);
+          object.matrixWorldNeedsUpdate = true;
+        } else if (data.debugKind === "selection-outline" && piece) {
+          piece.mesh.updateMatrixWorld(true);
+          (object as THREE.BoxHelper).update();
+        } else if (data.debugKind === "gear-direction-lock" && piece) {
+          piece.mesh.updateMatrixWorld(true);
+          const axis = gearAxisForPiece(piece).multiplyScalar(
+            piece.gearDirectionLock ?? 1,
+          );
+          object.position
+            .copy(piece.mesh.getWorldPosition(new THREE.Vector3()))
+            .addScaledVector(axis, 0.35);
+          (object as THREE.ArrowHelper).setDirection(axis);
+        } else if (data.debugKind === "connector-point" && piece)
+          object.position.copy(
+            piece.mesh.localToWorld((data.local as THREE.Vector3).clone()),
+          );
+        else if (data.debugKind === "connector-axis" && piece) {
+          object.position.copy(
+            piece.mesh.localToWorld((data.local as THREE.Vector3).clone()),
+          );
+          (object as THREE.ArrowHelper).setDirection(
+            (data.axis as THREE.Vector3)
+              .clone()
+              .transformDirection(piece.mesh.matrixWorld)
+              .normalize(),
+          );
+        } else if (data.debugKind === "body-axes" && piece) {
+          object.position.copy(piece.mesh.getWorldPosition(new THREE.Vector3()));
+          object.quaternion.copy(piece.mesh.getWorldQuaternion(new THREE.Quaternion()));
+        } else if (data.debugKind === "joint-point") {
+          const connection = data.connection as Connection;
+          object.position.copy(
+            connection.a.mesh.localToWorld((data.local as THREE.Vector3).clone()),
+          );
+        } else if (data.debugKind === "joint-axis") {
+          const connection = data.connection as Connection;
+          object.position.copy(
+            connection.a.mesh.localToWorld((data.local as THREE.Vector3).clone()),
+          );
+          (object as THREE.ArrowHelper).setDirection(
+            (data.axis as THREE.Vector3)
+              .clone()
+              .transformDirection(connection.a.mesh.matrixWorld)
+              .normalize(),
+          );
+        } else if (data.debugKind === "joint-link") {
+          const connection = data.connection as Connection,
+            a = connection.a.mesh.getWorldPosition(new THREE.Vector3()),
+            b = connection.b.mesh.getWorldPosition(new THREE.Vector3());
+          setDebugLineEndpoints(object as THREE.Line, a, b);
+        } else if (data.debugKind === "forced-joint-link") {
+          const connection = data.connection as Connection;
+          if (!connection.localPointA || !connection.localPointB) return;
+          const a = connection.a.mesh.localToWorld(connection.localPointA.clone()),
+            b = connection.b.mesh.localToWorld(connection.localPointB.clone());
+          setDebugLineEndpoints(object as THREE.Line, a, b);
+        }
+      });
+    };
+    const configureDebugOverlay = () => {
+      debugRoot.children.forEach((rootObject) => {
+        const kind = rootObject.userData.debugKind as string | undefined,
+          order =
+            kind === "gear-direction-lock"
+              ? 98
+              : kind === "selection-outline"
+                ? 96
+                : kind === "connector-point"
+                  ? 90
+                  : kind === "connector-axis" || kind === "joint-axis"
+                    ? 80
+                    : kind === "forced-joint-link" || kind === "joint-link"
+                      ? 75
+                      : kind === "connector-volume"
+                        ? 70
+                        : 60;
+        rootObject.traverse((object) => {
+          object.renderOrder = order;
+          object.frustumCulled = false;
+          if (
+            !(object instanceof THREE.Mesh) &&
+            !(object instanceof THREE.Line) &&
+            !(object instanceof THREE.Points)
+          )
+            return;
+          const materials = Array.isArray(object.material)
+            ? object.material
+            : [object.material];
+          materials.forEach((material) => {
+            material.depthTest = false;
+            material.depthWrite = false;
+            material.transparent = true;
+            material.needsUpdate = true;
+          });
+        });
+      });
+    };
+    const refreshDebug = () => {
+      disposeDebug();
+      for (const selected of state.selectedPieces ??
+        (state.selected ? new Set([state.selected]) : new Set())) {
+        selected.mesh.updateMatrixWorld(true);
+        const outline = new THREE.BoxHelper(
+          selected.mesh,
+          selected === state.selected ? 0x2b8cff : 0xffa51f,
+        );
+        outline.userData = { debugKind: "selection-outline", piece: selected };
+        outline.renderOrder = 96;
+        outline.frustumCulled = false;
+        const material = outline.material as THREE.LineBasicMaterial;
+        material.depthTest = false;
+        material.depthWrite = false;
+        material.transparent = true;
+        material.opacity = 0.95;
+        debugRoot.add(outline);
+        if (selected.gear && selected.gearDirectionLock) {
+          const axis = gearAxisForPiece(selected).multiplyScalar(
+            selected.gearDirectionLock > 0 ? 1 : -1,
+          );
+          const arrow = new THREE.ArrowHelper(
+            axis,
+            selected.mesh
+              .getWorldPosition(new THREE.Vector3())
+              .addScaledVector(axis, 0.35),
+            0.55,
+            0xff304f,
+            0.18,
+            0.12,
+          );
+          arrow.userData = { debugKind: "gear-direction-lock", piece: selected, axis };
+          debugRoot.add(arrow);
+        }
+      }
+      for (const piece of state.pieces) {
+        piece.mesh.updateMatrixWorld(true);
+        if (state.debug.colliders) {
+          if (piece.exactCollider) {
+            // The complex-collider option sends the actual triangle mesh to
+            // Rapier. Mirror that same mesh here instead of leaving stale
+            // compound boxes visible in the technical view.
+            const rootInverse = piece.mesh.matrixWorld.clone().invert(),
+              exactHelper = new THREE.Group();
+            piece.mesh.traverse((object) => {
+              if (
+                !(object instanceof THREE.Mesh) ||
+                object instanceof THREE.InstancedMesh
+              )
+                return;
+              const wireframe = new THREE.LineSegments(
+                new THREE.WireframeGeometry(object.geometry),
+                new THREE.LineBasicMaterial({
+                  color: piece.fixed ? 0xffc928 : 0x3dff78,
+                  transparent: true,
+                  opacity: 0.72,
+                  depthTest: false,
+                }),
+              );
+              wireframe.applyMatrix4(rootInverse.clone().multiply(object.matrixWorld));
+              exactHelper.add(wireframe);
+            });
+            exactHelper.userData = { debugKind: "exact-collider", piece };
+            debugRoot.add(exactHelper);
+          }
+          const debugColliders = [
+            ...(piece.exactCollider ? [] : piece.colliders).map((primitive) => ({
+              primitive,
+              gearLayer: false,
+            })),
+            ...piece.gearColliders.map((primitive) => ({
+              primitive,
+              gearLayer: true,
+            })),
+          ];
+          for (const { primitive, gearLayer } of debugColliders) {
+            const material = new THREE.MeshBasicMaterial({
+                color: gearLayer ? 0xff4fa3 : piece.fixed ? 0xffc928 : 0x3dff78,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.72,
+                depthTest: false,
+              }),
+              helper = new THREE.Group();
+            if (primitive.shape === "box")
+              helper.add(
+                new THREE.Mesh(
+                  new THREE.BoxGeometry(
+                    primitive.size!.x,
+                    primitive.size!.y,
+                    primitive.size!.z,
+                  ),
+                  material,
+                ),
+              );
+            else if (primitive.shape === "sphere")
+              helper.add(
+                new THREE.Mesh(
+                  new THREE.SphereGeometry(primitive.radius!, 18, 12),
+                  material,
+                ),
+              );
+            else if (primitive.shape === "cylinder")
+              helper.add(
+                new THREE.Mesh(
+                  new THREE.CylinderGeometry(
+                    primitive.radius!,
+                    primitive.radius!,
+                    primitive.halfHeight! * 2,
+                    18,
+                  ),
+                  material,
+                ),
+              );
+            else {
+              for (const segment of annularCollisionSegments(primitive)) {
+                const mesh = new THREE.Mesh(
+                  new THREE.BoxGeometry(segment.size.x, segment.size.y, segment.size.z),
+                  material,
+                );
+                mesh.position.copy(segment.center);
+                mesh.quaternion.copy(segment.rotation);
+                helper.add(mesh);
+              }
+              if (primitive.shape === "arc")
+                arcCollisionControlPoints(primitive).forEach((point, pointIndex) => {
+                  const marker = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.065, 10, 8),
+                    new THREE.MeshBasicMaterial({
+                      color: [0x35d7ff, 0xffd43b, 0xff6b74][pointIndex],
+                      depthTest: false,
+                    }),
+                  );
+                  marker.position.set(point[0], 0, point[1]);
+                  helper.add(marker);
+                });
+            }
+            helper.renderOrder = 40;
+            helper.traverse((child) => {
+              child.renderOrder = 40;
+            });
+            helper.userData = {
+              debugKind: "collider",
+              piece,
+              gearLayer,
+              local: primitive.center.clone(),
+              localRotation: primitive.rotation.clone(),
+            };
+            debugRoot.add(helper);
+          }
+        }
+        if (state.debug.connectors)
+          for (const connector of piece.connectors) {
+            const manual = state.manualConnect,
+              selectedNode = manual?.piece === piece && manual.connector === connector;
+            if (!manual && isConcealedGearboxGuide(connector)) continue;
+            if (
+              manual &&
+              ((piece === manual.piece && !selectedNode) ||
+                (piece !== manual.piece &&
+                  (!pairProfile(manual.connector, connector) ||
+                    !connectorPoliciesCompatible(
+                      manual.piece,
+                      manual.connector,
+                      piece,
+                      connector,
+                    ))))
+            )
+              continue;
+            const color = selectedNode
+              ? 0xffee38
+              : connector.kind === "half"
+                ? connector.role === "shaft"
+                  ? 0xff4fa3
+                  : 0x16dbe5
+                : connector.role === "shaft"
+                  ? connector.kind === "axle"
+                    ? 0xa855f7
+                    : 0xff8a1f
+                  : connector.kind === "axle"
+                    ? 0x35d36f
+                    : 0x26a7ff;
+            if (
+              connector.role === "shaft" &&
+              connector.kind === "axle" &&
+              !connector.rotationOnly
+            ) {
+              const localRotation = new THREE.Quaternion().setFromUnitVectors(
+                  new THREE.Vector3(0, 1, 0),
+                  connector.axis,
+                ),
+                volume = new THREE.Mesh(
+                  new THREE.CylinderGeometry(
+                    selectedNode ? 0.13 : 0.065,
+                    selectedNode ? 0.13 : 0.065,
+                    connector.length ?? 0.5,
+                    10,
+                  ),
+                  new THREE.MeshBasicMaterial({
+                    color,
+                    wireframe: true,
+                    depthTest: false,
+                    transparent: true,
+                    opacity: 0.9,
+                  }),
+                );
+              volume.renderOrder = 41;
+              volume.userData = {
+                debugKind: "connector-volume",
+                piece,
+                local: connector.local.clone(),
+                localRotation,
+              };
+              debugRoot.add(volume);
+              for (const snapPoint of axleSnapPoints(connector)) {
+                const highlighted =
+                    manual?.piece === piece &&
+                    manual.connector === connector &&
+                    manual.anchorLocal.distanceTo(snapPoint.local) < 1e-4,
+                  marker = new THREE.Mesh(
+                    new THREE.SphereGeometry(
+                      highlighted ? 0.14 : snapPoint.important ? 0.09 : 0.052,
+                      10,
+                      8,
+                    ),
+                    new THREE.MeshBasicMaterial({
+                      color: highlighted
+                        ? 0xffee38
+                        : snapPoint.important
+                          ? 0xc084fc
+                          : 0x7e22ce,
+                      depthTest: false,
+                      transparent: true,
+                      opacity: snapPoint.important ? 1 : 0.7,
+                    }),
+                  );
+                marker.renderOrder = 43;
+                marker.userData = {
+                  debugKind: "connector-point",
+                  piece,
+                  local: snapPoint.local.clone(),
+                };
+                debugRoot.add(marker);
+              }
+            } else {
+              const point = new THREE.Mesh(
+                connector.kind === "axle"
+                  ? new THREE.OctahedronGeometry(selectedNode ? 0.19 : 0.105)
+                  : connector.kind === "half" && connector.role === "socket"
+                    ? new THREE.TorusGeometry(
+                        selectedNode ? 0.13 : 0.075,
+                        selectedNode ? 0.035 : 0.022,
+                        7,
+                        14,
+                      )
+                    : new THREE.SphereGeometry(selectedNode ? 0.16 : 0.085, 10, 8),
+                new THREE.MeshBasicMaterial({ color, depthTest: false }),
+              );
+              point.renderOrder = 41;
+              point.userData = {
+                debugKind: "connector-point",
+                piece,
+                local: connector.local.clone(),
+              };
+              debugRoot.add(point);
+            }
+            const arrow = new THREE.ArrowHelper(
+              connector.axis,
+              new THREE.Vector3(),
+              selectedNode ? 0.7 : 0.35,
+              color,
+              0.11,
+              0.07,
+            );
+            arrow.userData = {
+              debugKind: "connector-axis",
+              piece,
+              local: connector.local.clone(),
+              axis: connector.axis.clone(),
+            };
+            debugRoot.add(arrow);
+          }
+        if (showRotationPivot && piece === state.selected && piece.rotationPivotLocal) {
+          const pivotMarker = new THREE.Mesh(
+            new THREE.TorusGeometry(0.14, 0.035, 8, 20),
+            new THREE.MeshBasicMaterial({
+              color: 0xffc928,
+              depthTest: false,
+              transparent: true,
+              opacity: 0.95,
+            }),
+          );
+          pivotMarker.renderOrder = 48;
+          pivotMarker.userData = {
+            debugKind: "connector-point",
+            piece,
+            local: piece.rotationPivotLocal.clone(),
+          };
+          debugRoot.add(pivotMarker);
+        }
+        if (state.debug.physics) {
+          const axes = new THREE.AxesHelper(0.65);
+          axes.userData = { debugKind: "body-axes", piece };
+          axes.renderOrder = 42;
+          debugRoot.add(axes);
+        }
+      }
+      for (const connection of state.connections.filter(
+        (candidate) => candidate.forced,
+      )) {
+        if (!connection.localPointA || !connection.localPointB) continue;
+        const addForcedPoint = (piece: Piece, local: THREE.Vector3) => {
+          const point = new THREE.Mesh(
+            new THREE.SphereGeometry(0.13, 12, 8),
+            new THREE.MeshBasicMaterial({
+              color: 0xff2d2d,
+              depthTest: false,
+            }),
+          );
+          point.renderOrder = 55;
+          point.userData = {
+            debugKind: "connector-point",
+            piece,
+            local: local.clone(),
+          };
+          debugRoot.add(point);
+        };
+        addForcedPoint(connection.a, connection.localPointA);
+        addForcedPoint(connection.b, connection.localPointB);
+        const line = new THREE.Line(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({
+            color: 0xff2d2d,
+            depthTest: false,
+            transparent: true,
+            opacity: 0.9,
+          }),
+        );
+        line.renderOrder = 54;
+        line.userData = { debugKind: "forced-joint-link", connection };
+        debugRoot.add(line);
+      }
+      if (state.debug.physics)
+        for (const connection of state.connections) {
+          connection.a.mesh.updateMatrixWorld(true);
+          const local = connection.a.mesh.worldToLocal(connection.point.clone()),
+            nearest = connection.a.connectors
+              .slice()
+              .sort((a, b) => a.local.distanceTo(local) - b.local.distanceTo(local))[0],
+            axis = nearest?.axis.clone() ?? new THREE.Vector3(1, 0, 0);
+          const point = new THREE.Mesh(
+            new THREE.SphereGeometry(0.11, 12, 8),
+            new THREE.MeshBasicMaterial({ color: 0xff9d20, depthTest: false }),
+          );
+          point.userData = {
+            debugKind: "joint-point",
+            connection,
+            local: local.clone(),
+          };
+          debugRoot.add(point);
+          const arrow = new THREE.ArrowHelper(
+            axis,
+            new THREE.Vector3(),
+            0.75,
+            0xff9d20,
+            0.16,
+            0.1,
+          );
+          arrow.userData = {
+            debugKind: "joint-axis",
+            connection,
+            local: local.clone(),
+            axis,
+          };
+          debugRoot.add(arrow);
+          const link = new THREE.Line(
+            new THREE.BufferGeometry(),
+            new THREE.LineBasicMaterial({
+              color: 0xff572d,
+              depthTest: false,
+              transparent: true,
+              opacity: 0.8,
+            }),
+          );
+          link.userData = { debugKind: "joint-link", connection };
+          debugRoot.add(link);
+        }
+      configureDebugOverlay();
+      updateDebug();
+      gpuSceneRenderer?.invalidate();
+      requestRender();
+    };
+    // Selection-only changes must not invalidate and rebuild every WebGPU
+    // geometry batch. WebGL keeps its BoxHelper; WebGPU uses the per-instance
+    // selected flag and filters this helper out of its extras.
+    const refreshSelectionOutlines = () => {
+      debugRoot.children
+        .filter((object) => object.userData.debugKind === "selection-outline")
+        .forEach((object) => {
+          debugRoot.remove(object);
+          object.traverse((child) => {
+            if (!(child instanceof THREE.Mesh) && !(child instanceof THREE.Line)) return;
+            child.geometry.dispose();
+            const materials = Array.isArray(child.material)
+              ? child.material
+              : [child.material];
+            materials.forEach((material) => material.dispose());
+          });
+        });
+      for (const selected of state.selectedPieces) {
+        selected.mesh.updateMatrixWorld(true);
+        const outline = new THREE.BoxHelper(
+          selected.mesh,
+          selected === state.selected ? 0x2b8cff : 0xffa51f,
+        );
+        outline.userData = { debugKind: "selection-outline", piece: selected };
+        outline.renderOrder = 96;
+        outline.frustumCulled = false;
+        const material = outline.material as THREE.LineBasicMaterial;
+        material.depthTest = false;
+        material.depthWrite = false;
+        material.transparent = true;
+        material.opacity = 0.95;
+        debugRoot.add(outline);
+      }
+      requestRender();
+    };
+    const disposeRenderBatches = () => {
+      state.renderBatchItems?.forEach(({ mesh }) => {
+        if (mesh.userData.ownedBatchMaterial) (mesh.material as THREE.Material).dispose();
+        if (mesh.userData.ownedBatchGeometry) mesh.geometry.dispose();
+        mesh.dispose();
+      });
+      const outlineGeometries = new Set<THREE.BufferGeometry>();
+      state.pieces?.forEach((piece) => {
+        const outlines: THREE.Line[] = [];
+        piece.mesh.traverse((object) => {
+          if (object instanceof THREE.Line && object.userData.dynamicOutlineBatch)
+            outlines.push(object);
+        });
+        outlines.forEach((outline) => {
+          outlineGeometries.add(outline.geometry);
+          outline.removeFromParent();
+        });
+      });
+      outlineGeometries.forEach((geometry) => geometry.dispose());
+      if (state.renderBatchRoot) {
+        state.renderBatchRoot.traverse((object) => {
+          if (object.userData.ownedBatchGeometry && object instanceof THREE.Line)
+            object.geometry.dispose();
+          if (object.userData.ownedBatchMaterial && object instanceof THREE.Line)
+            (object.material as THREE.Material).dispose();
+        });
+        scene.remove(state.renderBatchRoot);
+        state.renderBatchRoot.clear();
+        state.renderBatchRoot = undefined;
+        state.renderLineBatchRoot = undefined;
+      }
+      state.renderBatchItems = [];
+      state.renderLineBatchItems = [];
+      state.renderBatchStats = {
+        lineBatches: 0,
+        meshBatches: 0,
+        hiddenOriginalLines: 0,
+        hiddenOriginalMeshes: 0,
+      };
+      state.renderBatchesDirty = false;
+      state.pieces?.forEach((piece) => {
+        piece.renderBatched = false;
+        piece.mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) child.visible = true;
+          else if (child instanceof THREE.Line)
+            child.visible = modelOutlinesVisibleRef.current;
+          if (child instanceof THREE.Mesh) child.castShadow = true;
+        });
+      });
+    };
+    const updateRenderBatches = () => {
+      const matrix = new THREE.Matrix4();
+      const pieceMatrices = new Map<Piece, THREE.Matrix4>();
+      state.pieces.forEach((piece) => {
+        piece.mesh.updateMatrix();
+        pieceMatrices.set(piece, piece.mesh.matrix);
+      });
+      for (const batch of state.renderBatchItems ?? []) {
+        let changed = false;
+        batch.pieces.forEach((piece, index) => {
+          if (
+            state.running &&
+            (!piece.body ||
+              piece.physicsIslandFixed ||
+              state.sleepingBodyHandles.has(piece.body.handle))
+          )
+            return;
+          matrix.multiplyMatrices(
+            pieceMatrices.get(piece) ?? piece.mesh.matrix,
+            batch.localMatrix,
+          );
+          batch.mesh.setMatrixAt(index, matrix);
+          changed = true;
+        });
+        if (changed) batch.mesh.instanceMatrix.needsUpdate = true;
+      }
+      for (const batch of state.renderLineBatchItems ?? []) {
+        const output = batch.matrixAttribute.array as Float32Array;
+        let changed = false;
+        batch.pieces.forEach((piece, pieceIndex) => {
+          if (
+            state.running &&
+            (!piece.body ||
+              piece.physicsIslandFixed ||
+              state.sleepingBodyHandles.has(piece.body.handle))
+          )
+            return;
+          const pieceMatrix = pieceMatrices.get(piece) ?? piece.mesh.matrix;
+          pieceMatrix.toArray(output, pieceIndex * 16);
+          changed = true;
+        });
+        if (changed) batch.matrixAttribute.needsUpdate = true;
+      }
+      state.renderBatchesDirty = false;
+    };
+    const rebuildRenderBatches = (batchPieces = state.pieces) => {
+      disposeRenderBatches();
+      if (!batchPieces.length) return;
+      const root = new THREE.Group();
+      root.name = "Sim Studio instanced LDraw batches";
+      state.renderBatchRoot = root;
+      state.renderBatchItems = [];
+      state.renderLineBatchItems = [];
+      state.renderBatchesDirty = true;
+      scene.add(root);
+      let hiddenOriginalLines = 0,
+        outlineBatchCount = 0,
+        hiddenOriginalMeshes = 0;
+      state.renderLineBatchRoot = undefined;
+      const cloneGeometryRange = (
+        source: THREE.BufferGeometry,
+        start: number,
+        count: number,
+      ) => {
+        const nonIndexed = source.index ? source.toNonIndexed() : source,
+          result = new THREE.BufferGeometry();
+        Object.entries(nonIndexed.attributes).forEach(([name, attribute]) => {
+          if (attribute instanceof THREE.InterleavedBufferAttribute) return;
+          const sourceArray = attribute.array as ArrayLike<number> & {
+              slice?: (from: number, to: number) => ArrayLike<number>;
+            },
+            from = start * attribute.itemSize,
+            to = (start + count) * attribute.itemSize,
+            sliced = sourceArray.slice
+              ? sourceArray.slice(from, to)
+              : Array.from(sourceArray).slice(from, to),
+            ArrayType = attribute.array.constructor as new (
+              values: ArrayLike<number>,
+            ) => THREE.TypedArray;
+          result.setAttribute(
+            name,
+            new THREE.BufferAttribute(
+              new ArrayType(sliced),
+              attribute.itemSize,
+              attribute.normalized,
+            ),
+          );
+        });
+        if (source.index) nonIndexed.dispose();
+        return result;
+      };
+      const groups = new Map<string, Piece[]>();
+      batchPieces
+        .filter((piece) => !state.rubberBands.some((band) => band.owner === piece))
+        .forEach((piece) => {
+          piece.mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh) child.castShadow = false;
+          });
+          const key = modelRenderKey(piece),
+            group = groups.get(key) ?? [];
+          group.push(piece);
+          groups.set(key, group);
+        });
+      groups.forEach((pieces) => {
+        // También procesamos piezas que aparecen una sola vez.
+        //
+        // Aunque instanciar una única malla no reduzca los draw calls de las caras,
+        // el batching de líneas LDraw que se hace más abajo sí fusiona los muchos
+        // LineSegments internos de una pieza en muy pocos draw calls.
+        //
+        // Esto es especialmente importante en modelos importados grandes, donde
+        // las referencias que aparecen una sola vez pueden conservar cientos o
+        // miles de objetos de línea individuales.
+        // La geometría real ya está cargada dentro de piece.mesh.
+        // No necesitamos exigir packaged-cache para poder hacer batching.
+        // modelRenderKey ya agrupa referencias equivalentes.
+        if (!pieces.length) return;
+        const template = pieces[0];
+        const shouldInstanceMeshes = pieces.length >= 2;
+        template.mesh.updateMatrixWorld(true);
+        const templateMeshes: THREE.Mesh[] = [];
+        template.mesh.traverse((child) => {
+          if (child instanceof THREE.Mesh) templateMeshes.push(child);
+        });
+        if (!templateMeshes.length) return;
+        const inverseWrapper = template.mesh.matrixWorld.clone().invert();
+        let createdBatches = 0;
+        if (shouldInstanceMeshes) {
+          templateMeshes.forEach((child) => {
+            const materials = Array.isArray(child.material)
+                ? child.material
+                : [child.material],
+              ranges =
+                Array.isArray(child.material) && child.geometry.groups.length
+                  ? child.geometry.groups.map((group) => ({
+                      start: group.start,
+                      count: group.count,
+                      material: materials[group.materialIndex ?? 0],
+                    }))
+                  : [
+                      {
+                        start: 0,
+                        count: child.geometry.index
+                          ? child.geometry.index.count
+                          : child.geometry.getAttribute("position").count,
+                        material: materials[0],
+                      },
+                    ],
+              localTransform = inverseWrapper.clone().multiply(child.matrixWorld);
+            ranges.forEach(({ start, count, material }) => {
+              if (!material || count <= 0) return;
+              const geometry = cloneGeometryRange(child.geometry, start, count),
+                instance = new THREE.InstancedMesh(geometry, material, pieces.length);
+              instance.name = `${template.part} × ${pieces.length}`;
+              instance.castShadow = false;
+              instance.receiveShadow = true;
+              instance.frustumCulled = false;
+              instance.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+              instance.userData.instancePieces = pieces;
+              instance.userData.ownedBatchGeometry = true;
+              instance.userData.ownedBatchMaterial = false;
+              root.add(instance);
+              state.renderBatchItems.push({
+                mesh: instance,
+                pieces,
+                localMatrix: localTransform.clone(),
+              });
+              createdBatches++;
+            });
+          });
+        }
+        // LDraw represents outlines as many individual LineSegments objects.
+        // Keeping those originals produced 6-8k draw calls on large imports.
+        // Merge equal-material outlines by repeated part. Per-piece transforms
+        // are instanced on the GPU, so moving a mechanism updates only a small
+        // matrix buffer instead of rebuilding hundreds of thousands of lines.
+        const linePoint = new THREE.Vector3();
+        const lineEnd = new THREE.Vector3();
+        let createdLineBatches = 0;
+        const lineGroups = new Map<
+          string,
+          {
+            material: THREE.Material;
+            positions: number[];
+            control0: number[];
+            control1: number[];
+            directions: number[];
+            conditional: boolean;
+          }
+        >();
+        template.mesh.traverse((child) => {
+          if (!(child instanceof THREE.LineSegments)) return;
+          const materials = Array.isArray(child.material)
+            ? child.material
+            : [child.material];
+          const material = materials[0];
+          if (!material) return;
+          const lineMaterial = material as THREE.LineBasicMaterial;
+          // ObjectLoader/preloaded geometry can deserialize LDraw's conditional
+          // line shader as a plain ShaderMaterial. The control attributes are
+          // therefore the reliable identifier, especially after importing a
+          // model triggers render batching for repeated parts.
+          const hasConditionalAttributes =
+            child.geometry.hasAttribute("control0") &&
+            child.geometry.hasAttribute("control1") &&
+            child.geometry.hasAttribute("direction");
+          const conditional = Boolean(
+            (
+              material as THREE.ShaderMaterial & {
+                isLDrawConditionalLineMaterial?: boolean;
+              }
+            ).isLDrawConditionalLineMaterial || hasConditionalAttributes,
+          );
+          const key = [
+            material.type,
+            lineMaterial.color?.getHexString() ?? "",
+            material.opacity,
+            Number(material.transparent),
+            Number(material.depthTest),
+            Number((lineMaterial as THREE.LineBasicMaterial).vertexColors),
+            conditional ? "conditional" : "hard",
+          ].join(":");
+          const group = lineGroups.get(key) ?? {
+            material,
+            positions: [] as number[],
+            control0: [] as number[],
+            control1: [] as number[],
+            directions: [] as number[],
+            conditional,
+          };
+          const sourcePosition = child.geometry.getAttribute("position");
+          if (!sourcePosition) return;
+          const childLocal = inverseWrapper.clone().multiply(child.matrixWorld);
+          const control0 = child.geometry.getAttribute("control0"),
+            control1 = child.geometry.getAttribute("control1"),
+            direction = child.geometry.getAttribute("direction");
+          const index = child.geometry.index;
+          const appendVertex = (vertexIndex: number) => {
+            linePoint
+              .fromBufferAttribute(sourcePosition, vertexIndex)
+              .applyMatrix4(childLocal);
+            group.positions.push(linePoint.x, linePoint.y, linePoint.z);
+            if (!conditional || !control0 || !control1 || !direction) return;
+            linePoint.fromBufferAttribute(control0, vertexIndex).applyMatrix4(childLocal);
+            group.control0.push(linePoint.x, linePoint.y, linePoint.z);
+            linePoint.fromBufferAttribute(control1, vertexIndex).applyMatrix4(childLocal);
+            group.control1.push(linePoint.x, linePoint.y, linePoint.z);
+            linePoint
+              .fromBufferAttribute(sourcePosition, vertexIndex)
+              .applyMatrix4(childLocal);
+            lineEnd
+              .fromBufferAttribute(sourcePosition, vertexIndex)
+              .add(new THREE.Vector3().fromBufferAttribute(direction, vertexIndex))
+              .applyMatrix4(childLocal)
+              .sub(linePoint);
+            group.directions.push(lineEnd.x, lineEnd.y, lineEnd.z);
+          };
+          if (index) {
+            for (let offset = 0; offset < index.count; offset++)
+              appendVertex(index.getX(offset));
+          } else {
+            for (let offset = 0; offset < sourcePosition.count; offset++)
+              appendVertex(offset);
+          }
+          lineGroups.set(key, group);
+        });
+        lineGroups.forEach(
+          ({ material, positions, control0, control1, directions, conditional }) => {
+            if (!positions.length) return;
+            const geometry = new THREE.InstancedBufferGeometry(),
+              positionAttribute = new THREE.BufferAttribute(
+                new Float32Array(positions),
+                3,
+              ),
+              matrixAttribute = new THREE.InstancedBufferAttribute(
+                new Float32Array(pieces.length * 16),
+                16,
+              ),
+              sourceMaterial = material as THREE.LineBasicMaterial & {
+                uniforms?: {
+                  diffuse?: {
+                    value?: unknown;
+                  };
+                  opacity?: {
+                    value?: unknown;
+                  };
+                };
+              },
+              uniformColor = sourceMaterial.uniforms?.diffuse?.value,
+              outlineColor =
+                sourceMaterial.color instanceof THREE.Color
+                  ? sourceMaterial.color.clone()
+                  : uniformColor instanceof THREE.Color
+                    ? uniformColor.clone()
+                    : new THREE.Color(darkTheme ? 0x9aa4ad : 0x20262b),
+              uniformOpacity = sourceMaterial.uniforms?.opacity?.value,
+              outlineOpacity = Number.isFinite(sourceMaterial.opacity)
+                ? sourceMaterial.opacity
+                : typeof uniformOpacity === "number" && Number.isFinite(uniformOpacity)
+                  ? uniformOpacity
+                  : 1,
+              batchMaterial = conditional
+                ? (material.clone() as THREE.ShaderMaterial)
+                : new THREE.ShaderMaterial({
+                    uniforms: THREE.UniformsUtils.merge([
+                      THREE.UniformsLib.fog,
+                      {
+                        diffuse: { value: outlineColor },
+                        opacity: { value: outlineOpacity },
+                      },
+                    ]),
+                    vertexShader: `
+                    attribute mat4 instanceMatrix;
+                    #include <fog_pars_vertex>
+                    void main() {
+                      vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+                      gl_Position = projectionMatrix * mvPosition;
+                      #include <fog_vertex>
+                    }
+                  `,
+                    fragmentShader: `
+                    uniform vec3 diffuse;
+                    uniform float opacity;
+                    #include <fog_pars_fragment>
+                    void main() {
+                      gl_FragColor = vec4(diffuse, opacity);
+                      #include <fog_fragment>
+                    }
+                  `,
+                    fog: true,
+                    transparent: sourceMaterial.transparent,
+                    depthTest: sourceMaterial.depthTest,
+                    depthWrite: sourceMaterial.depthWrite,
+                    opacity: outlineOpacity,
+                    blending: sourceMaterial.blending,
+                  });
+            // Conditional LDraw shaders contain the fog chunks and uniforms, but
+            // ShaderMaterial does not enable the fog define automatically.
+            batchMaterial.fog = true;
+            configureDistanceScaledOutlineMaterial(batchMaterial);
+            if (conditional) {
+              geometry.setAttribute(
+                "control0",
+                new THREE.BufferAttribute(new Float32Array(control0), 3),
+              );
+              geometry.setAttribute(
+                "control1",
+                new THREE.BufferAttribute(new Float32Array(control1), 3),
+              );
+              geometry.setAttribute(
+                "direction",
+                new THREE.BufferAttribute(new Float32Array(directions), 3),
+              );
+              batchMaterial.vertexShader = `attribute mat4 instanceMatrix;\n${batchMaterial.vertexShader.replaceAll("modelViewMatrix * vec4(", "modelViewMatrix * instanceMatrix * vec4(")}`;
+            }
+            matrixAttribute.setUsage(THREE.DynamicDrawUsage);
+            geometry.setAttribute("position", positionAttribute);
+            geometry.setAttribute("instanceMatrix", matrixAttribute);
+            geometry.instanceCount = pieces.length;
+            const line = new THREE.LineSegments(geometry, batchMaterial);
+            line.name = `${template.part} outlines × ${pieces.length}`;
+            line.visible = modelOutlinesVisibleRef.current;
+            line.frustumCulled = false;
+            line.raycast = () => undefined;
+            line.userData.ownedBatchGeometry = true;
+            line.userData.ownedBatchMaterial = true;
+            root.add(line);
+            state.renderLineBatchItems.push({ line, pieces, matrixAttribute });
+            outlineBatchCount++;
+            createdLineBatches++;
+          },
+        );
+        if (!createdBatches && !createdLineBatches) return;
+        pieces.forEach((piece) => {
+          piece.mesh.traverse((child) => {
+            // Solo ocultamos las caras originales si realmente
+            // hemos creado un batch de caras.
+            if (child instanceof THREE.Mesh && createdBatches > 0) {
+              child.visible = false;
+              hiddenOriginalMeshes++;
+            }
+            // Las líneas sí pueden agruparse incluso para
+            // una única pieza.
+            if (child instanceof THREE.LineSegments && createdLineBatches > 0) {
+              child.visible = false;
+              hiddenOriginalLines++;
+            }
+          });
+          piece.renderBatched = createdBatches > 0 || createdLineBatches > 0;
+        });
+      });
+      state.renderBatchStats = {
+        lineBatches: outlineBatchCount,
+        meshBatches: state.renderBatchItems.length,
+        hiddenOriginalLines,
+        hiddenOriginalMeshes,
+      };
+      updateRenderBatches();
+      requestRender();
+    };
+    let renderBatchRebuildFrame = 0;
+    const scheduleRenderBatchRebuild = () => {
+      if (state.bulkLoading || state.running || renderBatchRebuildFrame) return;
+      renderBatchRebuildFrame = requestAnimationFrame(() => {
+        renderBatchRebuildFrame = 0;
+        if (!state.bulkLoading && !state.running) state.rebuildRenderBatches();
+      });
+    };
+    const recolorPart = async (piece: Piece, color: number) => {
+      if (piece.color === color) return true;
+      const sourceColor = piece.sourceColor ?? piece.color;
+      try {
+        const exact = await loadPartModel({
+          ...piece,
+          color,
+          sourceColor,
+        });
+        if (!piece.embeddedGeometry) prepareModel(exact);
+        exact.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            object.castShadow = true;
+            object.receiveShadow = true;
+          }
+        });
+        state.disposeRenderBatches();
+        piece.mesh.clear();
+        piece.mesh.add(exact);
+        piece.color = color;
+        piece.sourceColor = sourceColor;
+        piece.mesh.updateMatrixWorld(true);
+        state.rebuildRenderBatches();
+        state.refreshDebug();
+        return true;
+      } catch {
+        state.rebuildRenderBatches();
+        return false;
+      }
+    };
+    // --- Scene editing and connections -------------------------------------
+    const rubberBeltLength: Record<string, number> = {
+      "85543": 5.9,
+      "85545": 10.2,
+      "85546": 13.0,
+    };
+    const makeRubberBelt = (piece: Piece) => {
+      const length = rubberBeltLength[piece.part];
+      if (!length) return;
+      const bounds = new THREE.Box3().setFromObject(piece.mesh);
+      const center = bounds.getCenter(new THREE.Vector3());
+      const radiusX = Math.max(0.25, bounds.getSize(new THREE.Vector3()).x / 2);
+      const radiusZ = Math.max(0.25, bounds.getSize(new THREE.Vector3()).z / 2);
+      const guides = Array.from({ length: 16 }, (_, index) => {
+        const angle = (index / 16) * Math.PI * 2;
+        return new THREE.Vector3(
+          center.x + Math.cos(angle) * radiusX,
+          center.y,
+          center.z + Math.sin(angle) * radiusZ,
+        );
+      });
+      const color = new THREE.Color(colorHex[piece.color] ?? 0x202020).getHex();
+      const band: RubberBand = {
+        id: `rubber-${piece.id}`,
+        owner: piece,
+        guides,
+        radius: 0.075,
+        restLength: length,
+        stiffness: 4 / length,
+        damping: 0.12,
+        color,
+        line: makeRubberBandLine(color),
+        markers: makeRubberBandMarkers(color),
+        visual: makeRubberBandVisual(color),
+      };
+      band.line.userData.piece = piece;
+      band.visual!.userData.piece = piece;
+      drawRubberBand(band);
+      piece.mesh.visible = false;
+      piece.colliders = [];
+      piece.gearColliders = [];
+      state.rubberBands.push(band);
+      scene.add(band.visual);
+    };
+    const addPart = async (
+      p: CatalogPart,
+      position: THREE.Vector3,
+      rotation?: THREE.Quaternion,
+    ): Promise<Piece | null> => {
+      const counterpartId = turntableCounterpart[p.part.toLowerCase()];
+      if (counterpartId && !p.embeddedGeometry && !state.bulkLoading) {
+        const counterpartCatalog = paletteParts.find(
+          (part) => part.part.toLowerCase() === counterpartId,
+        );
+        if (!counterpartCatalog) return null;
+        const wasBulkLoading = state.bulkLoading,
+          baseRotation = rotation?.clone() ?? new THREE.Quaternion();
+        state.bulkLoading = true;
+        try {
+          const primary = await addPart(p, position.clone(), baseRotation),
+            counterpart = await addPart(
+              counterpartCatalog,
+              position.clone().add(turntableCounterpartOffset[p.part.toLowerCase()]),
+              baseRotation,
+            );
+          if (!primary || !counterpart) return null;
+          const assembly = [primary, counterpart],
+            editorAssemblyId = `turntable-${primary.id}`;
+          assembly.forEach((piece) => {
+            piece.editorAssemblyId = editorAssemblyId;
+            piece.editorAssemblyDetached = undefined;
+          });
+          if (!rotation) {
+            const bounds = new THREE.Box3();
+            assembly.forEach((piece) => bounds.expandByObject(piece.mesh));
+            const lift = -bounds.min.y;
+            assembly.forEach((piece) => {
+              piece.mesh.position.y += lift;
+              piece.mesh.updateMatrixWorld(true);
+            });
+          }
+          assembly.forEach((piece) => {
+            piece.mesh.visible = true;
+            verifyPieceConnections(piece, false);
+          });
+          // These parts are inserted as a closed assembly. Add their dedicated
+          // central pivot directly instead of relying on the broad auto-scan.
+          const primaryJoint = primary.connectors.find(
+              (connector) =>
+                connector.connectionTarget?.partId.toLowerCase() ===
+                counterpart.part.toLowerCase(),
+            ),
+            counterpartJoint = counterpart.connectors.find(
+              (connector) =>
+                connector.connectionTarget?.partId.toLowerCase() ===
+                primary.part.toLowerCase(),
+            );
+          if (primaryJoint && counterpartJoint) {
+            const socketPiece = primaryJoint.role === "socket" ? primary : counterpart,
+              socket = primaryJoint.role === "socket" ? primaryJoint : counterpartJoint,
+              shaftPiece = primaryJoint.role === "shaft" ? primary : counterpart,
+              shaft = primaryJoint.role === "shaft" ? primaryJoint : counterpartJoint;
+            addConnection(socketPiece, shaftPiece, socket, shaft, {
+              point: worldConnector(socketPiece, socket).point,
+              axis: worldConnector(socketPiece, socket).axis,
+              localAxisA: socket.axis.clone().normalize(),
+            });
+          }
+          // The pair is already snapped through its dedicated centre joint.
+          primary.mesh.userData.skipNextPlacementConnect = true;
+          return primary;
+        } finally {
+          state.bulkLoading = wasBulkLoading;
+          if (!wasBulkLoading) {
+            setCount(state.pieces.length);
+            setMessage(
+              languageRef.current === "es"
+                ? `${p.part} · Plataforma giratoria completa de 2 piezas`
+                : isChineseLanguage()
+                  ? `${p.part} · 完整双零件转盘`
+                  : `${p.part} · Complete 2-piece turntable`,
+            );
+            refreshDebug();
+            scheduleRenderBatchRebuild();
+          }
+        }
+      }
+      if (p.part.toLowerCase() === "61903" && !p.embeddedGeometry) {
+        const endCatalog = paletteParts.find((part) => part.part === "62520"),
+          centreCatalog = paletteParts.find((part) => part.part === "62519");
+        if (!endCatalog || !centreCatalog) return null;
+        const wasBulkLoading = state.bulkLoading,
+          baseRotation = rotation?.clone() ?? new THREE.Quaternion(),
+          flippedEndRotation = baseRotation
+            .clone()
+            .multiply(new THREE.Quaternion(Math.SQRT1_2, Math.SQRT1_2, 0, 0)),
+          component = (catalog: CatalogPart): CatalogPart => ({
+            ...catalog,
+            color: p.color,
+            sourceColor: catalog.color,
+          });
+        state.bulkLoading = true;
+        try {
+          const firstEnd = await addPart(
+              component(endCatalog),
+              position.clone(),
+              baseRotation,
+            ),
+            secondEnd = await addPart(
+              component(endCatalog),
+              position.clone(),
+              flippedEndRotation,
+            ),
+            centre = await addPart(
+              component(centreCatalog),
+              position.clone(),
+              baseRotation,
+            );
+          if (!firstEnd || !secondEnd || !centre) return null;
+          const assembly: Piece[] = [firstEnd, secondEnd, centre],
+            editorAssemblyId = `cardan-${firstEnd.id}`;
+          assembly.forEach((piece) => {
+            piece.editorAssemblyId = editorAssemblyId;
+            piece.editorAssemblyDetached = undefined;
+          });
+          if (!rotation) {
+            const bounds = new THREE.Box3();
+            assembly.forEach((piece) => bounds.expandByObject(piece.mesh));
+            const lift = -bounds.min.y;
+            assembly.forEach((piece) => {
+              piece.mesh.position.y += lift;
+              piece.mesh.updateMatrixWorld(true);
+            });
+          }
+          assembly.forEach((piece) => {
+            piece.mesh.visible = true;
+            verifyPieceConnections(piece, false);
+          });
+          // The drop handler normally snaps the returned piece once more.
+          // A compound Cardan has already connected all three components;
+          // snapping one yoke again can choose the other arm of the cross and
+          // rotate it 90 degrees, leaving both hinge axes parallel.
+          firstEnd.mesh.userData.skipNextPlacementConnect = true;
+          return firstEnd;
+        } finally {
+          state.bulkLoading = wasBulkLoading;
+          if (!wasBulkLoading) {
+            setCount(state.pieces.length);
+            setMessage(
+              languageRef.current === "es"
+                ? "61903 · Junta Cardán física de 3 piezas"
+                : isChineseLanguage()
+                  ? "61903 · 三零件万向节"
+                  : "61903 · Physical 3-piece universal joint",
+            );
+            refreshDebug();
+            scheduleRenderBatchRebuild();
+          }
+        }
+      }
+      if (!state.bulkLoading)
+        setMessage(isChineseLanguage() ? `正在加载 ${p.part}…` : `Cargando ${p.part}…`);
+      try {
+        const exact = await loadPartModel(p);
+        preloaded.add(modelRenderKey(p));
+        if (!p.embeddedGeometry) prepareModel(exact);
+        exact.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            object.castShadow = true;
+            object.receiveShadow = true;
+          }
+        });
+        const wrapper = new THREE.Group();
+        wrapper.add(exact);
+        wrapper.position.copy(position);
+        if (rotation) wrapper.quaternion.copy(rotation);
+        wrapper.updateMatrixWorld(true);
+        const { connectors, colliders, gearColliders, specialGear, mapProvenance } =
+            analyzePart(wrapper, p),
+          piece: Piece = {
+            ...p,
+            id: Date.now() + Math.random(),
+            mesh: wrapper,
+            mapProvenance,
+            connectors,
+            colliders,
+            gearColliders,
+            gear: isGearPart(p),
+            specialGear,
+            exactCollider: false,
+            fixed: false,
+            pin: isPinPart(p),
+            frictionPin: hasPinFriction(p),
+            dynamicAxleConnections: isAxlePart(p) || isGearboxExtensionPart(p),
+            gearDirectionLock: undefined,
+            gearMotor: undefined,
+          };
+        wrapper.userData.piece = piece;
+        wrapper.userData.connectorReach = connectorMapReach(connectors);
+        wrapper.visible = !state.bulkLoading;
+        state.pieces.push(piece);
+        scene.add(wrapper);
+        if (!rotation) {
+          const box = new THREE.Box3().setFromObject(wrapper);
+          wrapper.position.y -= box.min.y;
+        }
+        if (!state.bulkLoading) {
+          setCount(state.pieces.length);
+          setMessage(
+            isChineseLanguage()
+              ? `${p.part} · ${connectors.length} 个连接点 · ${colliders.length + gearColliders.length} 个碰撞形状`
+              : `${p.part} · ${connectors.length} conectores · ${colliders.length + gearColliders.length} formas físicas`,
+          );
+          refreshDebug();
+          scheduleRenderBatchRebuild();
+        }
+        return piece;
+      } catch {
+        if (!state.bulkLoading)
+          setMessage(
+            isChineseLanguage() ? `未找到 ${p.part}.dat` : `No se encontró ${p.part}.dat`,
+          );
+        return null;
+      }
+    };
+    Object.assign(state, {
+      scene,
+      renderer,
+      camera,
+      cameraTarget,
+      floor,
+      grid,
+      gridStep,
+      axleSnapStep,
+      rotationSnapStep,
+      pieces: [],
+      selectedPieces: new Set<Piece>(),
+      connections: [],
+      gearLinks: [],
+      seedGearContacts: () => undefined,
+      rubberBands: [],
+      gearAngles: new Map(),
+      gearBodyRotations: new Map(),
+      gearPhases: new Map(),
+      sleepingBodyHandles: new Set(),
+      physicsJoints: new Map(),
+      dynamicNoContactPairs: new Set(),
+      contactExclusions: new Set(),
+      contactCandidates: new Map(),
+      dynamicConnectionFrame: 0,
+      connectionModes: new Map<
+        string,
+        {
+          mode: JointMode;
+          motorSpeed: number;
+          motorForce: number;
+          motorPulse: boolean;
+          motorPulseAngle: number;
+          motorPulseInterval: number;
+          userConfigured: boolean;
+        }
+      >(),
+      running: false,
+      physicsSettings: { ...physicsSettings },
+      performanceTrace: {
+        startedAt: new Date().toISOString(),
+        startedAtMs: performance.now(),
+        samples: [],
+        cursor: 0,
+        totalFrames: 0,
+      },
+      pendingInputMs: 0,
+      pendingConnectionMs: 0,
+      connectionScanVersion: 0,
+      renderScale,
+      gpuTimerSupported: !!gpuTimerExtension,
+      gpuRenderer,
+      gpuVendor,
+      requestRender,
+      setGizmoAppearance: applyGizmoAppearance,
+      setViewportRendererPreference: () => undefined,
+      setAdaptiveRendering: () => undefined,
+      renderBatchItems: [],
+      renderLineBatchItems: [],
+      renderBatchStats: {
+        lineBatches: 0,
+        meshBatches: 0,
+        hiddenOriginalLines: 0,
+        hiddenOriginalMeshes: 0,
+      },
+      renderBatchesDirty: false,
+      addPart,
+      preloadPart,
+      recolorPart,
+      renderImportPreview,
+      rebuildRenderBatches,
+      updateRenderBatches,
+      disposeRenderBatches,
+      debug: { colliders: false, connectors: false, physics: false },
+      refreshDebug,
+      updateDebug,
+    });
+    appRef.current = state;
+    let activeRendererPreference = rendererPreferenceRef.current,
+      gpuInitializationVersion = 0;
+    const fallBackToWebGl = (error?: unknown, disposeRenderer = true) => {
+      const active = gpuSceneRenderer;
+      if (disposeRenderer) {
+        gpuSceneRenderer = null;
+        active?.dispose();
+      }
+      gpuSceneStats = null;
+      gpuViewportCanvas.classList.remove("active");
+      renderer.domElement.classList.remove("webgpu-active");
+      state.gpuRenderer = gpuRenderer;
+      state.gpuVendor = gpuVendor;
+      state.gpuTimerSupported = !!gpuTimerExtension;
+      // WebGL batches are deliberately left stale while WebGPU is active.
+      // Refresh them once if the fallback becomes necessary.
+      state.renderBatchesDirty = true;
+      requestRender();
+      setViewportRenderer("WebGL");
+      if (error)
+        console.warn("WebGPU viewport unavailable; continuing with WebGL:", error);
+    };
+    const startWebGpu = () => {
+      if (!GpuSceneRenderer.supported()) {
+        fallBackToWebGl();
+        return;
+      }
+      if (gpuSceneRenderer) {
+        gpuViewportCanvas.classList.add("active");
+        renderer.domElement.classList.add("webgpu-active");
+        state.gpuRenderer = gpuSceneRenderer.adapterName;
+        state.gpuVendor = "wgpu / navegador";
+        state.gpuTimerSupported = false;
+        setViewportRenderer("WebGPU");
+        requestRender();
+        return;
+      }
+      const initializationVersion = ++gpuInitializationVersion;
+      if (gpuViewportCanvas.parentElement !== host) host.appendChild(gpuViewportCanvas);
+      void GpuSceneRenderer.create(gpuViewportCanvas)
+        .then((gpuRendererInstance) => {
+          if (
+            gpuInitializationCancelled ||
+            initializationVersion !== gpuInitializationVersion ||
+            activeRendererPreference === "webgl"
+          ) {
+            gpuRendererInstance.dispose();
+            return;
+          }
+          gpuSceneRenderer = gpuRendererInstance;
+          gpuSceneRenderer.resize(
+            host.clientWidth,
+            host.clientHeight,
+            nativePixelRatio * renderScale,
+          );
+          gpuViewportCanvas.classList.add("active");
+          renderer.domElement.classList.add("webgpu-active");
+          state.gpuRenderer = gpuRendererInstance.adapterName;
+          state.gpuVendor = "wgpu / navegador";
+          state.gpuTimerSupported = false;
+          setViewportRenderer("WebGPU");
+          requestRender();
+        })
+        .catch((error) => {
+          if (
+            !gpuInitializationCancelled &&
+            initializationVersion === gpuInitializationVersion
+          )
+            fallBackToWebGl(error);
+        });
+    };
+    const applyRendererPreference = (preference: ViewportRendererPreference) => {
+      activeRendererPreference = preference;
+      if (preference === "webgl") {
+        gpuInitializationVersion++;
+        fallBackToWebGl();
+        return;
+      }
+      startWebGpu();
+    };
+    state.setViewportRendererPreference = applyRendererPreference;
+    applyRendererPreference(activeRendererPreference);
+    const isRod = (piece: Piece) =>
+      isPinPart(piece) ||
+      isAxlePart(piece) ||
+      piece.connectors.some((connector) => connector.role === "shaft");
+    const worldConnector = (host: Piece, connector: MeshConnector) => {
+      host.mesh.updateMatrixWorld(true);
+      return {
+        point: host.mesh.localToWorld(connector.local.clone()),
+        axis: connector.axis
+          .clone()
+          .transformDirection(host.mesh.matrixWorld)
+          .normalize(),
+      };
+    };
+    const connectorOccupied = (
+      piece: Piece,
+      connector: MeshConnector,
+      ignoredPiece?: Piece,
+    ) => {
+      const samePhysicalSite = (candidate: MeshConnector) =>
+        candidate === connector ||
+        (candidate.role === connector.role &&
+          candidate.local.distanceToSquared(connector.local) <= 0.0009 &&
+          Math.abs(candidate.axis.dot(connector.axis)) >= 0.995);
+      return state.connections.some(
+        (connection) =>
+          connection.a !== ignoredPiece &&
+          connection.b !== ignoredPiece &&
+          ((connection.a === piece && samePhysicalSite(connection.socket)) ||
+            (connection.b === piece && samePhysicalSite(connection.shaft))),
+      );
+    };
+    const connectorAvailable = (
+      piece: Piece,
+      connector: MeshConnector,
+      ignoredPiece?: Piece,
+    ) =>
+      connectorAcceptsAdditionalConnection(
+        connector,
+        connectorOccupied(piece, connector, ignoredPiece),
+      );
+    const connectorPairAvailable = (
+      aPiece: Piece,
+      a: MeshConnector,
+      bPiece: Piece,
+      b: MeshConnector,
+      ignoredPiece?: Piece,
+    ) => {
+      const sharedClutchSocket =
+        gearboxExtensionSeatingGap(aPiece, bPiece) > 0 ||
+        isChangeoverForkRingConnection(aPiece, a, bPiece, b);
+      return (
+        connectorPoliciesCompatible(aPiece, a, bPiece, b) &&
+        (connectorAvailable(aPiece, a, ignoredPiece) ||
+          (sharedClutchSocket && a.role === "socket")) &&
+        (connectorAvailable(bPiece, b, ignoredPiece) ||
+          (sharedClutchSocket && b.role === "socket"))
+      );
+    };
+    const gearboxSeatingOffset = (
+      shaftPiece: Piece,
+      socketPiece: Piece,
+      shaftPoint: THREE.Vector3,
+      socketPoint: THREE.Vector3,
+      axis: THREE.Vector3,
+    ) => {
+      const gap = gearboxExtensionSeatingGap(shaftPiece, socketPiece);
+      if (!gap) return undefined;
+      const connectorSide = shaftPoint.clone().sub(socketPoint).dot(axis),
+        centreSide = shaftPiece.mesh
+          .getWorldPosition(new THREE.Vector3())
+          .sub(socketPiece.mesh.getWorldPosition(new THREE.Vector3()))
+          .dot(axis),
+        side =
+          Math.sign(Math.abs(connectorSide) > 1e-4 ? connectorSide : centreSide) || 1;
+      return side * gap;
+    };
+    const nearestAxleSnapWorld = (
+      host: Piece,
+      connector: MeshConnector,
+      target: THREE.Vector3,
+      includeSecondary = true,
+    ) => {
+      host.mesh.updateMatrixWorld(true);
+      return axleSnapPoints(connector, includeSecondary)
+        .map((snap) => ({
+          ...snap,
+          world: host.mesh.localToWorld(snap.local.clone()),
+        }))
+        .sort(
+          (left, right) =>
+            left.world.distanceToSquared(target) - right.world.distanceToSquared(target),
+        )[0];
+    };
+    const forceConnectorAxesCompatible = (
+      sourcePiece: Piece,
+      sourceConnector: MeshConnector,
+      targetPiece: Piece,
+      targetConnector: MeshConnector,
+    ) => {
+      const sourceAxis = worldConnector(sourcePiece, sourceConnector).axis,
+        targetAxis = worldConnector(targetPiece, targetConnector).axis;
+      // Both directions on the same line are valid. Crossing or oblique axes
+      // cannot describe a physical pin/axle joint and must be rejected.
+      return Math.abs(sourceAxis.dot(targetAxis)) >= 0.985;
+    };
+    const socketSurfaceHalfThickness = (host: Piece, socket: MeshConnector) => {
+      const mapped = (socket.length ?? 0) / 2,
+        nominal = isHalfBeamPart(host) ? 0.25 : 0.5;
+      // Connection-map lengths win when present; otherwise LEGO's full/half
+      // beam thickness gives the collider surface without traversing the mesh.
+      return THREE.MathUtils.clamp(Math.max(mapped, nominal), 0.12, 0.6);
+    };
+    const addConnection = (
+      host: Piece,
+      rod: Piece,
+      socket: MeshConnector,
+      shaft: MeshConnector,
+      preparedSocket?: {
+        point: THREE.Vector3;
+        axis: THREE.Vector3;
+        localAxisA: THREE.Vector3;
+      },
+      forcedAnchors?: {
+        pointA: THREE.Vector3;
+        pointB: THREE.Vector3;
+      },
+    ) => {
+      const profile = connectorProfile(shaft, socket);
+      if (
+        !profile ||
+        !connectorPairAvailable(host, socket, rod, shaft) ||
+        state.connections.some(
+          (connection) =>
+            connection.a === host &&
+            connection.b === rod &&
+            connection.socket === socket &&
+            connection.shaft === shaft,
+        )
+      )
+        return false;
+      const world = preparedSocket ?? worldConnector(host, socket),
+        socketIndex = host.connectors.indexOf(socket),
+        shaftIndex = rod.connectors.indexOf(shaft),
+        id = `${host.id}:${socketIndex}:${rod.id}:${shaftIndex}:${profile}`,
+        saved = state.connectionModes.get(id),
+        rotationOnlyConnection =
+          isRotationOnlyConnector(socket) || isRotationOnlyConnector(shaft),
+        slidingConnection = isSlidingConnector(socket) || isSlidingConnector(shaft),
+        gearboxConnection = isGearboxCarrierPair(host, rod),
+        rigidExtensionConnection = isGearboxRigidExtensionPair(host, rod),
+        rotatingExtensionConnection = isGearboxRotatingExtensionPair(host, rod),
+        validModes = gearboxConnection
+          ? (["linear"] as JointMode[])
+          : rigidExtensionConnection
+            ? (["linear"] as JointMode[])
+            : rotatingExtensionConnection
+              ? (["rotation-linear"] as JointMode[])
+              : rotationOnlyConnection
+                ? (["rotation"] as JointMode[])
+                : allowedModes(profile),
+        mode =
+          saved && validModes.includes(saved.mode)
+            ? saved.mode
+            : gearboxConnection
+              ? "linear"
+              : rigidExtensionConnection
+                ? "linear"
+                : rotatingExtensionConnection
+                  ? "rotation-linear"
+                  : rotationOnlyConnection
+                    ? "rotation"
+                    : slidingConnection
+                      ? "linear"
+                      : defaultMode(profile),
+        motorSpeed = saved?.motorSpeed ?? 3,
+        motorForce = saved?.motorForce ?? 80,
+        motorPulse = saved?.motorPulse ?? false,
+        motorPulseAngle = saved?.motorPulseAngle ?? 90,
+        motorPulseInterval = saved?.motorPulseInterval ?? 1,
+        userConfigured = saved?.userConfigured ?? false;
+      const addedConnection: Connection = {
+        id,
+        a: host,
+        b: rod,
+        socket,
+        shaft,
+        mode,
+        profile,
+        point: world.point.clone(),
+        axis: world.axis.clone(),
+        localAxisA:
+          preparedSocket?.localAxisA.clone() ??
+          world.axis
+            .clone()
+            .applyQuaternion(
+              host.mesh.getWorldQuaternion(new THREE.Quaternion()).invert(),
+            )
+            .normalize(),
+        travel: shaft.length ?? 0.5,
+        motorSpeed,
+        motorForce,
+        motorPulse,
+        motorPulseAngle,
+        motorPulseInterval,
+        userConfigured,
+        forced: !!forcedAnchors,
+        forcedOffset: forcedAnchors?.pointA.distanceTo(forcedAnchors.pointB),
+        localPointA: forcedAnchors
+          ? host.mesh.worldToLocal(forcedAnchors.pointA.clone())
+          : undefined,
+        localPointB: forcedAnchors
+          ? rod.mesh.worldToLocal(forcedAnchors.pointB.clone())
+          : undefined,
+      };
+      state.connections.push(addedConnection);
+      ensurePieceRotationPivot(host, state.connections);
+      ensurePieceRotationPivot(rod, state.connections);
+      if (!state.bulkConnecting) rebalanceSmartDefaults(state, rod);
+      return true;
+    };
+    const connectManual = (
+      sourcePiece: Piece,
+      sourceConnector: MeshConnector,
+      sourceAnchorLocal: THREE.Vector3,
+      targetPiece: Piece,
+      targetConnector: MeshConnector,
+      targetAnchorLocal: THREE.Vector3,
+    ) => {
+      const sourceGroup = editorAssemblyMembers(state.pieces, sourcePiece),
+        sourceGroupSet = new Set(sourceGroup),
+        sourceConnectorInternallyOccupied = state.connections.some(
+          (connection) =>
+            sourceGroupSet.has(connection.a) &&
+            sourceGroupSet.has(connection.b) &&
+            ((connection.a === sourcePiece && connection.socket === sourceConnector) ||
+              (connection.b === sourcePiece && connection.shaft === sourceConnector)),
+        );
+      const profile = pairProfile(sourceConnector, targetConnector);
+      if (
+        sourceConnectorInternallyOccupied ||
+        !profile ||
+        !connectorPairAvailable(
+          sourcePiece,
+          sourceConnector,
+          targetPiece,
+          targetConnector,
+          sourcePiece,
+        )
+      )
+        return false;
+      const socketPiece = sourceConnector.role === "socket" ? sourcePiece : targetPiece,
+        shaftPiece = sourceConnector.role === "shaft" ? sourcePiece : targetPiece;
+      sourcePiece.mesh.updateMatrix();
+      const sourceMatrixBefore = sourcePiece.mesh.matrix.clone();
+      const sourceWorld = worldConnector(sourcePiece, sourceConnector),
+        targetConnectorWorld = worldConnector(targetPiece, targetConnector),
+        targetWorld = {
+          ...targetConnectorWorld,
+          point: targetPiece.mesh.localToWorld(targetAnchorLocal.clone()),
+        };
+      let targetAxis = targetWorld.axis.clone();
+      if (sourceWorld.axis.dot(targetAxis) < 0) targetAxis.negate();
+      const alignment = new THREE.Quaternion().setFromUnitVectors(
+        sourceWorld.axis,
+        targetAxis,
+      );
+      sourcePiece.mesh.quaternion.premultiply(alignment).normalize();
+      sourcePiece.mesh.updateMatrixWorld(true);
+      const socket =
+          sourceConnector.role === "socket" ? sourceConnector : targetConnector,
+        shaft = sourceConnector.role === "shaft" ? sourceConnector : targetConnector,
+        alignedSourceWorld = worldConnector(sourcePiece, sourceConnector),
+        alignedSourcePoint = sourcePiece.mesh.localToWorld(sourceAnchorLocal.clone()),
+        shaftWorld =
+          sourceConnector.role === "shaft"
+            ? { ...alignedSourceWorld, point: alignedSourcePoint }
+            : targetWorld,
+        socketWorld =
+          sourceConnector.role === "socket"
+            ? { ...alignedSourceWorld, point: alignedSourcePoint }
+            : targetWorld,
+        offset =
+          gearboxSeatingOffset(
+            shaftPiece,
+            socketPiece,
+            shaftWorld.point,
+            socketWorld.point,
+            targetAxis,
+          ) ??
+          (shaft.kind === "axle" &&
+          (isSlidingConnector(socket) || isSlidingConnector(shaft))
+            ? THREE.MathUtils.clamp(
+                shaftWorld.point.clone().sub(socketWorld.point).dot(targetAxis),
+                -(shaft.length ?? 0.5) / 2,
+                (shaft.length ?? 0.5) / 2,
+              )
+            : closestConnectorOffset(
+                shaft,
+                socket,
+                shaftWorld.point,
+                socketWorld.point,
+                targetAxis,
+              )),
+        sourceTarget = targetWorld.point
+          .clone()
+          .addScaledVector(
+            targetAxis,
+            sourceConnector.role === "shaft" ? offset : -offset,
+          );
+      sourcePiece.mesh.position.add(
+        sourceTarget.sub(sourcePiece.mesh.localToWorld(sourceAnchorLocal.clone())),
+      );
+      sourcePiece.mesh.updateMatrixWorld(true);
+      sourcePiece.mesh.updateMatrix();
+      const groupTransform = sourcePiece.mesh.matrix
+        .clone()
+        .multiply(sourceMatrixBefore.clone().invert());
+      sourceGroup.forEach((member) => {
+        if (member === sourcePiece) return;
+        member.mesh.updateMatrix();
+        groupTransform
+          .clone()
+          .multiply(member.mesh.matrix)
+          .decompose(member.mesh.position, member.mesh.quaternion, member.mesh.scale);
+        member.mesh.updateMatrixWorld(true);
+      });
+      // The three Cardan bodies remain separate for physics, but manual
+      // placement treats them as one rigid editorial assembly. Keep their
+      // internal joints and move their cached world frames with the group.
+      state.connections.forEach((connection) => {
+        const aMoved = sourceGroupSet.has(connection.a),
+          bMoved = sourceGroupSet.has(connection.b);
+        if (aMoved && bMoved) {
+          connection.point.applyMatrix4(groupTransform);
+          connection.axis.transformDirection(groupTransform).normalize();
+          return;
+        }
+        if (!(aMoved || bMoved) || !isSpecialMechanicalConnection(connection)) return;
+        const socketPose = worldConnector(connection.a, connection.socket);
+        connection.point.copy(socketPose.point);
+        connection.axis.copy(socketPose.axis);
+        connection.localAxisA.copy(connection.socket.axis).normalize();
+      });
+      state.renderBatchesDirty = true;
+      state.connections = state.connections.filter(
+        (connection) =>
+          sourceGroupSet.has(connection.a) === sourceGroupSet.has(connection.b) ||
+          connection.forced ||
+          isSpecialMechanicalConnection(connection),
+      );
+      rebalanceAllSmartDefaults(state);
+      const socketConnector =
+          sourceConnector.role === "socket" ? sourceConnector : targetConnector,
+        shaftConnector =
+          sourceConnector.role === "shaft" ? sourceConnector : targetConnector;
+      return addConnection(socketPiece, shaftPiece, socketConnector, shaftConnector);
+    };
+    const connectForced = (
+      sourcePiece: Piece,
+      sourceConnector: MeshConnector,
+      sourceAnchorLocal: THREE.Vector3,
+      targetPiece: Piece,
+      targetConnector: MeshConnector,
+      targetAnchorLocal: THREE.Vector3,
+    ) => {
+      if (
+        !pairProfile(sourceConnector, targetConnector) ||
+        !connectorPairAvailable(
+          sourcePiece,
+          sourceConnector,
+          targetPiece,
+          targetConnector,
+        ) ||
+        !forceConnectorAxesCompatible(
+          sourcePiece,
+          sourceConnector,
+          targetPiece,
+          targetConnector,
+        )
+      )
+        return false;
+      const sourcePoint = sourcePiece.mesh.localToWorld(sourceAnchorLocal.clone()),
+        targetPoint = targetPiece.mesh.localToWorld(targetAnchorLocal.clone());
+      if (sourcePoint.distanceTo(targetPoint) > 5) return false;
+      const socketPiece = sourceConnector.role === "socket" ? sourcePiece : targetPiece,
+        socketConnector =
+          sourceConnector.role === "socket" ? sourceConnector : targetConnector,
+        shaftPiece = sourceConnector.role === "shaft" ? sourcePiece : targetPiece,
+        shaftConnector =
+          sourceConnector.role === "shaft" ? sourceConnector : targetConnector,
+        pointA = sourceConnector.role === "socket" ? sourcePoint : targetPoint,
+        pointB = sourceConnector.role === "shaft" ? sourcePoint : targetPoint,
+        socketWorld = worldConnector(socketPiece, socketConnector);
+      return addConnection(
+        socketPiece,
+        shaftPiece,
+        socketConnector,
+        shaftConnector,
+        {
+          point: pointA.clone(),
+          axis: socketWorld.axis.clone(),
+          localAxisA: socketConnector.axis.clone().normalize(),
+        },
+        { pointA, pointB },
+      );
+    };
+    type IndexedSocket = {
+      host: Piece;
+      socket: MeshConnector;
+      point: THREE.Vector3;
+      axis: THREE.Vector3;
+      localAxisA: THREE.Vector3;
+    };
+    type IndexedShaft = {
+      rod: Piece;
+      shaft: MeshConnector;
+      point: THREE.Vector3;
+      axis: THREE.Vector3;
+    };
+    const connectionCellSize = 0.45,
+      connectionCell = (point: THREE.Vector3) =>
+        `${Math.floor(point.x / connectionCellSize)}:${Math.floor(point.y / connectionCellSize)}:${Math.floor(point.z / connectionCellSize)}`,
+      buildConnectionIndex = (axleEndCapture = 0) => {
+        const sockets: IndexedSocket[] = [],
+          shaftGrid = new Map<string, IndexedShaft[]>(),
+          addShaftCell = (key: string, entry: IndexedShaft) => {
+            const entries = shaftGrid.get(key) ?? [];
+            entries.push(entry);
+            shaftGrid.set(key, entries);
+          };
+        state.pieces.forEach((piece) => {
+          piece.mesh.updateMatrixWorld(true);
+          piece.connectors.forEach((connector) => {
+            const point = connector.local.clone().applyMatrix4(piece.mesh.matrixWorld),
+              axis = connector.axis
+                .clone()
+                .transformDirection(piece.mesh.matrixWorld)
+                .normalize();
+            if (connector.role === "socket") {
+              sockets.push({
+                host: piece,
+                socket: connector,
+                point,
+                axis,
+                localAxisA: connector.axis.clone().normalize(),
+              });
+              return;
+            }
+            const entry: IndexedShaft = {
+                rod: piece,
+                shaft: connector,
+                point,
+                axis,
+              },
+              occupiedCells = new Set<string>();
+            if (connector.kind !== "axle") occupiedCells.add(connectionCell(point));
+            else {
+              const half = (connector.length ?? 0.5) / 2 + 0.12 + axleEndCapture,
+                steps = Math.max(1, Math.ceil((half * 2) / (connectionCellSize * 0.5)));
+              for (let step = 0; step <= steps; step++)
+                occupiedCells.add(
+                  connectionCell(
+                    point
+                      .clone()
+                      .addScaledVector(axis, -half + (step / steps) * half * 2),
+                  ),
+                );
+            }
+            occupiedCells.forEach((key) => addShaftCell(key, entry));
+          });
+        });
+        return { sockets, shaftGrid };
+      },
+      nearbyShafts = (
+        grid: Map<string, IndexedShaft[]>,
+        point: THREE.Vector3,
+        found: Set<IndexedShaft>,
+      ) => {
+        const x = Math.floor(point.x / connectionCellSize),
+          y = Math.floor(point.y / connectionCellSize),
+          z = Math.floor(point.z / connectionCellSize);
+        for (let dx = -1; dx <= 1; dx++)
+          for (let dy = -1; dy <= 1; dy++)
+            for (let dz = -1; dz <= 1; dz++)
+              grid
+                .get(`${x + dx}:${y + dy}:${z + dz}`)
+                ?.forEach((entry) => found.add(entry));
+      },
+      scanSocketOnce = (
+        candidateSocket: IndexedSocket,
+        grid: Map<string, IndexedShaft[]>,
+        axleEndCapture = 0,
+      ) => {
+        const candidates = new Set<IndexedShaft>();
+        nearbyShafts(grid, candidateSocket.point, candidates);
+        let best:
+          | {
+              candidate: IndexedShaft;
+              score: number;
+              orientationError: number;
+            }
+          | undefined;
+        candidates.forEach((candidate) => {
+          const { rod, shaft, point, axis } = candidate,
+            profile = connectorProfile(shaft, candidateSocket.socket);
+          if (!profile || rod === candidateSocket.host) return;
+          if (
+            !connectorPairAvailable(
+              candidateSocket.host,
+              candidateSocket.socket,
+              rod,
+              shaft,
+            )
+          )
+            return;
+          if (Math.abs(candidateSocket.axis.dot(axis)) < 0.965) return;
+          let score: number;
+          if (shaft.kind !== "axle") {
+            const delta = point.clone().sub(candidateSocket.point),
+              along = delta.dot(axis),
+              radial = delta.clone().addScaledVector(axis, -along).length(),
+              axialError = Math.min(
+                ...connectorAxialOffsets(shaft, candidateSocket.socket).map((offset) =>
+                  Math.abs(along - offset),
+                ),
+              );
+            if (radial > 0.16 || axialError > 0.1) return;
+            score = radial + axialError;
+          } else {
+            const half = (shaft.length ?? 0.5) / 2,
+              delta = candidateSocket.point.clone().sub(point),
+              along = delta.dot(axis),
+              radial = delta.clone().addScaledVector(axis, -along).length(),
+              // Round and half-round sockets may capture an axle just before
+              // its tip enters from either side. Cross holes remain strict.
+              entranceCapture =
+                candidateSocket.socket.kind === "axle" || !axleEndCapture
+                  ? 0
+                  : socketSurfaceHalfThickness(
+                      candidateSocket.host,
+                      candidateSocket.socket,
+                    ) + 0.06;
+            if (
+              radial > (entranceCapture ? 0.13 : 0.16) ||
+              Math.abs(along) > half + 0.1 + entranceCapture
+            )
+              return;
+            score = radial + Math.abs(along) * 0.0001;
+          }
+          const orientationError = 1 - Math.abs(candidateSocket.axis.dot(axis));
+          if (automaticConnectorMatchIsBetter(score, orientationError, best))
+            best = { candidate, score, orientationError };
+        });
+        if (!best) return;
+        addConnection(
+          candidateSocket.host,
+          best.candidate.rod,
+          candidateSocket.socket,
+          best.candidate.shaft,
+          {
+            point: candidateSocket.point,
+            axis: candidateSocket.axis,
+            localAxisA: candidateSocket.localAxisA,
+          },
+        );
+      },
+      finishConnectionScan = () => {
+        state.bulkConnecting = false;
+        rebalanceAllSmartDefaults(state);
+        state.pieces.forEach((piece) =>
+          ensurePieceRotationPivot(piece, state.connections),
+        );
+        setConnectionRevision((value) => value + 1);
+        refreshDebug();
+        return state.connections.length;
+      },
+      retainReusableConnections = () => {
+        const livePieces = new Set(state.pieces);
+        state.connections = state.connections.filter(
+          (connection) =>
+            livePieces.has(connection.a) &&
+            livePieces.has(connection.b) &&
+            connection.a.connectors.includes(connection.socket) &&
+            connection.b.connectors.includes(connection.shaft) &&
+            connection.socket.role === "socket" &&
+            connection.shaft.role === "shaft" &&
+            connectorProfile(connection.shaft, connection.socket) !== undefined &&
+            connectorPoliciesCompatible(
+              connection.a,
+              connection.socket,
+              connection.b,
+              connection.shaft,
+            ),
+        );
+      };
+    const verifyConnections = () => {
+      if (!AUTO_CONNECTIONS_ENABLED) {
+        state.connectionScanVersion++;
+        state.bulkConnecting = false;
+        setConnectionRevision((value) => value + 1);
+        refreshDebug();
+        return state.connections.length;
+      }
+      const started = performance.now();
+      state.connectionScanVersion++;
+      // Adding a piece, pasting or refreshing the project must not rebuild
+      // already-known joints from approximate proximity. Their connector pair,
+      // special mode and exact seating are authoritative until an endpoint is
+      // actually moved or its connector map is replaced.
+      retainReusableConnections();
+      state.bulkConnecting = true;
+      const { sockets, shaftGrid } = buildConnectionIndex();
+      sockets.forEach((socket) => scanSocketOnce(socket, shaftGrid));
+      const result = finishConnectionScan();
+      state.pendingConnectionMs += performance.now() - started;
+      return result;
+    };
+    const verifyConnectionsAsync = async () => {
+      if (!AUTO_CONNECTIONS_ENABLED) return state.connections.length;
+      const scanVersion = ++state.connectionScanVersion;
+      let operationStarted = performance.now();
+      retainReusableConnections();
+      state.bulkConnecting = true;
+      const { sockets, shaftGrid } = buildConnectionIndex();
+      state.pendingConnectionMs += performance.now() - operationStarted;
+      let sliceStarted = performance.now();
+      for (let index = 0; index < sockets.length; index++) {
+        if (scanVersion !== state.connectionScanVersion) return state.connections.length;
+        operationStarted = performance.now();
+        scanSocketOnce(sockets[index], shaftGrid);
+        state.pendingConnectionMs += performance.now() - operationStarted;
+        if (performance.now() - sliceStarted >= 6) {
+          setMessage(
+            languageRef.current === "es"
+              ? `Conectando nodos ${index + 1}/${sockets.length}…`
+              : isChineseLanguage()
+                ? `正在连接节点 ${index + 1}/${sockets.length}…`
+                : `Connecting nodes ${index + 1}/${sockets.length}…`,
+          );
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          sliceStarted = performance.now();
+        }
+      }
+      operationStarted = performance.now();
+      const result = finishConnectionScan();
+      state.pendingConnectionMs += performance.now() - operationStarted;
+      return result;
+    };
+    state.verifyConnections = verifyConnections;
+    state.verifyConnectionsAsync = verifyConnectionsAsync;
+    const verifyPieceConnections = (movedPiece: Piece, notify = true) => {
+      const started = performance.now(),
+        previousPartners = state.connections
+          .filter(
+            (connection) => connection.a === movedPiece || connection.b === movedPiece,
+          )
+          .map((connection) =>
+            connection.a === movedPiece ? connection.b : connection.a,
+          );
+      // Moving one piece invalidates only its own links and the pivots of the
+      // pieces that were attached to it. Keep this set local; the full
+      // rebalance is reserved for import/reset operations.
+      const affectedPieces = new Set<Piece>([movedPiece, ...previousPartners]);
+      state.connections = state.connections.filter(
+        (connection) => connection.a !== movedPiece && connection.b !== movedPiece,
+      );
+      state.bulkConnecting = true;
+      const tryPair = (
+        socketPiece: Piece,
+        socket: MeshConnector,
+        shaftPiece: Piece,
+        shaft: MeshConnector,
+      ) => {
+        if (
+          !connectorProfile(shaft, socket) ||
+          !connectorPairAvailable(socketPiece, socket, shaftPiece, shaft)
+        )
+          return;
+        const socketWorld = worldConnector(socketPiece, socket),
+          shaftWorld = worldConnector(shaftPiece, shaft);
+        if (Math.abs(socketWorld.axis.dot(shaftWorld.axis)) < 0.965) return;
+        const delta = socketWorld.point.clone().sub(shaftWorld.point),
+          along = delta.dot(shaftWorld.axis),
+          radial = delta.clone().addScaledVector(shaftWorld.axis, -along).length();
+        if (shaft.kind === "axle") {
+          if (radial > 0.16 || Math.abs(along) > (shaft.length ?? 0.5) / 2 + 0.1) return;
+        } else {
+          const axialError = Math.min(
+            ...connectorAxialOffsets(shaft, socket).map((offset) =>
+              Math.abs(along - offset),
+            ),
+          );
+          if (radial > 0.16 || axialError > 0.1) return;
+        }
+        addConnection(socketPiece, shaftPiece, socket, shaft, {
+          point: socketWorld.point,
+          axis: socketWorld.axis,
+          localAxisA: socket.axis.clone().normalize(),
+        });
+      };
+      const movedReach =
+        (movedPiece.mesh.userData.connectorReach as number | undefined) ??
+        connectorMapReach(movedPiece.connectors);
+      for (const other of state.pieces) {
+        if (other === movedPiece) continue;
+        // A cheap piece-level rejection prevents connector work for nearly all
+        // distant parts in a large imported assembly.
+        const centerDistance = movedPiece.mesh.position.distanceTo(other.mesh.position);
+        const otherReach =
+            (other.mesh.userData.connectorReach as number | undefined) ??
+            connectorMapReach(other.connectors),
+          maximumReach = movedReach + otherReach + 0.35;
+        if (centerDistance > maximumReach) continue;
+        for (const movedConnector of movedPiece.connectors)
+          for (const otherConnector of other.connectors) {
+            if (movedConnector.role === "socket" && otherConnector.role === "shaft")
+              tryPair(movedPiece, movedConnector, other, otherConnector);
+            else if (movedConnector.role === "shaft" && otherConnector.role === "socket")
+              tryPair(other, otherConnector, movedPiece, movedConnector);
+          }
+      }
+      state.bulkConnecting = false;
+      state.connections.forEach((connection) => {
+        if (connection.a === movedPiece || connection.b === movedPiece) {
+          affectedPieces.add(connection.a);
+          affectedPieces.add(connection.b);
+        }
+      });
+      affectedPieces.forEach((piece) => rebalanceSmartDefaults(state, piece));
+      ensurePieceRotationPivot(movedPiece, state.connections);
+      previousPartners.forEach((piece) =>
+        ensurePieceRotationPivot(piece, state.connections),
+      );
+      state.pendingConnectionMs += performance.now() - started;
+      if (notify) {
+        setConnectionRevision((value) => value + 1);
+        refreshDebug();
+      }
+      return state.connections.length;
+    };
+    let activeGearContacts = new Map<
+      string,
+      {
+        a: Piece;
+        b: Piece;
+        links: RuntimeGearLink[];
+      }
+    >();
+    const missedGearContactFrames = new Map<string, number>();
+    const pendingGearContactChanges = new Map<
+      string,
+      {
+        a: Piece;
+        b: Piece;
+        links: RuntimeGearLink[];
+        touching: boolean;
+      }
+    >();
+    state.seedGearContacts = (links) => {
+      activeGearContacts.clear();
+      missedGearContactFrames.clear();
+      pendingGearContactChanges.clear();
+      links.forEach((link) => {
+        if (link.coaxialClutch) return;
+        const key = gearLinkKey(link),
+          existing = activeGearContacts.get(key);
+        if (existing) existing.links.push(link);
+        else
+          activeGearContacts.set(key, {
+            a: link.a.value,
+            b: link.b.value,
+            links: [link],
+          });
+      });
+    };
+    const updateDynamicMechanisms = () => {
+      const dynamicScanStarted = performance.now();
+      const previousGearLinks = state.gearLinks.length,
+        previousLinksByKey = new Map(
+          state.gearLinks.map((link) => [gearLinkKey(link), link]),
+        ),
+        changedGearPairs = new Set(pendingGearContactChanges.keys()),
+        detectedGearLinks = state.gearLinks.filter(
+          (link) =>
+            !link.coaxialClutch &&
+            !changedGearPairs.has(contactPairKey(link.a.value, link.b.value)),
+        ),
+        excludedGearPairs = differentialCarrierGearExclusions(
+          state.pieces,
+          state.connections,
+        );
+      // Rapier's broadphase has already identified the two colliding owners.
+      // Validate only newly-entered green gear envelopes; stopped pairs simply
+      // lose their existing link. No all-gears O(n²) scan happens here.
+      pendingGearContactChanges.forEach(({ links, touching }, key) => {
+        if (!touching || excludedGearPairs.has(key)) return;
+        detectedGearLinks.push(...links);
+      });
+      pendingGearContactChanges.clear();
+      detectedGearLinks.push(
+        ...detectGearboxLinks(state.pieces, state.rigidIslandByPiece),
+      );
+      // Dynamic overlap scans must not redefine the reference axes or the
+      // transmission direction of a pair that is already engaged. On bevel
+      // gears a numerically ambiguous tangent can otherwise flip sign between
+      // scans; the phase solver then sees a 240-unit error and injects a
+      // 20-rad/s kick into a 12-tooth gear.
+      detectedGearLinks.forEach((link) => {
+        const previous = previousLinksByKey.get(gearLinkKey(link));
+        // RustGearConfig axes are world-space. Converting only newly engaged
+        // pairs to body-local space made build_gears() apply the inverse body
+        // rotation a second time, producing an invalid bevel axis and phase.
+        if (!previous) return;
+        const sameOrder = previous.a.value === link.a.value;
+        link.axisA.copy(sameOrder ? previous.axisA : previous.axisB);
+        link.axisB.copy(sameOrder ? previous.axisB : previous.axisA);
+        link.localCenterA = (
+          sameOrder ? previous.localCenterA : previous.localCenterB
+        )?.clone();
+        link.localCenterB = (
+          sameOrder ? previous.localCenterB : previous.localCenterA
+        )?.clone();
+        link.localAxisA = (
+          sameOrder ? previous.localAxisA : previous.localAxisB
+        )?.clone();
+        link.localAxisB = (
+          sameOrder ? previous.localAxisB : previous.localAxisA
+        )?.clone();
+        link.signB = previous.signB;
+        link.perpendicular = previous.perpendicular;
+        link.ratio = link.ratioOverride
+          ? -link.ratioOverride / link.signB
+          : -link.a.spec.teeth / (link.signB * link.b.spec.teeth);
+      });
+      const detectedKeys = new Set(detectedGearLinks.map(gearLinkKey)),
+        gearTopologyChanged =
+          previousGearLinks !== detectedGearLinks.length ||
+          detectedGearLinks.some((link) => !previousLinksByKey.has(gearLinkKey(link))) ||
+          state.gearLinks.some((link) => !detectedKeys.has(gearLinkKey(link)));
+      state.gearLinks = detectedGearLinks;
+      if (state.world && gearTopologyChanged) {
+        const bodyIds = new Map(
+          state.pieces.flatMap((piece) =>
+            piece.physicsBodyId ? ([[piece, piece.physicsBodyId]] as const) : [],
+          ),
+        );
+        state.world.replaceGears(
+          buildRustGearConfigs(state.gearLinks, bodyIds, state.connections),
+        );
+      }
+      const activeGearKeys = new Set(state.gearLinks.map(gearLinkKey));
+      for (const key of state.gearPhases.keys())
+        if (!activeGearKeys.has(key)) state.gearPhases.delete(key);
+      if (state.simLog && previousGearLinks !== state.gearLinks.length)
+        state.simLog.events.push(
+          isChineseLanguage()
+            ? isChineseLanguage()
+              ? `动态齿轮： ${previousGearLinks} → ${state.gearLinks.length} 个啮合连接`
+              : `动态齿轮： ${previousGearLinks} → ${state.gearLinks.length} enlaces`
+            : isChineseLanguage()
+              ? `Engranajes dinámicos: ${previousGearLinks} → ${state.gearLinks.length} 个啮合连接`
+              : `Engranajes dinámicos: ${previousGearLinks} → ${state.gearLinks.length} enlaces`,
+        );
+      if (!state.world || !state.createPhysicsJoint) {
+        state.pendingConnectionMs += performance.now() - dynamicScanStarted;
+        return;
+      }
+      let changed = gearTopologyChanged;
+      const retained: Connection[] = [],
+        removedPairs: {
+          a: Piece;
+          b: Piece;
+        }[] = [];
+      for (const connection of state.connections) {
+        const dynamicAxle =
+          !connection.forced &&
+          (connection.profile === "axle-cross" || connection.profile === "axle-round") &&
+          supportsDynamicAxleConnections(connection.b);
+        if (!dynamicAxle) {
+          retained.push(connection);
+          continue;
+        }
+        const socketWorld = worldConnector(connection.a, connection.socket),
+          shaftWorld = worldConnector(connection.b, connection.shaft),
+          alignment = Math.abs(socketWorld.axis.dot(shaftWorld.axis)),
+          delta = socketWorld.point.clone().sub(shaftWorld.point),
+          along = delta.dot(shaftWorld.axis),
+          radial = delta.clone().addScaledVector(shaftWorld.axis, -along).length(),
+          halfShaft = (connection.shaft.length ?? 0.5) / 2,
+          // Disconnect farther out than the entry test (surface + 0.12).
+          // The previous smaller threshold made a connection valid for entry
+          // and invalid for retention on the next scan, causing frame-by-frame
+          // connect/disconnect oscillation.
+          entranceAllowance =
+            socketSurfaceHalfThickness(connection.a, connection.socket) + 0.2,
+          engaged =
+            alignment >= 0.9 &&
+            radial <= 0.2 &&
+            Math.abs(along) <= halfShaft + entranceAllowance;
+        if (engaged) {
+          retained.push(connection);
+          continue;
+        }
+        const joint = state.physicsJoints.get(connection.id);
+        if (joint) {
+          state.world.removeJoint(connection.id);
+          state.physicsJoints.delete(connection.id);
+        }
+        state.connectionModes.set(connection.id, {
+          mode: connection.mode,
+          motorSpeed: connection.motorSpeed,
+          motorForce: connection.motorForce,
+          motorPulse: connection.motorPulse,
+          motorPulseAngle: connection.motorPulseAngle,
+          motorPulseInterval: connection.motorPulseInterval,
+          userConfigured: connection.userConfigured,
+        });
+        changed = true;
+        removedPairs.push({ a: connection.a, b: connection.b });
+        state.simLog?.events.push(
+          isChineseLanguage()
+            ? `轴已动态断开： ${connection.b.part} ↔ ${connection.a.part}`
+            : `Eje desconectado dinámicamente: ${connection.b.part} ↔ ${connection.a.part}`,
+        );
+      }
+      state.connections = retained;
+      removedPairs.forEach(({ a, b }) => {
+        const stillConnected = retained.some(
+          (connection) =>
+            (connection.a === a && connection.b === b) ||
+            (connection.a === b && connection.b === a),
+        );
+        if (!stillConnected) {
+          const key = contactPairKey(a, b);
+          state.dynamicNoContactPairs.delete(key);
+          const remainsSpeciallyExcluded = gearboxContactExclusionPairs(
+            state.pieces,
+          ).some(([left, right]) => contactPairKey(left, right) === key);
+          if (!remainsSpeciallyExcluded) {
+            state.contactExclusions.delete(key);
+            state.world!.setExcludedColliderPair(a.id, b.id, false);
+          }
+        }
+      });
+      const existingIds = new Set(state.connections.map((connection) => connection.id));
+      state.bulkConnecting = true;
+      for (const pair of state.contactCandidates.values())
+        for (const [rod, host] of [
+          [pair.a, pair.b],
+          [pair.b, pair.a],
+        ] as [Piece, Piece][]) {
+          if (!supportsDynamicAxleConnections(rod)) continue;
+          for (const shaft of rod.connectors.filter(
+            (connector) => connector.role === "shaft" && connector.kind === "axle",
+          )) {
+            const shaftWorld = worldConnector(rod, shaft),
+              halfShaft = (shaft.length ?? 0.5) / 2;
+            for (const socket of host.connectors.filter(
+              (connector) => connector.role === "socket",
+            )) {
+              if (!connectorProfile(shaft, socket)) continue;
+              const socketWorld = worldConnector(host, socket),
+                alignment = Math.abs(socketWorld.axis.dot(shaftWorld.axis));
+              if (alignment < 0.94) continue;
+              const delta = socketWorld.point.clone().sub(shaftWorld.point),
+                along = delta.dot(shaftWorld.axis),
+                radial = delta.clone().addScaledVector(shaftWorld.axis, -along).length(),
+                surface = socketSurfaceHalfThickness(host, socket);
+              if (radial > 0.16 || Math.abs(along) > halfShaft + surface + 0.12) continue;
+              addConnection(host, rod, socket, shaft, {
+                point: socketWorld.point,
+                axis: socketWorld.axis,
+                localAxisA: socket.axis.clone().normalize(),
+              });
+            }
+          }
+        }
+      state.contactCandidates.clear();
+      state.bulkConnecting = false;
+      const hasNewConnections = state.connections.some(
+        (connection) => !existingIds.has(connection.id),
+      );
+      if (hasNewConnections) rebalanceAllSmartDefaults(state);
+      const accepted: Connection[] = [];
+      for (const connection of state.connections) {
+        if (existingIds.has(connection.id)) {
+          accepted.push(connection);
+          continue;
+        }
+        const dynamicAxle =
+          (connection.profile === "axle-cross" || connection.profile === "axle-round") &&
+          supportsDynamicAxleConnections(connection.b);
+        if (!dynamicAxle) continue;
+        accepted.push(connection);
+        const exclusionKey = contactPairKey(connection.a, connection.b);
+        if (!state.dynamicNoContactPairs.has(exclusionKey)) {
+          state.dynamicNoContactPairs.add(exclusionKey);
+          state.world.setExcludedColliderPair(connection.a.id, connection.b.id, true);
+        }
+        const hostBody = connection.a.body,
+          axleBody = connection.b.body;
+        if (hostBody && axleBody && hostBody !== axleBody) {
+          const axis = worldConnector(connection.a, connection.socket).axis,
+            hostVelocity = hostBody.linvel(),
+            axleVelocity = axleBody.linvel(),
+            relativeAxial = THREE.MathUtils.clamp(
+              (axleVelocity.x - hostVelocity.x) * axis.x +
+                (axleVelocity.y - hostVelocity.y) * axis.y +
+                (axleVelocity.z - hostVelocity.z) * axis.z,
+              -3,
+              3,
+            ),
+            hostAngular = hostBody.angvel(),
+            axleAngular = axleBody.angvel(),
+            relativeSpin = THREE.MathUtils.clamp(
+              (axleAngular.x - hostAngular.x) * axis.x +
+                (axleAngular.y - hostAngular.y) * axis.y +
+                (axleAngular.z - hostAngular.z) * axis.z,
+              -14,
+              14,
+            );
+          axleBody.setLinvel(
+            {
+              x: hostVelocity.x + axis.x * relativeAxial,
+              y: hostVelocity.y + axis.y * relativeAxial,
+              z: hostVelocity.z + axis.z * relativeAxial,
+            },
+            true,
+          );
+          axleBody.setAngvel(
+            {
+              x: hostAngular.x + axis.x * relativeSpin,
+              y: hostAngular.y + axis.y * relativeSpin,
+              z: hostAngular.z + axis.z * relativeSpin,
+            },
+            true,
+          );
+        }
+        state.createPhysicsJoint(connection);
+        changed = true;
+        state.simLog?.events.push(
+          isChineseLanguage()
+            ? `轴已动态连接： ${connection.b.part} ↔ ${connection.a.part}`
+            : `Eje conectado dinámicamente: ${connection.b.part} ↔ ${connection.a.part}`,
+        );
+      }
+      state.connections = accepted;
+      if (changed) {
+        setConnectionRevision((value) => value + 1);
+        if (state.debug.colliders || state.debug.connectors || state.debug.physics)
+          refreshDebug();
+        else updateDebug();
+      }
+      state.pendingConnectionMs += performance.now() - dynamicScanStarted;
+    };
+    const dynamicMechanismsNeedScan = () =>
+      pendingGearContactChanges.size > 0 ||
+      state.contactCandidates.size > 0 ||
+      hasGearboxRing(state.pieces) ||
+      hasGearboxExtension(state.pieces);
+    const connect = (piece: Piece) => {
+      if (!AUTO_CONNECTIONS_ENABLED) return;
+      const captureMargin = 0.9,
+        pieceReach =
+          (piece.mesh.userData.connectorReach as number | undefined) ??
+          connectorMapReach(piece.connectors),
+        nearbyPieces = state.pieces.filter((candidate) => {
+          if (candidate === piece) return false;
+          const candidateReach =
+              (candidate.mesh.userData.connectorReach as number | undefined) ??
+              connectorMapReach(candidate.connectors),
+            maximumReach = pieceReach + candidateReach + captureMargin;
+          return (
+            piece.mesh.position.distanceToSquared(candidate.mesh.position) <=
+            maximumReach * maximumReach
+          );
+        });
+      if (isRod(piece)) {
+        type Match = {
+          host: Piece;
+          socket: MeshConnector;
+          shaft: MeshConnector;
+          score: number;
+          orientationError: number;
+        };
+        let best: Match | undefined;
+        for (const host of nearbyPieces)
+          for (const socket of host.connectors.filter(
+            (connector) => connector.role === "socket",
+          ))
+            for (const shaft of piece.connectors.filter(
+              (connector) => connector.role === "shaft",
+            )) {
+              if (
+                !connectorProfile(shaft, socket) ||
+                !connectorPairAvailable(host, socket, piece, shaft, piece)
+              )
+                continue;
+              const socketWorld = worldConnector(host, socket),
+                shaftWorld = worldConnector(piece, shaft),
+                axis = shaftWorld.axis,
+                orientationError = 1 - Math.abs(socketWorld.axis.dot(axis));
+              let score: number;
+              if (shaft.kind !== "axle") {
+                const delta = shaftWorld.point.clone().sub(socketWorld.point),
+                  along = delta.dot(axis),
+                  radial = delta.clone().addScaledVector(axis, -along).length(),
+                  axialError = Math.min(
+                    ...connectorAxialOffsets(shaft, socket).map((offset) =>
+                      Math.abs(along - offset),
+                    ),
+                  );
+                score = radial + axialError;
+              } else {
+                const delta = socketWorld.point.clone().sub(shaftWorld.point),
+                  along = delta.dot(axis),
+                  radial = delta.clone().addScaledVector(axis, -along).length();
+                score = radial + Math.max(0, Math.abs(along) - (shaft.length ?? 0.5) / 2);
+              }
+              const specialConnection = isChangeoverForkRingConnection(
+                  host,
+                  socket,
+                  piece,
+                  shaft,
+                ),
+                rankedScore = specialConnection ? score - captureMargin * 2 : score;
+              if (
+                score < (specialConnection ? 1.4 : captureMargin) &&
+                automaticConnectorMatchIsBetter(rankedScore, orientationError, best)
+              )
+                best = { host, socket, shaft, score: rankedScore, orientationError };
+            }
+        if (best) {
+          let targetAxis = worldConnector(best.host, best.socket).axis,
+            currentAxis = worldConnector(piece, best.shaft).axis;
+          if (currentAxis.dot(targetAxis) < 0) targetAxis = targetAxis.clone().negate();
+          const alignment = new THREE.Quaternion().setFromUnitVectors(
+            currentAxis,
+            targetAxis,
+          );
+          piece.mesh.quaternion.premultiply(alignment).normalize();
+          piece.mesh.updateMatrixWorld(true);
+          const socketPoint = worldConnector(best.host, best.socket).point;
+          const shaftPoint = worldConnector(piece, best.shaft).point,
+            seatingOffset = gearboxSeatingOffset(
+              piece,
+              best.host,
+              shaftPoint,
+              socketPoint,
+              targetAxis,
+            );
+          if (seatingOffset !== undefined) {
+            const targetShaftPoint = socketPoint
+              .clone()
+              .addScaledVector(targetAxis, seatingOffset);
+            piece.mesh.position.add(targetShaftPoint.sub(shaftPoint));
+          } else if (best.shaft.kind !== "axle") {
+            const offset = closestConnectorOffset(
+                best.shaft,
+                best.socket,
+                shaftPoint,
+                socketPoint,
+                targetAxis,
+              ),
+              targetShaftPoint = socketPoint.clone().addScaledVector(targetAxis, offset);
+            piece.mesh.position.add(targetShaftPoint.sub(shaftPoint));
+          } else if (isSlidingConnector(best.socket)) {
+            const correction = socketPoint.clone().sub(shaftPoint),
+              along = correction.dot(targetAxis);
+            piece.mesh.position.addScaledVector(targetAxis, -along).add(correction);
+          } else {
+            const snap = nearestAxleSnapWorld(piece, best.shaft, socketPoint);
+            if (snap) piece.mesh.position.add(socketPoint.clone().sub(snap.world));
+          }
+          piece.mesh.updateMatrixWorld(true);
+          return;
+        }
+      }
+      type HostMatch = {
+        rod: Piece;
+        socket: MeshConnector;
+        shaft: MeshConnector;
+        score: number;
+        orientationError: number;
+      };
+      let best: HostMatch | undefined;
+      for (const rod of nearbyPieces.filter(isRod))
+        for (const socket of piece.connectors.filter(
+          (connector) => connector.role === "socket",
+        ))
+          for (const shaft of rod.connectors.filter(
+            (connector) => connector.role === "shaft",
+          )) {
+            if (
+              !connectorProfile(shaft, socket) ||
+              !connectorPairAvailable(piece, socket, rod, shaft, piece)
+            )
+              continue;
+            const socketWorld = worldConnector(piece, socket),
+              shaftWorld = worldConnector(rod, shaft),
+              axis = shaftWorld.axis,
+              orientationError = 1 - Math.abs(socketWorld.axis.dot(axis));
+            let score: number;
+            if (shaft.kind !== "axle") {
+              const delta = shaftWorld.point.clone().sub(socketWorld.point),
+                along = delta.dot(axis),
+                radial = delta.clone().addScaledVector(axis, -along).length(),
+                axialError = Math.min(
+                  ...connectorAxialOffsets(shaft, socket).map((offset) =>
+                    Math.abs(along - offset),
+                  ),
+                );
+              score = radial + axialError;
+            } else {
+              const delta = socketWorld.point.clone().sub(shaftWorld.point),
+                along = delta.dot(axis),
+                radial = delta.clone().addScaledVector(axis, -along).length();
+              score = radial + Math.max(0, Math.abs(along) - (shaft.length ?? 0.5) / 2);
+            }
+            const specialConnection = isChangeoverForkRingConnection(
+                piece,
+                socket,
+                rod,
+                shaft,
+              ),
+              rankedScore = specialConnection ? score - captureMargin * 2 : score;
+            if (
+              score < (specialConnection ? 1.4 : captureMargin) &&
+              automaticConnectorMatchIsBetter(rankedScore, orientationError, best)
+            )
+              best = { rod, socket, shaft, score: rankedScore, orientationError };
+          }
+      if (!best) return;
+      let targetAxis = worldConnector(best.rod, best.shaft).axis,
+        currentAxis = best.socket.axis
+          .clone()
+          .transformDirection(piece.mesh.matrixWorld)
+          .normalize();
+      if (currentAxis.dot(targetAxis) < 0) targetAxis = targetAxis.clone().negate();
+      const alignment = new THREE.Quaternion().setFromUnitVectors(
+        currentAxis,
+        targetAxis,
+      );
+      piece.mesh.quaternion.premultiply(alignment).normalize();
+      piece.mesh.updateMatrixWorld(true);
+      const socketPoint = worldConnector(piece, best.socket).point;
+      const shaftPoint = worldConnector(best.rod, best.shaft).point,
+        seatingOffset = gearboxSeatingOffset(
+          best.rod,
+          piece,
+          shaftPoint,
+          socketPoint,
+          targetAxis,
+        );
+      if (seatingOffset !== undefined) {
+        const targetSocketPoint = shaftPoint
+          .clone()
+          .addScaledVector(targetAxis, -seatingOffset);
+        piece.mesh.position.add(targetSocketPoint.sub(socketPoint));
+      } else if (best.shaft.kind !== "axle") {
+        const offset = closestConnectorOffset(
+            best.shaft,
+            best.socket,
+            shaftPoint,
+            socketPoint,
+            targetAxis,
+          ),
+          targetSocketPoint = shaftPoint.clone().addScaledVector(targetAxis, -offset);
+        piece.mesh.position.add(targetSocketPoint.sub(socketPoint));
+      } else if (isSlidingConnector(best.socket)) {
+        const correction = shaftPoint.clone().sub(socketPoint),
+          along = correction.dot(targetAxis);
+        piece.mesh.position.addScaledVector(targetAxis, -along).add(correction);
+      } else {
+        const snap = nearestAxleSnapWorld(best.rod, best.shaft, socketPoint);
+        if (snap) piece.mesh.position.add(snap.world.clone().sub(socketPoint));
+      }
+      piece.mesh.updateMatrixWorld(true);
+    };
+    const ray = new THREE.Raycaster(),
+      pointer = new THREE.Vector2();
+    let orbit = false,
+      pan = false,
+      moved = false,
+      shiftHeld = false,
+      shiftVerticalConsumed = false,
+      rotationPivotHeld = false,
+      moving: Piece | undefined,
+      movingGroup: Piece[] = [],
+      movingStartPositions = new Map<Piece, THREE.Vector3>(),
+      movingInternalConnectionPoints = new Map<Connection, THREE.Vector3>(),
+      movingPrepared = false,
+      altCandidate: Piece | undefined,
+      previous = { x: 0, y: 0 },
+      orbitStart = { x: 0, y: 0 },
+      moveOffset = new THREE.Vector2(),
+      movingStartPosition = new THREE.Vector3(),
+      movingStartPointer = new THREE.Vector2(),
+      movingLinearAxis: THREE.Vector3 | undefined,
+      movedAxially = false,
+      rubberGuideDrag:
+        | {
+            band: RubberBand;
+            index?: number;
+            origin: THREE.Vector3;
+            guides?: THREE.Vector3[];
+            plane: THREE.Plane;
+          }
+        | undefined;
+    let aimRotation:
+      | {
+          piece: Piece;
+          members: Piece[];
+          pivot: THREE.Vector3;
+          direction: THREE.Vector3;
+          previewDirection: THREE.Vector3;
+          plane: THREE.Plane;
+          arrow: THREE.ArrowHelper;
+          label: HTMLDivElement;
+        }
+      | undefined;
+    let gizmoDrag:
+      | {
+          pointerId: number;
+          kind: "move" | "rotate";
+          axisName: "x" | "y" | "z";
+          axis: THREE.Vector3;
+          pivot: THREE.Vector3;
+          pivotScreen: THREE.Vector2;
+          worldLength: number;
+          screenAxis: THREE.Vector2;
+          startPointer: THREE.Vector2;
+          startPointerAngle: number;
+          members: Piece[];
+          startPositions: Map<Piece, THREE.Vector3>;
+          startQuaternions: Map<Piece, THREE.Quaternion>;
+          internalFrames: Map<
+            Connection,
+            {
+              point: THREE.Vector3;
+              axis: THREE.Vector3;
+            }
+          >;
+          cardan?: {
+            centre: Piece;
+            first: Piece;
+            third: Piece;
+          };
+          prepared: boolean;
+          changed: boolean;
+        }
+      | undefined;
+    const gearMotorHeldKeys = new Set<string>();
+    let pivotRotate:
+      | {
+          piece: Piece;
+          local: THREE.Vector3;
+          axis: THREE.Vector3;
+          connector: MeshConnector;
+          connection: Connection;
+          startX: number;
+          startAbsoluteAngle: number;
+          startPosition: THREE.Vector3;
+          startQuaternion: THREE.Quaternion;
+          lastAppliedAngle: number;
+          prepared: boolean;
+        }
+      | undefined;
+    let lastMiddleDown = { time: 0, x: 0, y: 0 };
+    let spring:
+      | {
+          piece?: Piece;
+          rubberNodeId?: number;
+          bodyId: number;
+          component: Piece[];
+          anchor: THREE.Vector3;
+          target: THREE.Vector3;
+          plane: THREE.Plane;
+          overlay: SVGSVGElement;
+          line: SVGPolylineElement;
+          label: HTMLDivElement;
+          cursorScreen: {
+            x: number;
+            y: number;
+          };
+          startScreen: {
+            x: number;
+            y: number;
+          };
+          dragged: boolean;
+          force: number;
+        }
+      | undefined;
+    const cast = (e: { clientX: number; clientY: number }) => {
+      const r = renderer.domElement.getBoundingClientRect();
+      pointer.set(
+        ((e.clientX - r.left) / r.width) * 2 - 1,
+        -((e.clientY - r.top) / r.height) * 2 + 1,
+      );
+      ray.setFromCamera(pointer, camera);
+    };
+    const gizmoMembers = (piece: Piece) => {
+      const explicitlySelected = [...state.selectedPieces];
+      return explicitlySelected.length > 1 && explicitlySelected.includes(piece)
+        ? explicitlySelected
+        : editorAssemblyMembers(state.pieces, piece);
+    };
+    const cardanLayout = (members: Piece[]) => {
+      return cardanAssemblyLayout(members, state.connections);
+    };
+    const gizmoFrame = (piece: Piece, members: Piece[]) => {
+      const pivot = editorTransformPivot(state, piece, members),
+        worldQuaternion = piece.mesh.getWorldQuaternion(new THREE.Quaternion()),
+        localX = new THREE.Vector3(1, 0, 0).applyQuaternion(worldQuaternion),
+        localY = new THREE.Vector3(0, 1, 0).applyQuaternion(worldQuaternion),
+        localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(worldQuaternion),
+        cardan = cardanLayout(members);
+      if (cardan) {
+        const centralPivot = cardan.centre.mesh.getWorldPosition(new THREE.Vector3()),
+          firstOuterConnector = cardan.first.connectors.find(
+            (connector) => connector.role === "socket" && connector.kind === "axle",
+          ),
+          firstOuter = firstOuterConnector
+            ? cardan.first.mesh.localToWorld(firstOuterConnector.local.clone())
+            : cardan.first.mesh.getWorldPosition(new THREE.Vector3()),
+          y = centralPivot.clone().sub(firstOuter);
+        if (y.lengthSq() < 1.0e-5)
+          y.copy(new THREE.Vector3(0, 0, 1).applyQuaternion(worldQuaternion));
+        y.normalize();
+        const centreAxis = cardan.centre.connectors[0]?.axis
+          .clone()
+          .transformDirection(cardan.centre.mesh.matrixWorld)
+          .normalize();
+        let x = (centreAxis ?? localX).addScaledVector(y, -(centreAxis ?? localX).dot(y));
+        if (x.lengthSq() < 1.0e-5) x = localX.clone().addScaledVector(y, -localX.dot(y));
+        if (x.lengthSq() < 1.0e-5) x = localY.clone().addScaledVector(y, -localY.dot(y));
+        x.normalize();
+        return {
+          pivot: centralPivot,
+          axes: { x, y, z: x.clone().cross(y).normalize() },
+          cardan,
+        };
+      }
+      return { pivot, axes: { x: localX, y: localY, z: localZ } };
+    };
+    const projectGizmoPoint = (point: THREE.Vector3) => {
+      const projected = point.clone().project(camera),
+        bounds = renderer.domElement.getBoundingClientRect();
+      return {
+        point: new THREE.Vector2(
+          ((projected.x + 1) * bounds.width) / 2,
+          ((1 - projected.y) * bounds.height) / 2,
+        ),
+        visible: projected.z >= -1 && projected.z <= 1,
+      };
+    };
+    const updateTransformGizmo = () => {
+      const piece = state.selected;
+      if (!piece || state.running) {
+        transformGizmoRoot.scale.setScalar(0);
+        cardanReferenceMarker.scale.setScalar(0);
+        transformGizmoRoot.updateMatrixWorld(true);
+        cardanReferenceMarker.updateMatrixWorld(true);
+        return;
+      }
+      const members = gizmoMembers(piece),
+        frame = gizmoFrame(piece, members),
+        { pivot, axes } = frame,
+        bounds = renderer.domElement.getBoundingClientRect(),
+        projectedPivot = projectGizmoPoint(pivot);
+      const visible =
+        projectedPivot.visible &&
+        (moveGizmoVisibleRef.current || rotateGizmoVisibleRef.current);
+      if (!visible) {
+        transformGizmoRoot.scale.setScalar(0);
+        cardanReferenceMarker.scale.setScalar(0);
+        transformGizmoRoot.updateMatrixWorld(true);
+        cardanReferenceMarker.updateMatrixWorld(true);
+        return;
+      }
+      const distance = camera.position.distanceTo(pivot),
+        worldPerPixel =
+          (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
+          Math.max(1, bounds.height),
+        scale = Math.max(0.35, worldPerPixel * 112) * gizmoScaleRef.current,
+        basis = new THREE.Matrix4().makeBasis(axes.x, axes.y, axes.z);
+      transformGizmoRoot.position.copy(pivot);
+      transformGizmoRoot.quaternion.setFromRotationMatrix(basis);
+      transformGizmoRoot.scale.setScalar(scale);
+      gizmoMoveGroups.forEach((group) => {
+        group.scale.setScalar(moveGizmoVisibleRef.current ? 1 : 0);
+      });
+      gizmoRotateMeshes.forEach((ring) => {
+        ring.scale.setScalar(rotateGizmoVisibleRef.current ? 1 : 0);
+      });
+      gizmoCenter.scale.setScalar(
+        moveGizmoVisibleRef.current || rotateGizmoVisibleRef.current ? 1 : 0,
+      );
+      const referenceOuter = frame.cardan?.first.connectors.find(
+        (connector) => connector.role === "socket" && connector.kind === "axle",
+      );
+      if (frame.cardan && referenceOuter) {
+        const outerPoint = frame.cardan.first.mesh.localToWorld(
+            referenceOuter.local.clone(),
+          ),
+          inputDirection = pivot.clone().sub(outerPoint).normalize();
+        cardanReferenceMarker.position.copy(outerPoint);
+        cardanReferenceMarker.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          inputDirection,
+        );
+        cardanReferenceMarker.scale.setScalar(scale);
+      } else cardanReferenceMarker.scale.setScalar(0);
+      transformGizmoRoot.updateMatrixWorld(true);
+      cardanReferenceMarker.updateMatrixWorld(true);
+    };
+    const pickTransformGizmo = (e: { clientX: number; clientY: number }) => {
+      if (
+        !state.selected ||
+        state.running ||
+        (!moveGizmoVisibleRef.current && !rotateGizmoVisibleRef.current)
+      )
+        return undefined;
+      const hits = ray
+          .intersectObject(transformGizmoRoot, true)
+          .filter((candidate) => candidate.object.userData.gizmo),
+        hit =
+          hits.find((candidate) =>
+            String(candidate.object.userData.gizmo).startsWith("move-"),
+          ) ?? hits[0];
+      const exactHandle = hit?.object.userData.gizmo as string | undefined;
+      if (exactHandle?.startsWith("move-")) return exactHandle;
+      // The rendered arrows and rings are deliberately thin. Pick them in
+      // screen space as a fallback so their interactive area matches what the
+      // user can actually see, independently of WebGL/WebGPU rasterisation.
+      const piece = state.selected,
+        members = gizmoMembers(piece),
+        { pivot, axes } = gizmoFrame(piece, members),
+        bounds = renderer.domElement.getBoundingClientRect(),
+        pointer = new THREE.Vector2(e.clientX - bounds.left, e.clientY - bounds.top),
+        distance = camera.position.distanceTo(pivot),
+        worldPerPixel =
+          (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
+          Math.max(1, bounds.height),
+        scale = Math.max(0.35, worldPerPixel * 112) * gizmoScaleRef.current,
+        pointSegmentDistance = (
+          point: THREE.Vector2,
+          start: THREE.Vector2,
+          end: THREE.Vector2,
+        ) => {
+          const segment = end.clone().sub(start),
+            lengthSq = segment.lengthSq();
+          if (lengthSq < 1.0e-6) return point.distanceTo(start);
+          const amount = THREE.MathUtils.clamp(
+            point.clone().sub(start).dot(segment) / lengthSq,
+            0,
+            1,
+          );
+          return point.distanceTo(start.clone().addScaledVector(segment, amount));
+        },
+        candidates: {
+          handle: string;
+          distance: number;
+        }[] = [];
+      if (moveGizmoVisibleRef.current) {
+        (["x", "y", "z"] as const).forEach((axisName) => {
+          const start = projectGizmoPoint(pivot),
+            end = projectGizmoPoint(
+              pivot.clone().addScaledVector(axes[axisName], scale * 0.98),
+            );
+          if (!start.visible || !end.visible) return;
+          const screenDistance = pointSegmentDistance(pointer, start.point, end.point);
+          if (screenDistance <= Math.max(11, 11 * gizmoThicknessRef.current))
+            candidates.push({ handle: `move-${axisName}`, distance: screenDistance });
+        });
+      }
+      if (rotateGizmoVisibleRef.current) {
+        (["x", "y", "z"] as const).forEach((axisName) => {
+          const normal = axes[axisName],
+            seed =
+              Math.abs(normal.y) < 0.9
+                ? new THREE.Vector3(0, 1, 0)
+                : new THREE.Vector3(1, 0, 0),
+            basisU = seed.addScaledVector(normal, -seed.dot(normal)).normalize(),
+            basisV = normal.clone().cross(basisU).normalize(),
+            samples = 64,
+            ringRadius = scale * 0.72;
+          let previous = projectGizmoPoint(
+              pivot.clone().addScaledVector(basisU, ringRadius),
+            ),
+            closest = Number.POSITIVE_INFINITY;
+          for (let index = 1; index <= samples; index += 1) {
+            const angle = (index / samples) * Math.PI * 2,
+              current = projectGizmoPoint(
+                pivot
+                  .clone()
+                  .addScaledVector(basisU, Math.cos(angle) * ringRadius)
+                  .addScaledVector(basisV, Math.sin(angle) * ringRadius),
+              );
+            if (previous.visible && current.visible)
+              closest = Math.min(
+                closest,
+                pointSegmentDistance(pointer, previous.point, current.point),
+              );
+            previous = current;
+          }
+          if (closest <= Math.max(12, 16 * gizmoThicknessRef.current))
+            candidates.push({ handle: `rotate-${axisName}`, distance: closest });
+        });
+      }
+      candidates.sort((a, b) => {
+        const aMove = a.handle.startsWith("move-"),
+          bMove = b.handle.startsWith("move-");
+        return aMove === bMove ? a.distance - b.distance : aMove ? -1 : 1;
+      });
+      return candidates[0]?.handle ?? exactHandle;
+    };
+    const springAnchor = (active = spring) => {
+      if (!active) return undefined;
+      if (active.rubberNodeId !== undefined) {
+        const position = state.world?.bodies.get(active.rubberNodeId)?.translation();
+        return position
+          ? new THREE.Vector3(position.x, position.y, position.z)
+          : undefined;
+      }
+      return active.piece?.mesh.localToWorld(active.anchor.clone());
+    };
+    const nearestScreenConnector = (
+      piece: Piece,
+      e: {
+        clientX: number;
+        clientY: number;
+      },
+      includeAssembly = false,
+    ) => {
+      const bounds = renderer.domElement.getBoundingClientRect(),
+        pieces = includeAssembly ? editorAssemblyMembers(state.pieces, piece) : [piece],
+        pieceSet = new Set(pieces);
+      pieces.forEach((member) => member.mesh.updateMatrixWorld(true));
+      return pieces
+        .flatMap((member) =>
+          member.connectors.flatMap((connector) => {
+            if (!state.manualConnect && isConcealedGearboxGuide(connector)) return [];
+            const internallyOccupied = state.connections.some(
+              (connection) =>
+                pieceSet.has(connection.a) &&
+                pieceSet.has(connection.b) &&
+                ((connection.a === member && connection.socket === connector) ||
+                  (connection.b === member && connection.shaft === connector)),
+            );
+            if (includeAssembly && internallyOccupied) return [];
+            const anchors =
+              connector.role === "shaft" && connector.kind === "axle"
+                ? axleSnapPoints(connector)
+                : [{ local: connector.local, important: true }];
+            return anchors.map((anchor) => {
+              const projected = member.mesh
+                  .localToWorld(anchor.local.clone())
+                  .project(camera),
+                x = bounds.left + ((projected.x + 1) * bounds.width) / 2,
+                y = bounds.top + ((1 - projected.y) * bounds.height) / 2;
+              return {
+                piece: member,
+                connector,
+                anchorLocal: anchor.local.clone(),
+                distance: Math.hypot(x - e.clientX, y - e.clientY),
+              };
+            });
+          }),
+        )
+        .sort((a, b) => {
+          const distanceDelta = a.distance - b.distance;
+          if (Math.abs(distanceDelta) > 3) return distanceDelta;
+          const aIsDedicatedGuide = Boolean(a.connector.connectionTarget),
+            bIsDedicatedGuide = Boolean(b.connector.connectionTarget);
+          if (aIsDedicatedGuide !== bIsDedicatedGuide) return aIsDedicatedGuide ? 1 : -1;
+          return distanceDelta;
+        })[0];
+    };
+    const nearestConnectedPivot = (
+      piece: Piece,
+      e: {
+        clientX: number;
+        clientY: number;
+      },
+    ) => {
+      const bounds = renderer.domElement.getBoundingClientRect();
+      piece.mesh.updateMatrixWorld(true);
+      return state.connections
+        .filter((connection) => connection.a === piece || connection.b === piece)
+        .map((connection) => {
+          const connector = connection.a === piece ? connection.socket : connection.shaft,
+            socketPoint = worldConnector(connection.a, connection.socket).point,
+            anchorLocal = piece.mesh.worldToLocal(socketPoint.clone()),
+            projected = socketPoint.clone().project(camera),
+            x = bounds.left + ((projected.x + 1) * bounds.width) / 2,
+            y = bounds.top + ((1 - projected.y) * bounds.height) / 2;
+          return {
+            connection,
+            connector,
+            anchorLocal,
+            distance: Math.hypot(x - e.clientX, y - e.clientY),
+          };
+        })
+        .sort((a, b) => a.distance - b.distance)[0];
+    };
+    const nearbyPivotConnectionCorrection = (draft: {
+      piece: Piece;
+      local: THREE.Vector3;
+      axis: THREE.Vector3;
+      connector: MeshConnector;
+      connection: Connection;
+    }) => {
+      draft.piece.mesh.updateMatrixWorld(true);
+      const pivotSupport =
+          draft.connection.a === draft.piece ? draft.connection.b : draft.connection.a,
+        pivotTargetConnector =
+          draft.connection.a === draft.piece
+            ? draft.connection.shaft
+            : draft.connection.socket,
+        supportPieces = new Set<Piece>([pivotSupport]),
+        supportQueue = [pivotSupport];
+      while (supportQueue.length) {
+        const current = supportQueue.shift()!;
+        for (const connection of state.connections) {
+          const next =
+            connection.a === current
+              ? connection.b
+              : connection.b === current
+                ? connection.a
+                : undefined;
+          if (next && next !== draft.piece && !supportPieces.has(next)) {
+            supportPieces.add(next);
+            supportQueue.push(next);
+          }
+        }
+      }
+      const candidatePieces = [...state.pieces].sort(
+          (left, right) =>
+            Number(supportPieces.has(right)) - Number(supportPieces.has(left)),
+        ),
+        pivotWorld = draft.piece.mesh.localToWorld(draft.local.clone()),
+        pivotAxisWorld = draft.axis
+          .clone()
+          .transformDirection(draft.piece.mesh.matrixWorld)
+          .normalize(),
+        maximumCorrection = THREE.MathUtils.degToRad(12);
+      let best:
+        | {
+            angle: number;
+            other: Piece;
+            score: number;
+          }
+        | undefined;
+      for (const sourceConnector of draft.piece.connectors) {
+        if (sourceConnector === draft.connector) continue;
+        const sourceAnchors =
+          sourceConnector.role === "shaft" && sourceConnector.kind === "axle"
+            ? axleSnapPoints(sourceConnector).map((point) => point.local)
+            : [sourceConnector.local];
+        for (const other of candidatePieces) {
+          if (other === draft.piece) continue;
+          other.mesh.updateMatrixWorld(true);
+          for (const targetConnector of other.connectors) {
+            if (other === pivotSupport && targetConnector === pivotTargetConnector)
+              continue;
+            const profile = pairProfile(sourceConnector, targetConnector);
+            if (
+              !profile ||
+              !connectorPairAvailable(
+                draft.piece,
+                sourceConnector,
+                other,
+                targetConnector,
+                draft.piece,
+              )
+            )
+              continue;
+            const targetAnchors =
+              targetConnector.role === "shaft" && targetConnector.kind === "axle"
+                ? axleSnapPoints(targetConnector).map((point) => point.local)
+                : [targetConnector.local];
+            for (const sourceLocal of sourceAnchors)
+              for (const targetLocal of targetAnchors) {
+                const sourcePoint = draft.piece.mesh.localToWorld(sourceLocal.clone()),
+                  targetPoint = other.mesh.localToWorld(targetLocal.clone()),
+                  sourceRadius = sourcePoint
+                    .clone()
+                    .sub(pivotWorld)
+                    .addScaledVector(
+                      pivotAxisWorld,
+                      -sourcePoint.clone().sub(pivotWorld).dot(pivotAxisWorld),
+                    ),
+                  targetRadius = targetPoint
+                    .clone()
+                    .sub(pivotWorld)
+                    .addScaledVector(
+                      pivotAxisWorld,
+                      -targetPoint.clone().sub(pivotWorld).dot(pivotAxisWorld),
+                    );
+                if (
+                  sourceRadius.lengthSq() < 1e-5 ||
+                  targetRadius.lengthSq() < 1e-5 ||
+                  Math.abs(sourceRadius.length() - targetRadius.length()) > 0.22
+                )
+                  continue;
+                const angle = Math.atan2(
+                  pivotAxisWorld.dot(sourceRadius.clone().cross(targetRadius)),
+                  sourceRadius.dot(targetRadius),
+                );
+                if (Math.abs(angle) > maximumCorrection) continue;
+                const correction = new THREE.Quaternion().setFromAxisAngle(
+                    pivotAxisWorld,
+                    angle,
+                  ),
+                  predictedSourcePoint = sourcePoint
+                    .clone()
+                    .sub(pivotWorld)
+                    .applyQuaternion(correction)
+                    .add(pivotWorld),
+                  predictedSourceAxis = worldConnector(
+                    draft.piece,
+                    sourceConnector,
+                  ).axis.applyQuaternion(correction),
+                  targetAxis = worldConnector(other, targetConnector).axis;
+                if (Math.abs(predictedSourceAxis.dot(targetAxis)) < 0.965) continue;
+                const shaft =
+                    sourceConnector.role === "shaft" ? sourceConnector : targetConnector,
+                  socket =
+                    sourceConnector.role === "socket" ? sourceConnector : targetConnector,
+                  shaftPoint =
+                    sourceConnector.role === "shaft" ? predictedSourcePoint : targetPoint,
+                  socketPoint =
+                    sourceConnector.role === "socket"
+                      ? predictedSourcePoint
+                      : targetPoint,
+                  shaftAxis =
+                    sourceConnector.role === "shaft" ? predictedSourceAxis : targetAxis,
+                  delta = socketPoint.clone().sub(shaftPoint),
+                  along = delta.dot(shaftAxis),
+                  radial = delta.clone().addScaledVector(shaftAxis, -along).length(),
+                  axialError =
+                    shaft.kind === "axle"
+                      ? Math.max(0, Math.abs(along) - (shaft.length ?? 0.5) / 2)
+                      : Math.min(
+                          ...connectorAxialOffsets(shaft, socket).map((offset) =>
+                            Math.abs(along - offset),
+                          ),
+                        );
+                if (radial > 0.18 || axialError > 0.14) continue;
+                const score =
+                  radial +
+                  axialError +
+                  Math.abs(angle) * 0.04 +
+                  (supportPieces.has(other) ? 0 : 0.025);
+                if (!best || score < best.score) best = { angle, other, score };
+              }
+          }
+        }
+      }
+      return best;
+    };
+    const updateManualForceMode = (forced: boolean) => {
+      const draft = state.manualConnect;
+      if (!draft || draft.forced === forced) return;
+      draft.forced = forced;
+      (draft.line.material as THREE.LineBasicMaterial).color.setHex(
+        forced ? 0xff2d2d : 0xffee38,
+      );
+      draft.label.textContent = forced
+        ? translations[languageRef.current].forceConnect
+        : isChineseLanguage()
+          ? "连接"
+          : "CONNECT";
+      draft.label.classList.toggle("forced", forced);
+      setMessage(
+        forced
+          ? languageRef.current === "es"
+            ? "Force Connect: las piezas no se moverán"
+            : isChineseLanguage()
+              ? "强制连接：零件位置保持不变"
+              : "Force Connect: parts will not be moved"
+          : languageRef.current === "es"
+            ? "Connect manual normal"
+            : isChineseLanguage()
+              ? "普通手动连接"
+              : "Normal manual Connect",
+      );
+    };
+    const pieceFrom = (object: THREE.Object3D, instanceId?: number) => {
+      const instancePieces = object.userData.instancePieces as Piece[] | undefined;
+      if (instancePieces && instanceId !== undefined) return instancePieces[instanceId];
+      let o: THREE.Object3D | null = object;
+      while (o) {
+        if (o.userData.piece) return o.userData.piece as Piece;
+        o = o.parent;
+      }
+      return undefined;
+    };
+    const pickPiece = () => {
+      // In WebGPU mode the hidden WebGL instance matrices are intentionally
+      // not uploaded every frame. Raycasting still uses those WebGL batches,
+      // so synchronize them on demand before a click; otherwise force-drag
+      // selection tests the pieces at an older simulation position.
+      if (state.running && gpuSceneRenderer && state.renderBatchItems.length)
+        state.updateRenderBatches();
+      let best:
+        | {
+            piece: Piece;
+            point: THREE.Vector3;
+            distance: number;
+          }
+        | undefined;
+      const consider = (
+        piece: Piece | undefined,
+        point: THREE.Vector3,
+        distance: number,
+      ) => {
+        if (!piece || !Number.isFinite(distance)) return;
+        if (!best || distance < best.distance - 1.0e-5)
+          best = { piece, point: point.clone(), distance };
+      };
+      const meshBatchedPieces = new Set(
+        state.renderBatchItems.flatMap((batch) => batch.pieces),
+      );
+      const visualHits = ray.intersectObjects(
+        [
+          ...state.pieces
+            .filter(
+              (piece) =>
+                !meshBatchedPieces.has(piece) &&
+                !state.rubberBands.some((band) => band.owner === piece),
+            )
+            .map((piece) => piece.mesh),
+          ...state.rubberBands.flatMap((band) => (band.visual ? [band.visual] : [])),
+          ...(state.renderBatchRoot ? [state.renderBatchRoot] : []),
+        ],
+        true,
+      );
+      for (const candidate of visualHits) {
+        const piece = pieceFrom(
+          candidate.object,
+          candidate.instanceId ??
+            (
+              candidate as THREE.Intersection & {
+                batchId?: number;
+              }
+            ).batchId,
+        );
+        consider(piece, candidate.point, candidate.distance);
+      }
+      // What the user can actually see under the pointer is authoritative.
+      // Collider envelopes can protrude beyond thin/concave LEGO geometry and
+      // must never steal a click from a visible triangle behind them. They are
+      // retained only as a fallback for parts without raycastable render data.
+      if (best) return best;
+      // The three Cardan meshes contain narrow fork faces and open gaps. Give
+      // their visible bounds a small pick tolerance only when no rendered
+      // triangle from any piece was hit, so clicking through a fork remains
+      // reliable without allowing an invisible envelope to steal another
+      // visible piece's click.
+      for (const piece of state.pieces) {
+        if (
+          !piece.editorAssemblyId ||
+          (piece.part.toLowerCase() !== "62519" && piece.part.toLowerCase() !== "62520")
+        )
+          continue;
+        const box = new THREE.Box3().setFromObject(piece.mesh).expandByScalar(0.07),
+          point = ray.ray.intersectBox(box, new THREE.Vector3());
+        if (point) consider(piece, point, ray.ray.origin.distanceTo(point));
+      }
+      if (best) return best;
+      const unitScale = new THREE.Vector3(1, 1, 1);
+      const colliderFallbackPieces = state.pieces.filter((piece) => {
+        if (meshBatchedPieces.has(piece)) return false;
+        let hasVisibleTriangles = false;
+        piece.mesh.traverse((object) => {
+          if (
+            object instanceof THREE.Mesh &&
+            object.visible &&
+            object.geometry.getAttribute("position")?.count > 0
+          )
+            hasVisibleTriangles = true;
+        });
+        return !hasVisibleTriangles;
+      });
+      for (const piece of colliderFallbackPieces) {
+        if (state.rubberBands.some((band) => band.owner === piece)) continue;
+        piece.mesh.updateMatrixWorld(true);
+        for (const primitive of piece.colliders) {
+          const primitiveMatrix = piece.mesh.matrixWorld
+              .clone()
+              .multiply(
+                new THREE.Matrix4().compose(
+                  primitive.center,
+                  primitive.rotation,
+                  unitScale,
+                ),
+              ),
+            inverse = primitiveMatrix.clone().invert(),
+            localRay = new THREE.Ray(
+              ray.ray.origin.clone().applyMatrix4(inverse),
+              ray.ray.direction.clone().transformDirection(inverse),
+            ),
+            halfSize =
+              primitive.shape === "box"
+                ? primitive.size!.clone().multiplyScalar(0.5)
+                : primitive.shape === "sphere"
+                  ? new THREE.Vector3(
+                      primitive.radius!,
+                      primitive.radius!,
+                      primitive.radius!,
+                    )
+                  : new THREE.Vector3(
+                      primitive.radius!,
+                      primitive.halfHeight!,
+                      primitive.radius!,
+                    ),
+            localHit = localRay.intersectBox(
+              new THREE.Box3(halfSize.clone().negate(), halfSize),
+              new THREE.Vector3(),
+            );
+          if (!localHit) continue;
+          const point = localHit.applyMatrix4(primitiveMatrix),
+            distance = ray.ray.origin.distanceTo(point);
+          consider(piece, point, distance);
+        }
+      }
+      return best;
+    };
+    const paintForceLabel = (label: HTMLDivElement, force: number) => {
+      const text = `${force.toFixed(1)} N`;
+      if (label.textContent !== text) label.textContent = text;
+    };
+    const updateSpring = () => {
+      if (!spring) return;
+      const anchorWorld = springAnchor();
+      if (!anchorWorld) return;
+      const projected = anchorWorld.project(camera),
+        anchor = {
+          x: ((projected.x + 1) * canvas.clientWidth) / 2,
+          y: ((1 - projected.y) * canvas.clientHeight) / 2,
+        },
+        target = spring.cursorScreen,
+        validProjection =
+          Number.isFinite(anchor.x) &&
+          Number.isFinite(anchor.y) &&
+          Number.isFinite(target.x) &&
+          Number.isFinite(target.y);
+      if (!validProjection) {
+        spring.line.removeAttribute("points");
+        spring.label.style.display = "none";
+        return;
+      }
+      spring.label.style.display = "";
+      const dx = target.x - anchor.x,
+        dy = target.y - anchor.y,
+        length = Math.hypot(dx, dy),
+        nx = length > 0 ? -dy / length : 0,
+        ny = length > 0 ? dx / length : 0,
+        points = Array.from({ length: 25 }, (_, index) => {
+          const t = index / 24,
+            offset =
+              index === 0 || index === 24
+                ? 0
+                : (index % 2 ? 1 : -1) * Math.min(8, length * 0.04);
+          return `${anchor.x + dx * t + nx * offset},${anchor.y + dy * t + ny * offset}`;
+        });
+      spring.line.setAttribute("points", points.join(" "));
+      spring.label.style.left = `${(anchor.x + target.x) / 2}px`;
+      spring.label.style.top = `${(anchor.y + target.y) / 2}px`;
+      paintForceLabel(spring.label, spring.force);
+    };
+    const connectedPieces = (start: Piece) => {
+      const found = new Set<Piece>([start]),
+        queue = [start];
+      while (queue.length) {
+        const current = queue.shift()!;
+        for (const connection of state.connections) {
+          const next =
+            connection.a === current
+              ? connection.b
+              : connection.b === current
+                ? connection.a
+                : undefined;
+          if (next && !found.has(next)) {
+            found.add(next);
+            queue.push(next);
+          }
+        }
+      }
+      return [...found];
+    };
+    const cancelAimRotation = (notify = true) => {
+      if (!aimRotation) return;
+      scene.remove(aimRotation.arrow);
+      aimRotation.arrow.line.geometry.dispose();
+      aimRotation.arrow.cone.geometry.dispose();
+      (aimRotation.arrow.line.material as THREE.Material).dispose();
+      (aimRotation.arrow.cone.material as THREE.Material).dispose();
+      aimRotation.label.remove();
+      aimRotation = undefined;
+      if (notify)
+        setMessage(
+          languageRef.current === "es"
+            ? "Orientación cancelada"
+            : isChineseLanguage()
+              ? "已取消定向"
+              : "Orientation cancelled",
+        );
+    };
+    const beginAimRotation = (piece: Piece) => {
+      if (state.running) return;
+      cancelAimRotation(false);
+      const members = editorAssemblyMembers(state.pieces, piece),
+        bounds = members.reduce(
+          (box, member) => box.union(new THREE.Box3().setFromObject(member.mesh)),
+          new THREE.Box3(),
+        ),
+        pivot = bounds.isEmpty()
+          ? piece.mesh.getWorldPosition(new THREE.Vector3())
+          : bounds.getCenter(new THREE.Vector3()),
+        candidates = members.flatMap((member) => {
+          member.mesh.updateMatrixWorld(true);
+          return member.connectors.map((connector) => ({
+            point: member.mesh.localToWorld(connector.local.clone()),
+            preferred: connector.role === "socket" && connector.kind === "axle" ? 1 : 0,
+          }));
+        });
+      candidates.sort(
+        (left, right) =>
+          right.preferred - left.preferred ||
+          right.point.distanceToSquared(pivot) - left.point.distanceToSquared(pivot),
+      );
+      const direction = (candidates[0]?.point ?? piece.mesh.position).clone().sub(pivot);
+      if (direction.lengthSq() < 1.0e-6)
+        direction.set(1, 0, 0).applyQuaternion(piece.mesh.quaternion);
+      direction.normalize();
+      const radius = bounds.isEmpty()
+          ? 2
+          : Math.max(2, bounds.getBoundingSphere(new THREE.Sphere()).radius * 1.35),
+        arrow = new THREE.ArrowHelper(direction, pivot, radius, 0xffd51f, 0.35, 0.2),
+        label = document.createElement("div");
+      arrow.renderOrder = 1000;
+      arrow.traverse((object) => {
+        const material = (object as THREE.Mesh).material as THREE.Material | undefined;
+        if (material) {
+          material.depthTest = false;
+          material.depthWrite = false;
+        }
+      });
+      label.className = "manual-connect-label";
+      label.textContent =
+        languageRef.current === "es"
+          ? "ORIENTAR · clic para aplicar · Esc cancelar"
+          : isChineseLanguage()
+            ? "定向 · 单击应用 · Esc 取消"
+            : "AIM · click to apply · Esc to cancel";
+      host.appendChild(label);
+      scene.add(arrow);
+      aimRotation = {
+        piece,
+        members,
+        pivot,
+        direction,
+        previewDirection: direction.clone(),
+        plane: new THREE.Plane().setFromNormalAndCoplanarPoint(
+          camera.getWorldDirection(new THREE.Vector3()),
+          pivot,
+        ),
+        arrow,
+        label,
+      };
+      setMessage(
+        languageRef.current === "es"
+          ? "Mueve el cursor para apuntar la junta y haz clic"
+          : isChineseLanguage()
+            ? "移动光标调整关节方向，然后单击确认"
+            : "Move the cursor to aim the joint, then click",
+      );
+    };
+    const commitAimRotation = () => {
+      const draft = aimRotation;
+      if (!draft) return;
+      const rotation = new THREE.Quaternion().setFromUnitVectors(
+          draft.direction,
+          draft.previewDirection,
+        ),
+        memberSet = new Set(draft.members),
+        affected = new Set<Piece>();
+      if (rotation.angleTo(new THREE.Quaternion()) > 1.0e-5) {
+        state.recordHistory();
+        draft.members.forEach((member) => {
+          member.mesh.position
+            .sub(draft.pivot)
+            .applyQuaternion(rotation)
+            .add(draft.pivot);
+          member.mesh.quaternion.premultiply(rotation).normalize();
+          member.mesh.updateMatrixWorld(true);
+        });
+        state.connections.forEach((connection) => {
+          const aInside = memberSet.has(connection.a),
+            bInside = memberSet.has(connection.b);
+          if (aInside !== bInside) affected.add(aInside ? connection.b : connection.a);
+          else if (aInside) {
+            connection.point.sub(draft.pivot).applyQuaternion(rotation).add(draft.pivot);
+            connection.axis.applyQuaternion(rotation).normalize();
+          }
+        });
+        state.connections = state.connections.filter(
+          (connection) => memberSet.has(connection.a) === memberSet.has(connection.b),
+        );
+        affected.forEach((member) => rebalanceSmartDefaults(state, member));
+        if (draft.members.some((member) => member.renderBatched))
+          state.rebuildRenderBatches();
+        else state.renderBatchesDirty = true;
+        setConnectionRevision((value) => value + 1);
+        refreshDebug();
+        scheduleRecoverySave();
+      }
+      const part = draft.piece.part;
+      cancelAimRotation(false);
+      setMessage(
+        languageRef.current === "es"
+          ? `${part} orientada desde el visor`
+          : isChineseLanguage()
+            ? `${part} 已通过视图区定向`
+            : `${part} aimed from the viewport`,
+      );
+    };
+    const clampMotion = (piece: Piece, linearLimit: number, angularLimit: number) => {
+      if (!piece.body || piece.physicsIslandFixed) return;
+      const v = piece.body.linvel(),
+        w = piece.body.angvel(),
+        linear = Math.hypot(v.x, v.y, v.z),
+        angular = Math.hypot(w.x, w.y, w.z);
+      if (linear > linearLimit) {
+        const scale = linearLimit / linear;
+        piece.body.setLinvel({ x: v.x * scale, y: v.y * scale, z: v.z * scale }, true);
+      }
+      if (angular > angularLimit) {
+        const scale = angularLimit / angular;
+        piece.body.setAngvel({ x: w.x * scale, y: w.y * scale, z: w.z * scale }, true);
+      }
+    };
+    // Gear and differential constraints live in physics-core/src/systems/gears.rs.
+    // The editor only detects topology and sends a numeric graph to Rust.
+    const makeLock = () => {
+      const lock = new THREE.Group(),
+        white = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }),
+        gold = new THREE.MeshBasicMaterial({ color: 0xf1b900, depthTest: false }),
+        darkGold = new THREE.MeshBasicMaterial({ color: 0x9a6b00, depthTest: false }),
+        background = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), white),
+        border = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.42, 24), gold),
+        body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.27, 0.06), gold),
+        shackle = new THREE.Mesh(
+          new THREE.TorusGeometry(0.14, 0.045, 8, 18, Math.PI),
+          darkGold,
+        ),
+        keyhole = new THREE.Mesh(new THREE.CircleGeometry(0.035, 12), darkGold);
+      background.position.z = 0;
+      border.position.z = 0.01;
+      body.position.set(0, -0.07, 0.055);
+      shackle.position.set(0, 0.08, 0.055);
+      keyhole.position.set(0, -0.07, 0.09);
+      lock.add(background, border, shackle, body, keyhole);
+      lock.renderOrder = 100;
+      lock.userData.gpuOverlay = true;
+      return lock;
+    };
+    const disposeLock = (piece: Piece) => {
+      if (!piece.lockSprite) return;
+      scene.remove(piece.lockSprite);
+      piece.lockSprite.traverse((object) => {
+        if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.Line)) return;
+        object.geometry.dispose();
+        const materials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+        materials.forEach((material) => material.dispose());
+      });
+      piece.lockSprite = undefined;
+    };
+    const toggleFixed = (piece: Piece) => {
+      piece.fixed = !piece.fixed;
+      if (piece.fixed) {
+        piece.lockSprite = makeLock();
+        scene.add(piece.lockSprite);
+      } else disposeLock(piece);
+      if (piece.body)
+        (piece.physicsIsland ?? [piece]).forEach((member) => {
+          member.physicsIslandFixed = (member.physicsIsland ?? [member]).some(
+            (candidate) => candidate.fixed,
+          );
+        });
+      if (piece.body) piece.body.setFixed(Boolean(piece.physicsIslandFixed));
+      setMessage(
+        piece.fixed
+          ? isChineseLanguage()
+            ? `${piece.part} 已固定在空间中`
+            : `${piece.part} fijada al espacio`
+          : isChineseLanguage()
+            ? `${piece.part} 已释放`
+            : `${piece.part} liberada`,
+      );
+    };
+    const cloneConnection = (connection: Connection): Connection => ({
+        ...connection,
+        point: connection.point.clone(),
+        axis: connection.axis.clone(),
+        localAxisA: connection.localAxisA.clone(),
+        localPointA: connection.localPointA?.clone(),
+        localPointB: connection.localPointB?.clone(),
+      }),
+      cloneConnector = (connector: MeshConnector): MeshConnector => ({
+        ...connector,
+        local: connector.local.clone(),
+        axis: connector.axis.clone(),
+      }),
+      cloneCollider = (collider: CollisionPrimitive): CollisionPrimitive => ({
+        ...collider,
+        center: collider.center.clone(),
+        size: collider.size?.clone(),
+        rotation: collider.rotation.clone(),
+      });
+    const captureEditorSnapshot = (): EditorSnapshot => ({
+      pieces: state.pieces.map((piece) => ({
+        piece,
+        position: piece.mesh.position.clone(),
+        rotation: piece.mesh.quaternion.clone(),
+        scale: piece.mesh.scale.clone(),
+        color: piece.color,
+        fixed: piece.fixed,
+        exactCollider: piece.exactCollider,
+        dynamicAxleConnections: piece.dynamicAxleConnections,
+        editorAssemblyId: piece.editorAssemblyId,
+        editorAssemblyDetached: piece.editorAssemblyDetached,
+        editorCardanReferenceConnector: piece.editorCardanReferenceConnector,
+        rotationPivotLocal: piece.rotationPivotLocal?.clone(),
+        rotationPivotKey: piece.rotationPivotKey,
+        gearDirectionLock: piece.gearDirectionLock,
+        gearMotor: piece.gearMotor,
+        connectors: piece.connectors.map(cloneConnector),
+        colliders: piece.colliders.map(cloneCollider),
+        mapProvenance: { ...piece.mapProvenance },
+        gearColliders: piece.gearColliders.map(cloneCollider),
+        specialGear: piece.specialGear,
+      })),
+      connections: state.connections.map(cloneConnection),
+      connectionModes: new Map(
+        [...state.connectionModes].map(([id, mode]) => [id, { ...mode }]),
+      ),
+      rubberBands: state.rubberBands.map((band) => ({
+        band,
+        guides: band.guides.map((guide) => guide.clone()),
+      })),
+      selected: state.selected,
+      selectedPieces: [...state.selectedPieces],
+    });
+    const undoStack: EditorSnapshot[] = [],
+      redoStack: EditorSnapshot[] = [];
+    let restoringHistory = false,
+      historyBusy = false,
+      clipboard:
+        | {
+            anchor: THREE.Vector3;
+            connections: Connection[];
+            items: {
+              sourceId: number;
+              catalog: CatalogPart;
+              position: THREE.Vector3;
+              rotation: THREE.Quaternion;
+              scale: THREE.Vector3;
+              connectors: MeshConnector[];
+              colliders: CollisionPrimitive[];
+              mapProvenance?: MapProvenanceSnapshot;
+              gearColliders: CollisionPrimitive[];
+              specialGear: boolean;
+              fixed: boolean;
+              exactCollider: boolean;
+              dynamicAxleConnections: boolean;
+              editorAssemblyId?: string;
+              editorAssemblyDetached?: boolean;
+              editorCardanReferenceConnector?: 0 | 1;
+              rotationPivotLocal?: THREE.Vector3;
+              rotationPivotKey?: string;
+              gearDirectionLock?: -1 | 0 | 1;
+              gearMotor?: {
+                key: string;
+                speed: number;
+                force: number;
+              };
+            }[];
+          }
+        | undefined,
+      pasteIndex = 0;
+    const restoreEditorSnapshot = async (snapshot: EditorSnapshot) => {
+      restoringHistory = true;
+      try {
+        state.disposeRenderBatches();
+        const restoredPieces = new Set(snapshot.pieces.map((item) => item.piece));
+        state.pieces.forEach((piece) => {
+          if (restoredPieces.has(piece)) return;
+          scene.remove(piece.mesh);
+          disposeLock(piece);
+        });
+        state.pieces = snapshot.pieces.map((item) => item.piece);
+        for (const item of snapshot.pieces) {
+          const piece = item.piece;
+          if (piece.mesh.parent !== scene) scene.add(piece.mesh);
+          if (piece.color !== item.color) await state.recolorPart(piece, item.color);
+          piece.mesh.position.copy(item.position);
+          piece.mesh.quaternion.copy(item.rotation);
+          piece.mesh.scale.copy(item.scale);
+          piece.mesh.visible = !state.rubberBands.some((band) => band.owner === piece);
+          piece.mesh.updateMatrixWorld(true);
+          piece.fixed = item.fixed;
+          piece.exactCollider = item.exactCollider;
+          piece.dynamicAxleConnections = item.dynamicAxleConnections;
+          piece.editorAssemblyId = item.editorAssemblyId;
+          piece.editorAssemblyDetached = item.editorAssemblyDetached;
+          piece.editorCardanReferenceConnector = item.editorCardanReferenceConnector;
+          piece.rotationPivotLocal = item.rotationPivotLocal?.clone();
+          piece.rotationPivotKey = item.rotationPivotKey;
+          piece.gearDirectionLock = item.gearDirectionLock;
+          piece.gearMotor = item.gearMotor;
+          piece.connectors = item.connectors.map(cloneConnector);
+          piece.colliders = item.colliders.map(cloneCollider);
+          piece.gearColliders = item.gearColliders.map(cloneCollider);
+          piece.mapProvenance = { ...item.mapProvenance };
+          piece.specialGear = item.specialGear;
+          if (piece.fixed && !piece.lockSprite) {
+            piece.lockSprite = makeLock();
+            scene.add(piece.lockSprite);
+          } else if (!piece.fixed) disposeLock(piece);
+        }
+        state.connections = snapshot.connections.map(cloneConnection);
+        state.connectionModes = new Map(
+          [...snapshot.connectionModes].map(([id, mode]) => [id, { ...mode }]),
+        );
+        snapshot.rubberBands?.forEach(({ band, guides }) => {
+          band.guides = guides.map((guide) => guide.clone());
+          drawRubberBand(band);
+        });
+        state.gearLinks = detectGearLinks(
+          state.pieces,
+          undefined,
+          differentialCarrierGearExclusions(state.pieces, state.connections),
+        );
+        state.selected =
+          snapshot.selected && restoredPieces.has(snapshot.selected)
+            ? snapshot.selected
+            : undefined;
+        state.selectedPieces = new Set(
+          (snapshot.selectedPieces ?? (state.selected ? [state.selected] : [])).filter(
+            (piece) => restoredPieces.has(piece),
+          ),
+        );
+        if (state.selected && !state.selectedPieces.has(state.selected))
+          state.selectedPieces.add(state.selected);
+        state.rebuildRenderBatches();
+        state.refreshDebug();
+        setSelectedId(state.selected?.id ?? null);
+        setCount(state.pieces.length);
+        setConnectionRevision((value) => value + 1);
+      } finally {
+        restoringHistory = false;
+      }
+    };
+    const recordHistory = () => {
+      if (restoringHistory || historyBusy || state.running) return;
+      undoStack.push(captureEditorSnapshot());
+      if (undoStack.length > 80) undoStack.shift();
+      redoStack.length = 0;
+      scheduleRecoverySave();
+    };
+    const undo = async () => {
+      if (historyBusy || state.running) return false;
+      if (!undoStack.length) {
+        setMessage(
+          isChineseLanguage() ? "没有可撤销的操作" : "No hay acciones que deshacer",
+        );
+        return false;
+      }
+      historyBusy = true;
+      try {
+        redoStack.push(captureEditorSnapshot());
+        await restoreEditorSnapshot(undoStack.pop()!);
+        setMessage(isChineseLanguage() ? "撤销" : "Deshacer");
+        return true;
+      } finally {
+        historyBusy = false;
+      }
+    };
+    const redo = async () => {
+      if (historyBusy || state.running) return false;
+      if (!redoStack.length) {
+        setMessage(
+          isChineseLanguage() ? "没有可重做的操作" : "No hay acciones que rehacer",
+        );
+        return false;
+      }
+      historyBusy = true;
+      try {
+        undoStack.push(captureEditorSnapshot());
+        await restoreEditorSnapshot(redoStack.pop()!);
+        setMessage(isChineseLanguage() ? "重做" : "Rehacer");
+        return true;
+      } finally {
+        historyBusy = false;
+      }
+    };
+    const catalogFromPiece = (piece: Piece): CatalogPart => ({
+      part: piece.part,
+      name: piece.name,
+      thumb: piece.thumb,
+      kind: piece.kind,
+      color: piece.color,
+      family: piece.family,
+      modelPart: piece.modelPart,
+      rawThumb: piece.rawThumb,
+      geometry: piece.geometry,
+      sourceColor: piece.sourceColor,
+      gear: piece.gear,
+      specialGear: piece.specialGear,
+      origin: piece.origin,
+      sourceKind: piece.sourceKind,
+      requestedPart: piece.requestedPart,
+      catalogReturnedPart: piece.catalogReturnedPart,
+      resolvedPart: piece.resolvedPart,
+      catalogQuery: piece.catalogQuery,
+      importFile: piece.importFile,
+      downloadUrl: piece.downloadUrl,
+      downloadSource: piece.downloadSource,
+    });
+    const tuple3 = (vector: THREE.Vector3) =>
+        vector.toArray() as [number, number, number],
+      tuple4 = (quaternion: THREE.Quaternion) =>
+        quaternion.toArray() as [number, number, number, number],
+      saveConnector = (connector: MeshConnector): SavedConnector => ({
+        local: tuple3(connector.local),
+        axis: tuple3(connector.axis),
+        kind: connector.kind,
+        role: connector.role,
+        diameter: connector.diameter,
+        length: connector.length,
+        rotationOnly: connector.rotationOnly,
+        sliding: connector.sliding,
+        connectionTarget: connector.connectionTarget
+          ? { ...connector.connectionTarget }
+          : undefined,
+        singleConnection: connector.singleConnection,
+      }),
+      saveCollider = (collider: CollisionPrimitive): SavedCollisionPrimitive => ({
+        shape: collider.shape,
+        center: tuple3(collider.center),
+        size: collider.size ? tuple3(collider.size) : undefined,
+        radius: collider.radius,
+        innerRadius: collider.innerRadius,
+        halfHeight: collider.halfHeight,
+        startAngle: collider.startAngle,
+        arcAngle: collider.arcAngle,
+        arcPoints: collider.arcPoints?.map((point) => [...point]) as
+          ArcControlPoints | undefined,
+        arcThickness: collider.arcThickness,
+        segments: collider.segments,
+        rotation: tuple4(collider.rotation),
+        gearCollision: collider.gearCollision,
+        gearRatio: collider.gearRatio,
+      }),
+      loadConnector = (connector: SavedConnector): MeshConnector => ({
+        ...connector,
+        local: new THREE.Vector3().fromArray(connector.local),
+        axis: new THREE.Vector3().fromArray(connector.axis),
+      }),
+      loadCollider = (collider: SavedCollisionPrimitive): CollisionPrimitive => ({
+        ...collider,
+        center: new THREE.Vector3().fromArray(collider.center),
+        size: collider.size ? new THREE.Vector3().fromArray(collider.size) : undefined,
+        rotation: new THREE.Quaternion().fromArray(collider.rotation),
+      });
+    let recoveryTimer = 0,
+      recoveryGeneration = 0,
+      restoringProject = false;
+    const createProjectDocument = (identity?: {
+      id?: string;
+      name?: string;
+      createdAt?: string;
+    }): SimStudioProjectDocument => {
+      const now = new Date().toISOString(),
+        id = identity?.id ?? activeProjectIdRef.current,
+        name = identity?.name ?? projectNameRef.current,
+        createdAt = identity?.createdAt ?? projectCreatedAtRef.current,
+        assets: Record<string, JsonObject> = {},
+        pieceIds = new Map(
+          state.pieces.map((piece, index) => [piece, `piece-${index + 1}`]),
+        ),
+        connectorIndex = (piece: Piece, connector: MeshConnector) => {
+          const direct = piece.connectors.indexOf(connector);
+          if (direct >= 0) return direct;
+          return Math.max(
+            0,
+            piece.connectors.findIndex(
+              (candidate) =>
+                candidate.kind === connector.kind &&
+                candidate.role === connector.role &&
+                candidate.local.distanceToSquared(connector.local) < 1e-8,
+            ),
+          );
+        };
+      const pieces = state.pieces.map((piece) => {
+          const asset = modelRenderKey(piece);
+          if (!assets[asset]) {
+            const visual = (piece.mesh.children[0] ?? piece.mesh).clone(true);
+            visual.traverse((object) => {
+              object.visible = true;
+            });
+            assets[asset] = visual.toJSON() as unknown as JsonObject;
+          }
+          const catalog = catalogFromPiece(piece);
+          delete catalog.embeddedGeometry;
+          delete catalog.projectAssetKey;
+          return {
+            id: pieceIds.get(piece)!,
+            catalog: catalog as unknown as JsonObject,
+            asset,
+            position: tuple3(piece.mesh.position),
+            rotation: tuple4(piece.mesh.quaternion),
+            scale: tuple3(piece.mesh.scale),
+            fixed: piece.fixed,
+            exactCollider: piece.exactCollider,
+            dynamicAxleConnections: piece.dynamicAxleConnections,
+            editorAssemblyId: piece.editorAssemblyId,
+            editorAssemblyDetached: piece.editorAssemblyDetached,
+            editorCardanReferenceConnector: piece.editorCardanReferenceConnector,
+            rotationPivotLocal: piece.rotationPivotLocal
+              ? tuple3(piece.rotationPivotLocal)
+              : undefined,
+            rotationPivotKey: piece.rotationPivotKey,
+            gearDirectionLock: piece.gearDirectionLock,
+            gearMotor: piece.gearMotor,
+            connectors: piece.connectors.map(saveConnector),
+            colliders: piece.colliders.map(saveCollider),
+            mapProvenance: normalizeMapProvenanceSnapshot(piece.mapProvenance),
+            gearColliders: piece.gearColliders.map(saveCollider),
+          };
+        }),
+        connections = state.connections.map((connection) => ({
+          id: connection.id,
+          a: pieceIds.get(connection.a)!,
+          b: pieceIds.get(connection.b)!,
+          socketIndex: connectorIndex(connection.a, connection.socket),
+          shaftIndex: connectorIndex(connection.b, connection.shaft),
+          mode: connection.mode,
+          profile: connection.profile,
+          point: tuple3(connection.point),
+          axis: tuple3(connection.axis),
+          localAxisA: tuple3(connection.localAxisA),
+          travel: connection.travel,
+          motorSpeed: connection.motorSpeed,
+          motorForce: connection.motorForce,
+          motorPulse: connection.motorPulse,
+          motorPulseAngle: connection.motorPulseAngle,
+          motorPulseInterval: connection.motorPulseInterval,
+          userConfigured: connection.userConfigured,
+          forced: connection.forced,
+          forcedOffset: connection.forcedOffset,
+          localPointA: connection.localPointA
+            ? tuple3(connection.localPointA)
+            : undefined,
+          localPointB: connection.localPointB
+            ? tuple3(connection.localPointB)
+            : undefined,
+        })),
+        gearLinks = state.gearLinks.flatMap((link) => {
+          const a = pieceIds.get(link.a.value),
+            b = pieceIds.get(link.b.value);
+          return !a || !b
+            ? []
+            : [
+                {
+                  a,
+                  b,
+                  specA: link.a.spec,
+                  specB: link.b.spec,
+                  centerA: link.a.center,
+                  centerB: link.b.center,
+                  poseAxisA: link.a.axis,
+                  poseAxisB: link.b.axis,
+                  axisA: tuple3(link.axisA),
+                  axisB: tuple3(link.axisB),
+                  ratio: link.ratio,
+                  centerDistance: link.centerDistance,
+                  expectedDistance: link.expectedDistance,
+                  distanceError: link.distanceError,
+                  signB: link.signB,
+                  perpendicular: link.perpendicular,
+                  ratioOverride: link.ratioOverride,
+                },
+              ];
+        }),
+        rubberBands = state.rubberBands.map(
+          (band) =>
+            ({
+              id: band.id,
+              pieceId: band.owner ? pieceIds.get(band.owner) : undefined,
+              guides: band.guides.map(tuple3),
+              radius: band.radius,
+              restLength: band.restLength,
+              stiffness: band.stiffness,
+              damping: band.damping,
+              color: band.color,
+            }) satisfies SavedRubberBand,
+        ),
+        importedCatalog = [
+          ...new Map(
+            state.pieces
+              .filter((piece) => !belongsToDefaultPalette(piece))
+              .map((piece) => {
+                const catalog = catalogFromPiece(piece);
+                return [
+                  `${catalog.part}:${catalog.color}`,
+                  catalog as unknown as JsonObject,
+                ];
+              }),
+          ).values(),
+        ],
+        mapBaselines = Object.fromEntries(
+          [...new Set(state.pieces.map(correctionStorageKeyFor))].flatMap((key) => {
+            const current = preloadedMapFingerprint(key);
+            if (!Object.keys(current).length) return [];
+            const baseline = projectMapBaselinesRef.current[key] ?? current;
+            projectMapBaselinesRef.current[key] = baseline;
+            return [[key, baseline]];
+          }),
+        );
+      return {
+        format: "simstudio-project",
+        version: 1,
+        id,
+        name,
+        createdAt,
+        updatedAt: now,
+        appVersion: "0.4",
+        revision: projectRevisionRef.current,
+        savedRevision: savedProjectRevisionRef.current,
+        assets,
+        pieces,
+        connections,
+        gearLinks,
+        rubberBands,
+        mapBaselines,
+        importedCatalog,
+        camera: {
+          position: tuple3(camera.position),
+          quaternion: tuple4(camera.quaternion),
+          target: tuple3(cameraTarget),
+        },
+        settings: {
+          gridStep: state.gridStep,
+          axleSnapStep: state.axleSnapStep,
+          rotationSnapStep: state.rotationSnapStep,
+          structuralMode: structuralModeRef.current,
+          structuralStiffness: structuralStiffnessRef.current,
+          physics: { ...state.physicsSettings },
+        },
+      };
+    };
+    const scheduleRecoverySave = (immediate = false, markDirty = true) => {
+      if (restoringProject || projectRestoringRef.current || state.running) return;
+      if (markDirty) {
+        projectRevisionRef.current++;
+        setProjectDirty(true);
+      }
+      const generation = ++recoveryGeneration;
+      if (recoveryTimer) window.clearTimeout(recoveryTimer);
+      setRecoveryStatus("saving");
+      recoveryTimer = window.setTimeout(
+        () => {
+          if (generation !== recoveryGeneration || restoringProject) return;
+          void saveRecoveryProject(createProjectDocument())
+            .then(() => setRecoveryStatus("saved"))
+            .catch(() => setRecoveryStatus("idle"));
+        },
+        immediate ? 0 : 450,
+      );
+    };
+    const restoreProjectDocument = async (document: SimStudioProjectDocument) => {
+      if (state.running) return;
+      setMapUpdates((current) =>
+        current.flatMap((candidate) => {
+          const sources = candidate.sources.filter((source) => source !== "project");
+          return sources.length ? [{ ...candidate, sources }] : [];
+        }),
+      );
+      restoringProject = true;
+      projectRestoringRef.current = true;
+      recoveryGeneration++;
+      if (recoveryTimer) window.clearTimeout(recoveryTimer);
+      state.bulkLoading = true;
+      state.disposeRenderBatches();
+      state.pieces.forEach((piece) => {
+        scene.remove(piece.mesh);
+        disposeLock(piece);
+      });
+      state.pieces = [];
+      state.connections = [];
+      state.connectionModes.clear();
+      state.gearLinks = [];
+      state.rubberBands.forEach((band) => {
+        scene.remove(band.line);
+        if (band.markers) scene.remove(band.markers);
+        if (band.visual) scene.remove(band.visual);
+        disposeRubberBand(band);
+      });
+      state.rubberBands = [];
+      state.selected = undefined;
+      state.selectedPieces.clear();
+      projectMapBaselinesRef.current = { ...(document.mapBaselines ?? {}) };
+      const piecesById = new Map<string, Piece>(),
+        projectMapUpdateCandidates = new Map<string, MapUpdateCandidate>();
+      let projectHasAutomaticMapUpdate = false;
+      try {
+        for (const saved of document.pieces) {
+          const asset = document.assets[saved.asset];
+          if (!asset)
+            throw new Error(
+              isChineseLanguage()
+                ? `缺少内嵌资源 ${saved.asset}`
+                : `Missing embedded asset ${saved.asset}`,
+            );
+          const catalog = {
+              ...(saved.catalog as unknown as CatalogPart),
+              embeddedGeometry: asset,
+              projectAssetKey: saved.asset,
+              sourceKind: "packaged-cache" as const,
+            },
+            piece = await addPart(
+              catalog,
+              new THREE.Vector3().fromArray(saved.position),
+              new THREE.Quaternion().fromArray(saved.rotation),
+            );
+          if (!piece)
+            throw new Error(
+              isChineseLanguage()
+                ? `无法恢复 ${catalog.part}`
+                : `Could not restore ${catalog.part}`,
+            );
+          piece.mesh.scale.fromArray(saved.scale);
+          piece.connectors = connectorDefaultsForPart(
+            catalog.part,
+            saved.connectors.map(loadConnector),
+          );
+          piece.colliders = saved.colliders.map(loadCollider);
+          piece.mapProvenance = normalizeMapProvenanceSnapshot(saved.mapProvenance);
+          piece.gearColliders = saved.gearColliders.map(loadCollider);
+          piece.fixed = saved.fixed;
+          piece.exactCollider = saved.exactCollider ?? false;
+          piece.dynamicAxleConnections = saved.dynamicAxleConnections;
+          piece.editorAssemblyId = saved.editorAssemblyId;
+          piece.editorAssemblyDetached = saved.editorAssemblyDetached;
+          piece.editorCardanReferenceConnector = saved.editorCardanReferenceConnector;
+          piece.rotationPivotLocal = saved.rotationPivotLocal
+            ? new THREE.Vector3().fromArray(saved.rotationPivotLocal)
+            : undefined;
+          piece.rotationPivotKey = saved.rotationPivotKey;
+          piece.gearDirectionLock = saved.gearDirectionLock;
+          piece.gearMotor = saved.gearMotor;
+          piece.mesh.visible = true;
+          piece.mesh.updateMatrixWorld(true);
+          if (piece.fixed) {
+            piece.lockSprite = makeLock();
+            scene.add(piece.lockSprite);
+          }
+          piecesById.set(saved.id, piece);
+          const mapKey = correctionStorageKeyFor(piece),
+            currentMap = preloadedMapFingerprint(mapKey);
+          if (Object.keys(currentMap).length) {
+            const actualBundle: PartMapBundle = {
+                connectors: saved.connectors,
+                colliders: saved.colliders,
+                gearColliders: saved.gearColliders,
+                specialGear: piece.specialGear,
+              },
+              actualMap = fingerprintMapBundle(actualBundle);
+            let baseline = projectMapBaselinesRef.current[mapKey];
+            if (!baseline) {
+              const browserBaseline = readStoredMapBaseline(localStorage, mapKey),
+                browserActual = fingerprintMapBundle(
+                  storedMapBundle(localStorage, mapKey),
+                ),
+                comparableLayers = Object.keys(browserActual) as MapUpdateLayer[];
+              baseline =
+                browserBaseline &&
+                comparableLayers.length > 0 &&
+                comparableLayers.every(
+                  (layer) => browserActual[layer] === actualMap[layer],
+                )
+                  ? browserBaseline
+                  : currentMap;
+            }
+            projectMapBaselinesRef.current[mapKey] = baseline;
+            const layers = differentMapLayers(currentMap, actualMap),
+              automaticLayers = changedMapLayers(baseline, currentMap, actualMap);
+            if (automaticLayers.length) projectHasAutomaticMapUpdate = true;
+            if (layers.length) {
+              const previous = projectMapUpdateCandidates.get(mapKey);
+              projectMapUpdateCandidates.set(mapKey, {
+                key: mapKey,
+                part: piece.part,
+                name: piece.name,
+                thumb: piece.thumb,
+                layers: [...new Set([...(previous?.layers ?? []), ...layers])],
+                localCounts: mapLayerCounts(actualBundle),
+                preloadedCounts: mapLayerCounts(preloadedMapBundle(mapKey)),
+                sources: ["project"],
+              });
+            }
+          }
+        }
+        state.connections = document.connections.flatMap((saved) => {
+          const a = piecesById.get(saved.a),
+            b = piecesById.get(saved.b);
+          if (!a || !b) return [];
+          const socket = a.connectors[saved.socketIndex],
+            shaft = b.connectors[saved.shaftIndex];
+          if (!socket || !shaft) return [];
+          const connection: Connection = {
+            id: saved.id,
+            a,
+            b,
+            socket,
+            shaft,
+            mode: saved.mode,
+            profile: saved.profile,
+            point: new THREE.Vector3().fromArray(saved.point),
+            axis: new THREE.Vector3().fromArray(saved.axis),
+            localAxisA: new THREE.Vector3().fromArray(saved.localAxisA),
+            travel: saved.travel,
+            motorSpeed: saved.motorSpeed,
+            motorForce: saved.motorForce,
+            motorPulse: saved.motorPulse,
+            motorPulseAngle: saved.motorPulseAngle,
+            motorPulseInterval: saved.motorPulseInterval,
+            userConfigured: saved.userConfigured,
+            forced: saved.forced,
+            forcedOffset: saved.forcedOffset,
+            localPointA: saved.localPointA
+              ? new THREE.Vector3().fromArray(saved.localPointA)
+              : undefined,
+            localPointB: saved.localPointB
+              ? new THREE.Vector3().fromArray(saved.localPointB)
+              : undefined,
+          };
+          state.connectionModes.set(connection.id, {
+            mode: connection.mode,
+            motorSpeed: connection.motorSpeed,
+            motorForce: connection.motorForce,
+            motorPulse: connection.motorPulse,
+            motorPulseAngle: connection.motorPulseAngle,
+            motorPulseInterval: connection.motorPulseInterval,
+            userConfigured: connection.userConfigured,
+          });
+          return [connection];
+        });
+        restoreLegacyCardanEditorAssemblies(state.pieces, state.connections);
+        state.gearLinks = document.gearLinks.flatMap((saved) => {
+          const a = piecesById.get(saved.a),
+            b = piecesById.get(saved.b);
+          return !a || !b
+            ? []
+            : [
+                {
+                  a: {
+                    value: a,
+                    spec: saved.specA as GearPose<Piece>["spec"],
+                    center: saved.centerA,
+                    axis: saved.poseAxisA,
+                  },
+                  b: {
+                    value: b,
+                    spec: saved.specB as GearPose<Piece>["spec"],
+                    center: saved.centerB,
+                    axis: saved.poseAxisB,
+                  },
+                  ratio: saved.ratio,
+                  centerDistance: saved.centerDistance,
+                  expectedDistance: saved.expectedDistance,
+                  distanceError: saved.distanceError,
+                  axisA: new THREE.Vector3().fromArray(saved.axisA),
+                  axisB: new THREE.Vector3().fromArray(saved.axisB),
+                  signB: saved.signB,
+                  perpendicular: saved.perpendicular,
+                  ratioOverride: saved.ratioOverride,
+                },
+              ];
+        });
+        // Rubber-band simulation is temporarily disabled. Keep legacy project
+        // data ignored so the catalog piece remains the single visible and
+        // physical object instead of restoring a hidden duplicate.
+        state.rubberBands = [];
+        camera.position.fromArray(document.camera.position);
+        camera.quaternion.fromArray(document.camera.quaternion);
+        cameraTarget.fromArray(document.camera.target);
+        camera.lookAt(cameraTarget);
+        activeProjectIdRef.current = document.id;
+        projectCreatedAtRef.current = document.createdAt;
+        projectRevisionRef.current = document.revision ?? 0;
+        savedProjectRevisionRef.current = document.savedRevision ?? null;
+        setProjectDirty(savedProjectRevisionRef.current !== projectRevisionRef.current);
+        projectNameRef.current = document.name.slice(0, 20);
+        suppressProjectNameDirtyRef.current = true;
+        setProjectName(document.name.slice(0, 20));
+        setGridStep(document.settings.gridStep as GridStep);
+        setAxleSnapStep(document.settings.axleSnapStep as AxleSnapStep);
+        setRotationSnapStep(document.settings.rotationSnapStep as RotationSnapStep);
+        setStructuralMode(document.settings.structuralMode);
+        setStructuralStiffness(document.settings.structuralStiffness);
+        setPhysicsSettings({
+          ...DEFAULT_PHYSICS_SETTINGS,
+          ...(document.settings.physics as Partial<PhysicsSettings>),
+        });
+        setImported(
+          document.importedCatalog.map((catalog) => catalog as unknown as CatalogPart),
+        );
+        state.rebuildRenderBatches();
+        state.refreshDebug();
+        setSelectedId(null);
+        setCount(state.pieces.length);
+        setConnectionRevision((value) => value + 1);
+        queueMapUpdates(
+          [...projectMapUpdateCandidates.values()],
+          projectHasAutomaticMapUpdate,
+        );
+        undoStack.length = 0;
+        redoStack.length = 0;
+      } finally {
+        state.bulkLoading = false;
+        restoringProject = false;
+        window.setTimeout(() => {
+          projectRestoringRef.current = false;
+          scheduleRecoverySave(true, false);
+        }, 50);
+      }
+    };
+    const copySelected = () => {
+      const pieces = [
+        ...(state.selectedPieces.size
+          ? state.selectedPieces
+          : state.selected
+            ? [state.selected]
+            : []),
+      ];
+      if (!pieces.length || state.running) return false;
+      const anchor = (state.selected ?? pieces[0]).mesh.position.clone();
+      clipboard = {
+        anchor,
+        connections: state.connections
+          .filter(
+            (connection) =>
+              pieces.includes(connection.a) && pieces.includes(connection.b),
+          )
+          .map(cloneConnection),
+        items: pieces.map((piece) => ({
+          sourceId: piece.id,
+          catalog: catalogFromPiece(piece),
+          position: piece.mesh.position.clone().sub(anchor),
+          rotation: piece.mesh.quaternion.clone(),
+          scale: piece.mesh.scale.clone(),
+          connectors: piece.connectors.map(cloneConnector),
+          colliders: piece.colliders.map(cloneCollider),
+          mapProvenance: { ...piece.mapProvenance },
+          gearColliders: piece.gearColliders.map(cloneCollider),
+          specialGear: piece.specialGear,
+          fixed: piece.fixed,
+          exactCollider: piece.exactCollider,
+          dynamicAxleConnections: piece.dynamicAxleConnections,
+          editorAssemblyId: piece.editorAssemblyId,
+          editorAssemblyDetached: piece.editorAssemblyDetached,
+          editorCardanReferenceConnector: piece.editorCardanReferenceConnector,
+          rotationPivotLocal: piece.rotationPivotLocal?.clone(),
+          rotationPivotKey: piece.rotationPivotKey,
+          gearDirectionLock: piece.gearDirectionLock,
+          gearMotor: piece.gearMotor,
+        })),
+      };
+      pasteIndex = 0;
+      setMessage(
+        pieces.length > 1
+          ? isChineseLanguage()
+            ? `${pieces.length} 个零件已复制`
+            : `${pieces.length} piezas copiadas`
+          : isChineseLanguage()
+            ? `${pieces[0].part} 已复制`
+            : `${pieces[0].part} copiada`,
+      );
+      return true;
+    };
+    const pasteClipboard = async () => {
+      if (state.running || historyBusy) return null;
+      if (!clipboard) {
+        setMessage(
+          isChineseLanguage() ? "请先复制零件再粘贴" : "Copia una pieza antes de pegar",
+        );
+        return null;
+      }
+      const historyLength = undoStack.length;
+      recordHistory();
+      pasteIndex++;
+      const offset = new THREE.Vector3(0.4 * pasteIndex, 0, 0.4 * pasteIndex),
+        pasted: Piece[] = [],
+        pastedAssemblyIds = new Map<string, string>();
+      for (const item of clipboard.items) {
+        const piece = await addPart(
+          { ...item.catalog },
+          clipboard.anchor.clone().add(item.position).add(offset),
+          item.rotation,
+        );
+        if (!piece) continue;
+        piece.mesh.scale.copy(item.scale);
+        piece.connectors = item.connectors.map(cloneConnector);
+        piece.colliders = item.colliders.map(cloneCollider);
+        piece.gearColliders = item.gearColliders.map(cloneCollider);
+        piece.mapProvenance = { ...item.mapProvenance };
+        piece.specialGear = item.specialGear;
+        piece.fixed = item.fixed;
+        piece.exactCollider = item.exactCollider;
+        piece.dynamicAxleConnections = item.dynamicAxleConnections;
+        piece.editorAssemblyId = item.editorAssemblyId
+          ? (pastedAssemblyIds.get(item.editorAssemblyId) ??
+            (() => {
+              const id = `assembly-${piece.id}`;
+              pastedAssemblyIds.set(item.editorAssemblyId!, id);
+              return id;
+            })())
+          : undefined;
+        piece.editorAssemblyDetached = item.editorAssemblyDetached;
+        piece.editorCardanReferenceConnector = item.editorCardanReferenceConnector;
+        piece.rotationPivotLocal = item.rotationPivotLocal?.clone();
+        piece.rotationPivotKey = item.rotationPivotKey;
+        piece.gearDirectionLock = item.gearDirectionLock;
+        piece.gearMotor = item.gearMotor;
+        if (piece.fixed) {
+          piece.lockSprite = makeLock();
+          scene.add(piece.lockSprite);
+        }
+        piece.mesh.updateMatrixWorld(true);
+        pasted.push(piece);
+      }
+      if (!pasted.length) {
+        undoStack.length = historyLength;
+        return null;
+      }
+      for (const piece of pasted) connect(piece);
+      const pastedBySource = new Map(
+        clipboard.items.map((item, index) => [item.sourceId, pasted[index]]),
+      );
+      for (const connection of clipboard.connections) {
+        const a = pastedBySource.get(connection.a.id),
+          b = pastedBySource.get(connection.b.id);
+        if (!a || !b) continue;
+        state.connections.push({
+          ...cloneConnection(connection),
+          id: `${connection.id}:copy:${pasteIndex}`,
+          a,
+          b,
+        });
+      }
+      void verifyConnectionsAsync();
+      state.selected = pasted[0];
+      state.selectedPieces = new Set(pasted);
+      state.rebuildRenderBatches();
+      state.refreshDebug();
+      setSelectedId(pasted[0].id);
+      setCount(state.pieces.length);
+      setConnectionRevision((value) => value + 1);
+      setMessage(
+        pasted.length > 1
+          ? isChineseLanguage()
+            ? `${pasted.length} 个零件已粘贴`
+            : `${pasted.length} piezas pegadas`
+          : isChineseLanguage()
+            ? `${pasted[0].part} 已粘贴`
+            : `${pasted[0].part} pegada`,
+      );
+      return pasted[0];
+    };
+    Object.assign(state, {
+      recordHistory,
+      undo,
+      redo,
+      copySelected,
+      pasteClipboard,
+      createProjectDocument,
+      restoreProjectDocument,
+      scheduleRecoverySave,
+      beginAimRotation,
+      cancelAimRotation: () => cancelAimRotation(),
+    });
+    const flushRecovery = () => {
+      if (document.visibilityState === "hidden") scheduleRecoverySave(true);
+    };
+    document.addEventListener("visibilitychange", flushRecovery);
+    void Promise.all([listBrowserProjects(), loadRecoveryProject()])
+      .then(async ([savedProjects, recovery]) => {
+        setProjects(savedProjects);
+        if (recovery) {
+          await restoreProjectDocument(recovery);
+          const existsInProjectManager = savedProjects.some(
+            (project) => project.id === recovery.id,
+          );
+          setCurrentProjectSaved(existsInProjectManager);
+          if (existsInProjectManager && recovery.savedRevision === undefined) {
+            savedProjectRevisionRef.current = projectRevisionRef.current;
+            setProjectDirty(false);
+          }
+          setMessage(
+            languageRef.current === "es"
+              ? "Sesión anterior recuperada automáticamente"
+              : isChineseLanguage()
+                ? "已自动恢复上次的工作"
+                : "Previous session recovered automatically",
+          );
+        } else {
+          setCurrentProjectSaved(false);
+          setProjectDirty(false);
+          scheduleRecoverySave(true, false);
+        }
+      })
+      .catch(() => setRecoveryStatus("idle"));
+    const down = (e: PointerEvent) => {
+      canvas.focus({ preventScroll: true });
+      canvas.setPointerCapture(e.pointerId);
+      previous = orbitStart = { x: e.clientX, y: e.clientY };
+      moved = false;
+      // Synchronise the hidden Three.js picking representation with the gizmo
+      // rendered by the active backend before evaluating this pointer press.
+      updateTransformGizmo();
+      cast(e);
+      const pointerPieceHit = pickPiece(),
+        gizmoHandle = pickTransformGizmo(e);
+      if (gizmoHandle && e.button === 0 && !e.ctrlKey && !rotationPivotHeld) {
+        beginGizmoDrag(e, gizmoHandle);
+        return;
+      }
+      if (aimRotation) {
+        e.preventDefault();
+        if (e.button === 0) commitAimRotation();
+        else if (e.button === 2) cancelAimRotation();
+        return;
+      }
+      if (e.button === 1) {
+        e.preventDefault();
+        const now = performance.now(),
+          isDoubleMiddle =
+            now - lastMiddleDown.time < 380 &&
+            Math.hypot(e.clientX - lastMiddleDown.x, e.clientY - lastMiddleDown.y) < 8;
+        lastMiddleDown = isDoubleMiddle
+          ? { time: 0, x: 0, y: 0 }
+          : { time: now, x: e.clientX, y: e.clientY };
+        if (isDoubleMiddle) {
+          pan = false;
+          const hit = pickPiece();
+          if (hit) {
+            const bounds = new THREE.Box3().setFromObject(hit.piece.mesh),
+              center = bounds.isEmpty()
+                ? hit.point.clone()
+                : bounds.getCenter(new THREE.Vector3()),
+              sphere = bounds.isEmpty()
+                ? new THREE.Sphere(center, 0.5)
+                : bounds.getBoundingSphere(new THREE.Sphere()),
+              verticalFov = THREE.MathUtils.degToRad(camera.fov),
+              horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect),
+              limitingFov = Math.min(verticalFov, horizontalFov),
+              focusDistance = Math.max(
+                1.6,
+                (sphere.radius / Math.sin(limitingFov / 2)) * 1.18,
+              ),
+              viewDirection = camera.position.clone().sub(cameraTarget).normalize();
+            if (viewDirection.lengthSq() < 0.5)
+              viewDirection.set(0.55, 0.45, 0.7).normalize();
+            cameraTarget.copy(center);
+            camera.position.copy(center).addScaledVector(viewDirection, focusDistance);
+            camera.lookAt(cameraTarget);
+            setMessage(
+              languageRef.current === "es"
+                ? `Cámara centrada en ${hit.piece.part}`
+                : isChineseLanguage()
+                  ? `视角已聚焦至 ${hit.piece.part}`
+                  : `Camera focused on ${hit.piece.part}`,
+            );
+          } else if (ray.intersectObject(floor)[0]) {
+            cameraTarget.copy(defaultCameraTarget);
+            camera.position.copy(defaultCameraPosition);
+            camera.lookAt(cameraTarget);
+            setMessage(
+              languageRef.current === "es"
+                ? "Cámara restaurada a la vista original"
+                : isChineseLanguage()
+                  ? "视角已恢复至初始位置"
+                  : "Camera restored to the original view",
+            );
+          }
+          return;
+        }
+        pan = true;
+        return;
+      }
+      if (!state.running && state.pendingPlacement && e.button === 0) {
+        const placed = state.pendingPlacement.pieces.length;
+        state.pendingPlacement = undefined;
+        const connections = verifyConnections();
+        setMessage(
+          isChineseLanguage()
+            ? `${placed} 个零件已放置 · ${connections} 个连接已识别`
+            : `${placed} piezas colocadas · ${connections} conexiones detectadas`,
+        );
+        if (placed > 0) scheduleRecoverySave();
+        return;
+      }
+      const hit = pointerPieceHit,
+        hitPiece = hit?.piece;
+      orbit = e.button === 2 || e.altKey;
+      altCandidate = e.altKey && e.button === 0 ? hitPiece : undefined;
+      if (orbit) return;
+      const selectedBand = state.rubberBands.find(
+        (band) => band.owner === state.selected,
+      );
+      if (!state.running && e.button === 0 && selectedBand) {
+        const bounds = canvas.getBoundingClientRect();
+        const center = selectedBand.guides
+          .reduce((sum, guide) => sum.add(guide), new THREE.Vector3())
+          .multiplyScalar(1 / selectedBand.guides.length);
+        const centerScreen = center.clone().project(camera);
+        const centerDistance = Math.hypot(
+          bounds.left + ((centerScreen.x + 1) * bounds.width) / 2 - e.clientX,
+          bounds.top + ((1 - centerScreen.y) * bounds.height) / 2 - e.clientY,
+        );
+        if (centerDistance <= 18) {
+          state.recordHistory();
+          rubberGuideDrag = {
+            band: selectedBand,
+            origin: center,
+            guides: selectedBand.guides.map((guide) => guide.clone()),
+            plane: new THREE.Plane().setFromNormalAndCoplanarPoint(
+              camera.getWorldDirection(new THREE.Vector3()),
+              center,
+            ),
+          };
+          return;
+        }
+        const closest = selectedBand.guides.reduce<
+          | {
+              index: number;
+              distance: number;
+            }
+          | undefined
+        >((best, guide, index) => {
+          const point = guide.clone().project(camera);
+          const x = bounds.left + ((point.x + 1) * bounds.width) / 2;
+          const y = bounds.top + ((1 - point.y) * bounds.height) / 2;
+          const distance = Math.hypot(x - e.clientX, y - e.clientY);
+          return !best || distance < best.distance ? { index, distance } : best;
+        }, undefined);
+        if (closest && closest.distance <= 15) {
+          const guide = selectedBand.guides[closest.index];
+          state.recordHistory();
+          rubberGuideDrag = {
+            band: selectedBand,
+            index: closest.index,
+            origin: guide.clone(),
+            plane: new THREE.Plane().setFromNormalAndCoplanarPoint(
+              camera.getWorldDirection(new THREE.Vector3()),
+              guide,
+            ),
+          };
+          return;
+        }
+      }
+      if (!state.running && rotationPivotHeld && e.button === 0 && hitPiece) {
+        const selectedConnector = nearestConnectedPivot(hitPiece, e);
+        if (!selectedConnector) {
+          setMessage(
+            languageRef.current === "es"
+              ? `${hitPiece.part} no tiene ninguna unión conectada que pueda usarse como pivote`
+              : isChineseLanguage()
+                ? `${hitPiece.part} 没有可作为旋转中心的连接`
+                : `${hitPiece.part} has no connected joint that can be used as a pivot`,
+          );
+          return;
+        }
+        const { connector, connection, anchorLocal } = selectedConnector;
+        state.recordHistory();
+        hitPiece.rotationPivotLocal = anchorLocal.clone();
+        hitPiece.rotationPivotKey = jointPivotKey(connection);
+        state.selected = hitPiece;
+        state.selectedPieces = new Set([hitPiece]);
+        pivotRotate = {
+          piece: hitPiece,
+          local: anchorLocal.clone(),
+          axis: connector.axis.clone().normalize(),
+          connector,
+          connection,
+          startX: e.clientX,
+          startAbsoluteAngle: absoluteRotationAroundLocalAxis(hitPiece, connector.axis),
+          startPosition: hitPiece.mesh.position.clone(),
+          startQuaternion: hitPiece.mesh.quaternion.clone(),
+          lastAppliedAngle: 0,
+          prepared: false,
+        };
+        showRotationPivot = true;
+        setSelectedId(hitPiece.id);
+        setMessage(
+          languageRef.current === "es"
+            ? `Pivote seleccionado en ${hitPiece.part} · arrastra para girar`
+            : isChineseLanguage()
+              ? `已选择旋转中心： ${hitPiece.part} · 拖动以旋转`
+              : `Pivot selected on ${hitPiece.part} · drag to rotate`,
+        );
+        refreshDebug();
+        scheduleRecoverySave();
+        return;
+      }
+      if (!state.running && e.ctrlKey && e.button === 0 && hitPiece) {
+        const selectedConnector = nearestScreenConnector(hitPiece, e, true);
+        if (!selectedConnector) {
+          setMessage(
+            isChineseLanguage()
+              ? `${hitPiece.part} 没有连接点`
+              : `${hitPiece.part} no tiene puntos de conexión`,
+          );
+          return;
+        }
+        const { piece: connectorPiece, connector, anchorLocal } = selectedConnector,
+          origin = connectorPiece.mesh.localToWorld(anchorLocal.clone()),
+          forced = e.shiftKey,
+          line = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([origin, origin]),
+            new THREE.LineBasicMaterial({
+              color: forced ? 0xff2d2d : 0xffee38,
+              depthTest: false,
+              depthWrite: false,
+              transparent: true,
+              opacity: 0.95,
+            }),
+          );
+        const forceLabel = document.createElement("div"),
+          hostBounds = host.getBoundingClientRect();
+        forceLabel.className = `manual-connect-label${forced ? " forced" : ""}`;
+        forceLabel.textContent = forced
+          ? translations[languageRef.current].forceConnect
+          : isChineseLanguage()
+            ? "连接"
+            : "CONNECT";
+        forceLabel.style.left = `${e.clientX - hostBounds.left + 14}px`;
+        forceLabel.style.top = `${e.clientY - hostBounds.top + 14}px`;
+        host.appendChild(forceLabel);
+        line.renderOrder = 60;
+        scene.add(line);
+        state.manualConnect = {
+          piece: connectorPiece,
+          connector,
+          anchorLocal,
+          cursor: origin.clone(),
+          plane: new THREE.Plane().setFromNormalAndCoplanarPoint(
+            camera.getWorldDirection(new THREE.Vector3()),
+            origin,
+          ),
+          line,
+          label: forceLabel,
+          forced,
+          connectorsWereVisible: state.debug.connectors,
+        };
+        const connectorGroup = editorAssemblyMembers(state.pieces, connectorPiece),
+          connectorGroupCentre = connectorGroup.find(
+            (member) => member.part.toLowerCase() === "62519",
+          );
+        state.selected = connectorGroupCentre ?? connectorPiece;
+        state.selectedPieces = new Set(connectorGroup);
+        state.debug.connectors = true;
+        setSelectedId(state.selected.id);
+        setDebugViews((current) => ({ ...current, connectors: true }));
+        setMessage(
+          forced
+            ? isChineseLanguage()
+              ? `${translations[languageRef.current].forceConnect}: ${connectorPiece.part} · 最大 5 单位`
+              : `${translations[languageRef.current].forceConnect}: ${connectorPiece.part} · máximo 5 u`
+            : isChineseLanguage()
+              ? `手动连接： ${connectorPiece.part} · 在兼容连接点附近松开`
+              : `Connect manual: ${connectorPiece.part} · suelta cerca de un punto compatible`,
+        );
+        refreshDebug();
+        return;
+      }
+      if (state.running) {
+        // A click on the floor is still a valid selection action while the
+        // simulation is running. Clear the editor selection instead of
+        // returning with the previous piece highlighted.
+        if (!hitPiece) {
+          state.selected = undefined;
+          state.selectedPieces.clear();
+          setSelectedId(null);
+          refreshSelectionOutlines();
+          return;
+        }
+        const rubberBand = hitPiece
+          ? state.rubberBands.find((band) => band.owner === hitPiece)
+          : undefined;
+        const rubberNodeId = rubberBand?.nodeBodyIds?.reduce<number | undefined>(
+          (closest, id) => {
+            const point = state.world?.bodies.get(id)?.translation();
+            if (!point) return closest;
+            if (closest === undefined) return id;
+            const current = state.world?.bodies.get(closest)?.translation();
+            return !current ||
+              new THREE.Vector3(point.x, point.y, point.z).distanceToSquared(hit!.point) <
+                new THREE.Vector3(current.x, current.y, current.z).distanceToSquared(
+                  hit!.point,
+                )
+              ? id
+              : closest;
+          },
+          undefined,
+        );
+        if (
+          hit &&
+          hitPiece &&
+          (rubberNodeId !== undefined || (!hitPiece.physicsIslandFixed && hitPiece.body))
+        ) {
+          state.selected = hitPiece;
+          state.selectedPieces = new Set([hitPiece]);
+          setSelectedId(hitPiece.id);
+          refreshSelectionOutlines();
+          const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg"),
+            line = document.createElementNS("http://www.w3.org/2000/svg", "polyline"),
+            label = document.createElement("div"),
+            canvasBounds = canvas.getBoundingClientRect();
+          overlay.classList.add("spring-overlay");
+          // Explicitly keep the pointer-force line above both the WebGL and
+          // WebGPU canvases. Some browsers create a separate stacking context
+          // for the active WebGPU canvas.
+          overlay.style.position = "absolute";
+          overlay.style.inset = "0";
+          overlay.style.zIndex = "6";
+          overlay.style.pointerEvents = "none";
+          overlay.setAttribute(
+            "viewBox",
+            `0 0 ${canvas.clientWidth} ${canvas.clientHeight}`,
+          );
+          line.setAttribute("fill", "none");
+          line.setAttribute("stroke", "#ffb327");
+          line.setAttribute("stroke-width", "3");
+          line.setAttribute("stroke-linejoin", "round");
+          line.setAttribute("stroke-linecap", "round");
+          overlay.appendChild(line);
+          label.className = "spring-force-label";
+          overlay.style.display = "none";
+          label.style.display = "none";
+          host.appendChild(overlay);
+          host.appendChild(label);
+          spring = {
+            piece: rubberNodeId === undefined ? hitPiece : undefined,
+            rubberNodeId,
+            bodyId: rubberNodeId ?? hitPiece.body!.handle,
+            component: rubberNodeId === undefined ? [hitPiece] : [],
+            anchor:
+              rubberNodeId === undefined
+                ? hitPiece.mesh.worldToLocal(hit.point.clone())
+                : hit.point.clone(),
+            target: hit.point.clone(),
+            plane: new THREE.Plane().setFromNormalAndCoplanarPoint(
+              camera.getWorldDirection(new THREE.Vector3()),
+              hit.point,
+            ),
+            overlay,
+            line,
+            label,
+            cursorScreen: {
+              x: e.clientX - canvasBounds.left,
+              y: e.clientY - canvasBounds.top,
+            },
+            startScreen: {
+              x: e.clientX - canvasBounds.left,
+              y: e.clientY - canvasBounds.top,
+            },
+            dragged: false,
+            force: 0,
+          };
+        }
+        return;
+      }
+      if (hit && hitPiece) {
+        if (state.rubberBands.some((band) => band.owner === hitPiece)) {
+          state.selected = hitPiece;
+          state.selectedPieces = new Set([hitPiece]);
+          setSelectedId(hitPiece.id);
+          refreshSelectionOutlines();
+          return;
+        }
+        // An editorial assembly selects and moves as one object without
+        // merging its independent physics bodies or joints.
+        const clickedGroup = editorAssemblyMembers(state.pieces, hitPiece),
+          cardanCentre = clickedGroup.find(
+            (piece) => piece.part.toLowerCase() === "62519",
+          ),
+          canonicalSelection = cardanCentre ?? hitPiece,
+          orderedClickedGroup = [
+            canonicalSelection,
+            ...clickedGroup.filter((piece) => piece !== canonicalSelection),
+          ],
+          previousAnchor = state.selected,
+          completeGroupSelected = clickedGroup.every((piece) =>
+            state.selectedPieces.has(piece),
+          );
+        let selectionAnchor = canonicalSelection;
+        // Shift-click toggles a complete assembly in the multi-selection.
+        // Ctrl/Cmd remains reserved for the existing manual-connect gesture.
+        if (e.shiftKey && !shiftVerticalConsumed) {
+          if (completeGroupSelected && state.selectedPieces.size > clickedGroup.length) {
+            clickedGroup.forEach((piece) => state.selectedPieces.delete(piece));
+            state.selected =
+              previousAnchor && state.selectedPieces.has(previousAnchor)
+                ? previousAnchor
+                : [...state.selectedPieces][0];
+            setSelectedId(state.selected?.id ?? null);
+            return;
+          }
+          orderedClickedGroup.forEach((piece) => state.selectedPieces.add(piece));
+          selectionAnchor = previousAnchor ?? canonicalSelection;
+          // Preserve an existing multi-selection when the user starts dragging
+          // one of its members; otherwise select its complete editorial group.
+        } else if (!completeGroupSelected) {
+          state.selectedPieces = new Set(orderedClickedGroup);
+        } else selectionAnchor = previousAnchor ?? canonicalSelection;
+        moving = hitPiece;
+        movingGroup = [...state.selectedPieces];
+        if (!movingGroup.length) {
+          movingGroup = [hitPiece];
+          state.selectedPieces.add(hitPiece);
+        }
+        movingStartPositions = new Map(
+          movingGroup.map((piece) => [piece, piece.mesh.position.clone()]),
+        );
+        const movingSet = new Set(movingGroup);
+        movingInternalConnectionPoints = new Map(
+          state.connections
+            .filter(
+              (connection) => movingSet.has(connection.a) && movingSet.has(connection.b),
+            )
+            .map((connection) => [connection, connection.point.clone()]),
+        );
+        movedAxially = false;
+        movingPrepared = false;
+        state.selected = selectionAnchor;
+        setSelectedId(selectionAnchor.id);
+        movingStartPosition.copy(moving.mesh.position);
+        movingStartPointer.set(e.clientX, e.clientY);
+        const linearGuide = state.connections.find(
+          (connection) =>
+            (connection.a === moving || connection.b === moving) &&
+            (connection.mode === "linear" ||
+              connection.mode === "rotation-linear" ||
+              connection.profile === "axle-cross" ||
+              connection.profile === "axle-round"),
+        );
+        movingLinearAxis = linearGuide
+          ? linearGuide.localAxisA
+              .clone()
+              .transformDirection(linearGuide.a.mesh.matrixWorld)
+              .normalize()
+          : undefined;
+        const ground =
+          ray.intersectObject(floor)[0] ??
+          (() => {
+            const point = ray.ray.intersectPlane(
+              new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+              new THREE.Vector3(),
+            );
+            return point ? { point } : undefined;
+          })();
+        if (ground)
+          moveOffset.set(
+            moving.mesh.position.x - ground.point.x,
+            moving.mesh.position.z - ground.point.z,
+          );
+      } else {
+        state.selected = undefined;
+        state.selectedPieces.clear();
+        setSelectedId(null);
+      }
+    };
+    const move = (e: PointerEvent) => {
+      if (gizmoDrag) {
+        moveGizmoDrag(e);
+        return;
+      }
+      if (aimRotation) {
+        cast(e);
+        const target = ray.ray.intersectPlane(aimRotation.plane, new THREE.Vector3());
+        if (target) {
+          const direction = target.sub(aimRotation.pivot);
+          if (direction.lengthSq() > 1.0e-5) {
+            direction.normalize();
+            aimRotation.previewDirection.copy(direction);
+            aimRotation.arrow.setDirection(direction);
+          }
+        }
+        const hostBounds = host.getBoundingClientRect();
+        aimRotation.label.style.left = `${e.clientX - hostBounds.left + 14}px`;
+        aimRotation.label.style.top = `${e.clientY - hostBounds.top + 14}px`;
+        return;
+      }
+      if (rubberGuideDrag) {
+        cast(e);
+        const point = ray.ray.intersectPlane(rubberGuideDrag.plane, new THREE.Vector3());
+        if (point) {
+          if (rubberGuideDrag.index === undefined && rubberGuideDrag.guides) {
+            const delta = point.sub(rubberGuideDrag.origin);
+            rubberGuideDrag.band.guides.forEach((guide, index) =>
+              guide.copy(rubberGuideDrag.guides![index]).add(delta),
+            );
+          } else if (rubberGuideDrag.index !== undefined) {
+            rubberGuideDrag.band.guides[rubberGuideDrag.index].copy(point);
+          }
+          drawRubberBand(rubberGuideDrag.band);
+          moved = true;
+        }
+        return;
+      }
+      if (pivotRotate) {
+        const rawAngle = (e.clientX - pivotRotate.startX) * 0.012,
+          angleStep = THREE.MathUtils.degToRad(state.rotationSnapStep),
+          requestedAngle = angleStep
+            ? Math.round((pivotRotate.startAbsoluteAngle + rawAngle) / angleStep) *
+                angleStep -
+              pivotRotate.startAbsoluteAngle
+            : rawAngle,
+          angle =
+            angleStep &&
+            Math.abs(requestedAngle - pivotRotate.lastAppliedAngle) > angleStep + 1e-6
+              ? pivotRotate.lastAppliedAngle +
+                Math.sign(requestedAngle - pivotRotate.lastAppliedAngle) * angleStep
+              : requestedAngle;
+        pivotRotate.lastAppliedAngle = angle;
+        if (Math.abs(angle) < 0.01) return;
+        if (!pivotRotate.prepared) {
+          pivotRotate.prepared = true;
+          state.connections = state.connections.filter(
+            (connection) =>
+              connection === pivotRotate!.connection ||
+              (connection.a !== pivotRotate!.piece &&
+                connection.b !== pivotRotate!.piece),
+          );
+          rebalanceAllSmartDefaults(state);
+        }
+        pivotRotate.piece.mesh.position.copy(pivotRotate.startPosition);
+        pivotRotate.piece.mesh.quaternion.copy(pivotRotate.startQuaternion);
+        pivotRotate.piece.mesh.updateMatrixWorld(true);
+        rotatePieceAroundLocalAxis(pivotRotate.piece, pivotRotate.axis, angle);
+        moved = true;
+        state.renderBatchesDirty = true;
+        refreshDebug();
+        return;
+      }
+      if (!state.running && state.pendingPlacement) {
+        cast(e);
+        const ground = ray.intersectObject(floor)[0];
+        if (ground) {
+          const target = new THREE.Vector3(
+            state.gridStep
+              ? Math.round(ground.point.x / state.gridStep) * state.gridStep
+              : ground.point.x,
+            0,
+            state.gridStep
+              ? Math.round(ground.point.z / state.gridStep) * state.gridStep
+              : ground.point.z,
+          );
+          state.pendingPlacement.pieces.forEach((piece, index) => {
+            piece.mesh.position.copy(target).add(state.pendingPlacement!.offsets[index]);
+            piece.mesh.updateMatrixWorld(true);
+          });
+          state.renderBatchesDirty = true;
+          refreshDebug();
+        }
+        return;
+      }
+      if (state.manualConnect) {
+        moved = true;
+        updateManualForceMode(e.shiftKey);
+        cast(e);
+        const selectedOrigin = state.manualConnect.piece.mesh.localToWorld(
+            state.manualConnect.anchorLocal.clone(),
+          ),
+          candidate = ray.ray.at(
+            camera.position.distanceTo(selectedOrigin),
+            new THREE.Vector3(),
+          );
+        state.manualConnect.cursor.copy(candidate);
+        state.manualConnect.line.geometry.setFromPoints([selectedOrigin, candidate]);
+        state.manualConnect.line.geometry.attributes.position.needsUpdate = true;
+        const hostBounds = host.getBoundingClientRect();
+        state.manualConnect.label.style.left = `${e.clientX - hostBounds.left + 14}px`;
+        state.manualConnect.label.style.top = `${e.clientY - hostBounds.top + 14}px`;
+        return;
+      }
+      if (spring) {
+        const canvasBounds = canvas.getBoundingClientRect(),
+          cursorScreen = {
+            x: e.clientX - canvasBounds.left,
+            y: e.clientY - canvasBounds.top,
+          };
+        if (
+          !spring.dragged &&
+          Math.hypot(
+            cursorScreen.x - spring.startScreen.x,
+            cursorScreen.y - spring.startScreen.y,
+          ) <= 5
+        )
+          return;
+        if (!spring.dragged) {
+          spring.dragged = true;
+          spring.component = spring.piece ? connectedPieces(spring.piece) : [];
+          spring.overlay.style.display = "";
+          spring.label.style.display = "";
+          if (state.simLog)
+            state.simLog.events.push(
+              `[${((Date.now() - Date.parse(state.simLog.startedAt)) / 1000).toFixed(3)}s] drag-start ${spring.piece?.part ?? "rubber node"}; componente ${spring.component.map((piece) => piece.part).join(",")}`,
+            );
+        }
+        moved = true;
+        cast(e);
+        const anchor = springAnchor();
+        if (!anchor) return;
+        spring.cursorScreen = cursorScreen;
+        const planeTarget = forceDragTarget(ray.ray, spring.plane);
+        if (planeTarget) spring.target.copy(planeTarget);
+        updateSpring();
+        return;
+      }
+      if (pan) {
+        camera.updateMatrixWorld(true);
+        const dx = e.clientX - previous.x,
+          dy = e.clientY - previous.y,
+          distance = camera.position.distanceTo(cameraTarget),
+          worldPerPixel =
+            (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
+            Math.max(1, canvas.clientHeight),
+          right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0),
+          up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1),
+          translation = right
+            .multiplyScalar(-dx * worldPerPixel)
+            .add(up.multiplyScalar(dy * worldPerPixel));
+        previous = { x: e.clientX, y: e.clientY };
+        if (Math.hypot(dx, dy) > 0) moved = true;
+        camera.position.add(translation);
+        cameraTarget.add(translation);
+        camera.lookAt(cameraTarget);
+        return;
+      }
+      if (orbit) {
+        const distance = Math.hypot(e.clientX - orbitStart.x, e.clientY - orbitStart.y),
+          dx = e.clientX - previous.x,
+          dy = e.clientY - previous.y;
+        previous = { x: e.clientX, y: e.clientY };
+        if (distance <= 5) return;
+        moved = true;
+        const s = new THREE.Spherical().setFromVector3(
+          camera.position.clone().sub(cameraTarget),
+        );
+        s.theta -= dx * 0.006;
+        s.phi = THREE.MathUtils.clamp(s.phi - dy * 0.006, 0.03, Math.PI - 0.03);
+        const nextPosition = cameraTarget
+          .clone()
+          .add(new THREE.Vector3().setFromSpherical(s));
+        camera.position.copy(nextPosition);
+        camera.lookAt(cameraTarget);
+        return;
+      }
+      if (moving) {
+        if (!movingPrepared) {
+          const pointerDistance = Math.hypot(
+            e.clientX - movingStartPointer.x,
+            e.clientY - movingStartPointer.y,
+          );
+          // A click only selects the piece. Connections are detached only
+          // after an intentional drag passes this screen-space threshold.
+          if (pointerDistance <= 5) return;
+          state.recordHistory();
+          movingPrepared = true;
+          moved = true;
+          const movingSet = new Set(movingGroup);
+          const affectedPieces = new Set<Piece>();
+          state.connections.forEach((connection) => {
+            const aInside = movingSet.has(connection.a),
+              bInside = movingSet.has(connection.b);
+            if (aInside !== bInside)
+              affectedPieces.add(aInside ? connection.b : connection.a);
+          });
+          state.connections = state.connections.filter(
+            (connection) => movingSet.has(connection.a) === movingSet.has(connection.b),
+          );
+          affectedPieces.forEach((piece) => rebalanceSmartDefaults(state, piece));
+          setConnectionRevision((value) => value + 1);
+        } else moved = true;
+        // Shift is reserved for movement along a real linear/axle guide.
+        // Free vertical movement is handled by the transform gizmo.
+        const shiftActive = e.shiftKey || shiftHeld;
+        if (shiftActive && movingLinearAxis) {
+          movedAxially = true;
+          const bounds = canvas.getBoundingClientRect(),
+            project = (point: THREE.Vector3) => {
+              const projected = point.clone().project(camera);
+              return new THREE.Vector2(
+                bounds.left + ((projected.x + 1) * bounds.width) / 2,
+                bounds.top + ((1 - projected.y) * bounds.height) / 2,
+              );
+            },
+            screenStart = project(movingStartPosition),
+            screenEnd = project(movingStartPosition.clone().add(movingLinearAxis)),
+            screenAxis = screenEnd.sub(screenStart),
+            pixelsPerUnit = screenAxis.length(),
+            pointerDelta = new THREE.Vector2(
+              e.clientX - movingStartPointer.x,
+              e.clientY - movingStartPointer.y,
+            ),
+            distance =
+              pixelsPerUnit > 3
+                ? pointerDelta.dot(screenAxis.normalize()) / pixelsPerUnit
+                : -(e.clientY - movingStartPointer.y) * 0.015,
+            snappedDistance = state.axleSnapStep
+              ? Math.round(distance / state.axleSnapStep) * state.axleSnapStep
+              : distance;
+          moving.mesh.position
+            .copy(movingStartPosition)
+            .addScaledVector(movingLinearAxis, snappedDistance);
+        } else if (shiftActive && movingGroup.length === 1) {
+          shiftVerticalConsumed = true;
+          const rawHeight =
+            movingStartPosition.y - (e.clientY - movingStartPointer.y) * 0.015;
+          moving.mesh.position.y = state.gridStep
+            ? Math.round(rawHeight / state.gridStep) * state.gridStep
+            : rawHeight;
+        } else {
+          cast(e);
+          const ground =
+            ray.intersectObject(floor)[0] ??
+            (() => {
+              const point = ray.ray.intersectPlane(
+                new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+                new THREE.Vector3(),
+              );
+              return point ? { point } : undefined;
+            })();
+          if (ground) {
+            moving.mesh.position.x = state.gridStep
+              ? Math.round((ground.point.x + moveOffset.x) / state.gridStep) *
+                state.gridStep
+              : ground.point.x + moveOffset.x;
+            moving.mesh.position.z = state.gridStep
+              ? Math.round((ground.point.z + moveOffset.y) / state.gridStep) *
+                state.gridStep
+              : ground.point.z + moveOffset.y;
+          }
+        }
+        const groupDelta = moving.mesh.position.clone().sub(movingStartPosition);
+        for (const piece of movingGroup) {
+          if (piece === moving) continue;
+          const start = movingStartPositions.get(piece);
+          if (start) piece.mesh.position.copy(start).add(groupDelta);
+        }
+        movingInternalConnectionPoints.forEach((point, connection) => {
+          connection.point.copy(point).add(groupDelta);
+        });
+        previous = { x: e.clientX, y: e.clientY };
+        state.renderBatchesDirty = true;
+      }
+    };
+    const up = (e: PointerEvent) => {
+      if (gizmoDrag) {
+        endGizmoDrag(e);
+        return;
+      }
+      if (canvas.hasPointerCapture(e.pointerId))
+        canvas.releasePointerCapture(e.pointerId);
+      if (rubberGuideDrag) {
+        rubberGuideDrag = undefined;
+        if (moved) scheduleRecoverySave();
+        return;
+      }
+      if (pivotRotate) {
+        const rotated = pivotRotate;
+        pivotRotate = undefined;
+        showRotationPivot = false;
+        if (rotated.prepared) {
+          const correction = nearbyPivotConnectionCorrection(rotated);
+          if (correction && Math.abs(correction.angle) > 1e-5)
+            rotatePieceAroundLocalAxis(rotated.piece, rotated.axis, correction.angle);
+          verifyPieceConnections(rotated.piece);
+          if (rotated.piece.renderBatched) state.rebuildRenderBatches();
+          else state.renderBatchesDirty = true;
+          setMessage(
+            languageRef.current === "es"
+              ? correction
+                ? `${rotated.piece.part} ajustada y conectada con ${correction.other.part}`
+                : `${rotated.piece.part} girada desde su conexión`
+              : correction
+                ? isChineseLanguage()
+                  ? `${rotated.piece.part} 已吸附并连接至 ${correction.other.part}`
+                  : `${rotated.piece.part} snapped and connected to ${correction.other.part}`
+                : isChineseLanguage()
+                  ? `${rotated.piece.part} 已绕连接点旋转`
+                  : `${rotated.piece.part} rotated around its connection`,
+          );
+        }
+        refreshDebug();
+        scheduleRecoverySave();
+        return;
+      }
+      if (state.manualConnect) {
+        const draft = state.manualConnect;
+        cast(e);
+        const canvasBounds = canvas.getBoundingClientRect(),
+          maximumScreenDistance = 42,
+          draftMembers = editorAssemblyMembers(state.pieces, draft.piece),
+          draftMemberSet = new Set(draftMembers);
+        let best:
+          | {
+              piece: Piece;
+              connector: MeshConnector;
+              anchorLocal: THREE.Vector3;
+              screenDistance: number;
+              rayDistance: number;
+            }
+          | undefined;
+        let rejectedByOrientation = false;
+        for (const piece of state.pieces) {
+          if (draftMemberSet.has(piece)) continue;
+          piece.mesh.updateMatrixWorld(true);
+          for (const connector of piece.connectors) {
+            if (
+              !pairProfile(draft.connector, connector) ||
+              !connectorPairAvailable(
+                draft.piece,
+                draft.connector,
+                piece,
+                connector,
+                draft.piece,
+              )
+            )
+              continue;
+            const anchors =
+              connector.role === "shaft" && connector.kind === "axle"
+                ? axleSnapPoints(connector)
+                : [{ local: connector.local, important: true }];
+            for (const anchor of anchors) {
+              const worldPoint = piece.mesh.localToWorld(anchor.local.clone()),
+                projected = worldPoint.clone().project(camera);
+              if (projected.z < -1 || projected.z > 1) continue;
+              const screenX =
+                  canvasBounds.left + ((projected.x + 1) * canvasBounds.width) / 2,
+                screenY =
+                  canvasBounds.top + ((1 - projected.y) * canvasBounds.height) / 2,
+                screenDistance = Math.hypot(screenX - e.clientX, screenY - e.clientY),
+                rayDistance = ray.ray.distanceToPoint(worldPoint);
+              if (
+                draft.forced &&
+                screenDistance <= maximumScreenDistance &&
+                !forceConnectorAxesCompatible(
+                  draft.piece,
+                  draft.connector,
+                  piece,
+                  connector,
+                )
+              ) {
+                rejectedByOrientation = true;
+                continue;
+              }
+              if (
+                screenDistance <= maximumScreenDistance &&
+                (!best ||
+                  screenDistance < best.screenDistance - 0.5 ||
+                  (Math.abs(screenDistance - best.screenDistance) <= 0.5 &&
+                    rayDistance < best.rayDistance))
+              )
+                best = {
+                  piece,
+                  connector,
+                  anchorLocal: anchor.local.clone(),
+                  screenDistance,
+                  rayDistance,
+                };
+            }
+          }
+        }
+        let connected = false;
+        if (best) {
+          state.recordHistory();
+          connected = draft.forced
+            ? connectForced(
+                draft.piece,
+                draft.connector,
+                draft.anchorLocal,
+                best.piece,
+                best.connector,
+                best.anchorLocal,
+              )
+            : connectManual(
+                draft.piece,
+                draft.connector,
+                draft.anchorLocal,
+                best.piece,
+                best.connector,
+                best.anchorLocal,
+              );
+        }
+        scene.remove(draft.line);
+        draft.label.remove();
+        draft.line.geometry.dispose();
+        (draft.line.material as THREE.Material).dispose();
+        state.manualConnect = undefined;
+        state.debug.connectors = draft.connectorsWereVisible;
+        setDebugViews((current) => ({
+          ...current,
+          connectors: draft.connectorsWereVisible,
+        }));
+        if (connected && draftMembers.some((member) => member.renderBatched))
+          state.rebuildRenderBatches();
+        setConnectionRevision((value) => value + 1);
+        setMessage(
+          connected && best
+            ? draft.forced
+              ? `${translations[languageRef.current].forceConnect}: ${draft.piece.part} ↔ ${best.piece.part} · ${draft.piece.mesh.localToWorld(draft.anchorLocal.clone()).distanceTo(best.piece.mesh.localToWorld(best.anchorLocal.clone())).toFixed(2)} u`
+              : isChineseLanguage()
+                ? `手动连接： ${draft.piece.part} ↔ ${best.piece.part} · 正在检查其他连接…`
+                : `Connect manual: ${draft.piece.part} ↔ ${best.piece.part} · verificando el resto de uniones…`
+            : draft.forced && best
+              ? languageRef.current === "es"
+                ? "Force Connect cancelado: la separación supera 5 u"
+                : isChineseLanguage()
+                  ? "已取消强制连接：间距超过 5 单位"
+                  : "Force Connect cancelled: separation exceeds 5 u"
+              : draft.forced && rejectedByOrientation
+                ? languageRef.current === "es"
+                  ? "Force Connect rechazado: los ejes de los conectores no están alineados"
+                  : isChineseLanguage()
+                    ? "无法强制连接：连接点轴线未对齐"
+                    : "Force Connect rejected: connector axes are not aligned"
+                : isChineseLanguage()
+                  ? "已取消手动连接：光标处没有兼容连接点"
+                  : "Connect manual cancelado: no hay un punto compatible bajo el cursor",
+        );
+        refreshDebug();
+        if (connected && !draft.forced) {
+          const connections = state.connections.filter(
+            (connection) =>
+              draftMemberSet.has(connection.a) || draftMemberSet.has(connection.b),
+          ).length;
+          setMessage(
+            isChineseLanguage()
+              ? `手动连接： ${draft.piece.part} ↔ ${best!.piece.part} · ${connections} 个连接已检查`
+              : `Connect manual: ${draft.piece.part} ↔ ${best!.piece.part} · ${connections} uniones verificadas`,
+          );
+        }
+        scheduleRecoverySave();
+        return;
+      }
+      if (spring) {
+        const released = spring;
+        if (released.dragged) {
+          const releasedBodies = new Set<NonNullable<Piece["body"]>>();
+          released.component.forEach((p) => {
+            if (p.body && !p.physicsIslandFixed && !releasedBodies.has(p.body)) {
+              releasedBodies.add(p.body);
+              clampMotion(p, 3.5, 4.5);
+              p.body.setLinearDamping(0.35);
+              p.body.setAngularDamping(0.65);
+            }
+          });
+          if (state.simLog)
+            state.simLog.events.push(
+              `[${((Date.now() - Date.parse(state.simLog.startedAt)) / 1000).toFixed(3)}s] drag-end ${released.piece?.part ?? "rubber node"}; fuerza y par eliminados, velocidades limitadas`,
+            );
+        }
+        released.overlay.remove();
+        released.label.remove();
+        spring = undefined;
+        // Selection is already reflected by the per-instance flag. Avoid the
+        // generic tail below: it rebuilds every debug object and invalidates
+        // all WebGPU geometry batches on a simple simulation click.
+        return;
+      }
+      const toggledFixed = Boolean(orbit && !moved && altCandidate);
+      if (toggledFixed && altCandidate) {
+        state.recordHistory();
+        toggleFixed(altCandidate);
+      }
+      orbit = false;
+      pan = false;
+      altCandidate = undefined;
+      const movedPiece = moving;
+      if (moving && moved) {
+        // A single moved piece first snaps to the best nearby compatible
+        // connector; the strict verifier then records every connection at the
+        // resulting pose. Multi-selection keeps its relative layout intact.
+        if (movingGroup.length === 1) {
+          if (!movedAxially) connect(moving);
+          verifyPieceConnections(moving, false);
+        }
+      }
+      moving = undefined;
+      movingGroup = [];
+      movingStartPositions.clear();
+      movingInternalConnectionPoints.clear();
+      movingPrepared = false;
+      movingLinearAxis = undefined;
+      movedAxially = false;
+      const editorChanged = toggledFixed || Boolean(movedPiece && moved);
+      if (movedPiece?.renderBatched && moved) state.renderBatchesDirty = true;
+      if (editorChanged) setConnectionRevision((value) => value + 1);
+      if (state.debug.colliders || state.debug.connectors || state.debug.physics)
+        refreshDebug();
+      else {
+        refreshSelectionOutlines();
+        updateDebug();
+      }
+      if (editorChanged) scheduleRecoverySave();
+    };
+    const drop = (e: DragEvent) => {
+      e.preventDefault();
+      if (state.running) return;
+      try {
+        const p = JSON.parse(
+          e.dataTransfer?.getData("application/x-ldraw-part") || "",
+        ) as CatalogPart;
+        cast(e);
+        const ground = ray.intersectObject(floor)[0];
+        if (ground) {
+          state.recordHistory();
+          void addPart(
+            p,
+            new THREE.Vector3(
+              state.gridStep
+                ? Math.round(ground.point.x / state.gridStep) * state.gridStep
+                : ground.point.x,
+              0,
+              state.gridStep
+                ? Math.round(ground.point.z / state.gridStep) * state.gridStep
+                : ground.point.z,
+            ),
+          ).then((piece) => {
+            if (!piece) return;
+            const skipPlacementConnect =
+              piece.mesh.userData.skipNextPlacementConnect === true;
+            delete piece.mesh.userData.skipNextPlacementConnect;
+            if (!skipPlacementConnect) {
+              connect(piece);
+              verifyPieceConnections(piece);
+            }
+            scheduleRecoverySave();
+          });
+          if (
+            (p.origin === "catalog-search" || p.origin === "model-import") &&
+            !belongsToDefaultPalette(p)
+          )
+            setImported((old) =>
+              old.some((x) => x.part === p.part && x.color === p.color)
+                ? old
+                : [p, ...old],
+            );
+        }
+      } catch {
+        setMessage(
+          isChineseLanguage() ? "无法释放该零件" : "No se pudo soltar esa pieza",
+        );
+      }
+    };
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const offset = camera.position.clone().sub(cameraTarget),
+        nextDistance = THREE.MathUtils.clamp(
+          offset.length() * (e.deltaY > 0 ? 1.08 : 0.92),
+          0.5,
+          120,
+        );
+      camera.position.copy(cameraTarget.clone().add(offset.setLength(nextDistance)));
+      camera.lookAt(cameraTarget);
+    };
+    const resize = () => {
+      camera.aspect = host.clientWidth / host.clientHeight;
+      camera.updateProjectionMatrix();
+      state.renderScale = renderScale;
+      renderer.setPixelRatio(nativePixelRatio * renderScale);
+      renderer.setSize(host.clientWidth, host.clientHeight);
+      gpuSceneRenderer?.resize(
+        host.clientWidth,
+        host.clientHeight,
+        nativePixelRatio * renderScale,
+      );
+      if (spring) {
+        spring.overlay.setAttribute(
+          "viewBox",
+          `0 0 ${canvas.clientWidth} ${canvas.clientHeight}`,
+        );
+        updateSpring();
+      }
+    };
+    state.setAdaptiveRendering = (enabled) => {
+      adaptiveRenderingEnabled = enabled;
+      healthyFpsWindows = 0;
+      lowFpsWindows = 0;
+      if (!enabled) {
+        renderScale = 1;
+        state.renderScale = 1;
+        resize();
+      }
+    };
+    const keydown = (e: KeyboardEvent) => {
+      if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        if (!e.repeat) shiftVerticalConsumed = false;
+        shiftHeld = true;
+        updateManualForceMode(true);
+      }
+      const target = e.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable=true]")) return;
+      if (e.code === "Escape" && aimRotation) {
+        e.preventDefault();
+        cancelAimRotation();
+        return;
+      }
+      if (e.code === "KeyR") {
+        rotationPivotHeld = true;
+        e.preventDefault();
+        return;
+      }
+      if (
+        state.running &&
+        state.pieces.some((piece) => piece.gearMotor?.key === e.code)
+      ) {
+        gearMotorHeldKeys.add(e.code);
+        e.preventDefault();
+        return;
+      }
+      const command = e.ctrlKey || e.metaKey;
+      if (command && !e.altKey) {
+        if (e.code === "KeyS") {
+          e.preventDefault();
+          if (!e.repeat) saveShortcutRef.current();
+          return;
+        }
+        const redoShortcut = e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey);
+        if (e.code === "KeyZ" || redoShortcut) {
+          e.preventDefault();
+          if (!e.repeat) void (redoShortcut ? state.redo() : state.undo());
+          return;
+        }
+        if (e.code === "KeyC") {
+          e.preventDefault();
+          if (!e.repeat) state.copySelected();
+          return;
+        }
+        if (e.code === "KeyV") {
+          e.preventDefault();
+          if (!e.repeat) void state.pasteClipboard();
+          return;
+        }
+      }
+      if (state.running || !state.selected) return;
+      const piece = state.selected,
+        selectedPieces = [
+          ...(state.selectedPieces.size ? state.selectedPieces : new Set([piece])),
+        ],
+        code = e.code;
+      if (code === "Delete") {
+        e.preventDefault();
+        state.recordHistory();
+        const selectedSet = new Set(selectedPieces);
+        for (const selected of selectedPieces) {
+          scene.remove(selected.mesh);
+          if (selected.lockSprite) scene.remove(selected.lockSprite);
+        }
+        state.rubberBands = state.rubberBands.filter((band) => {
+          if (!selectedSet.has(band.owner!)) return true;
+          scene.remove(band.line);
+          if (band.markers) scene.remove(band.markers);
+          if (band.visual) scene.remove(band.visual);
+          disposeRubberBand(band);
+          return false;
+        });
+        state.pieces = state.pieces.filter((item) => !selectedSet.has(item));
+        state.rebuildRenderBatches();
+        state.connections = state.connections.filter(
+          (connection) =>
+            !selectedSet.has(connection.a) && !selectedSet.has(connection.b),
+        );
+        rebalanceAllSmartDefaults(state);
+        state.selected = undefined;
+        state.selectedPieces.clear();
+        refreshDebug();
+        setSelectedId(null);
+        setCount(state.pieces.length);
+        setConnectionRevision((value) => value + 1);
+        setMessage(
+          selectedPieces.length > 1
+            ? isChineseLanguage()
+              ? `${selectedPieces.length} 个零件已删除`
+              : `${selectedPieces.length} piezas eliminadas`
+            : isChineseLanguage()
+              ? `${piece.part} 已删除`
+              : `${piece.part} eliminada`,
+        );
+        return;
+      }
+      if (e.repeat) return;
+      const rotation =
+        code === "KeyW" || code === "ArrowUp"
+          ? { axis: "x" as const, angle: -Math.PI / 2 }
+          : code === "KeyS" || code === "ArrowDown"
+            ? { axis: "x" as const, angle: Math.PI / 2 }
+            : code === "KeyA" || code === "ArrowLeft"
+              ? { axis: "y" as const, angle: -Math.PI / 2 }
+              : code === "KeyD" || code === "ArrowRight"
+                ? { axis: "y" as const, angle: Math.PI / 2 }
+                : code === "KeyQ"
+                  ? { axis: "z" as const, angle: -Math.PI / 2 }
+                  : code === "KeyE"
+                    ? { axis: "z" as const, angle: Math.PI / 2 }
+                    : undefined;
+      if (!rotation) return;
+      e.preventDefault();
+      state.recordHistory();
+      rotatePieceAroundPivotWithGlobalSnap(
+        piece,
+        rotation.axis,
+        rotation.angle,
+        state.rotationSnapStep,
+      );
+      const disconnected = removeMisalignedForcedConnections(state, piece);
+      piece.mesh.updateMatrixWorld(true);
+      if (piece.renderBatched) state.rebuildRenderBatches();
+      else state.renderBatchesDirty = true;
+      refreshDebug();
+      if (disconnected) setConnectionRevision((value) => value + 1);
+      setSelectedId(piece.id);
+      setMessage(
+        disconnected
+          ? languageRef.current === "es"
+            ? `${piece.part} rotada · ${disconnected} unión forzada desconectada por desalineación`
+            : isChineseLanguage()
+              ? `${piece.part} 已旋转 · ${disconnected} 强制连接因错位而断开`
+              : `${piece.part} rotated · ${disconnected} forced joint disconnected after misalignment`
+          : isChineseLanguage()
+            ? `${piece.part} 已旋转 90° · ${rotation.axis.toUpperCase()}`
+            : `${piece.part} rotada 90° · ${rotation.axis.toUpperCase()}`,
+      );
+    };
+    const keyup = (e: KeyboardEvent) => {
+      gearMotorHeldKeys.delete(e.code);
+      if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        shiftHeld = false;
+        shiftVerticalConsumed = false;
+        updateManualForceMode(false);
+      }
+      if (e.code === "KeyR") rotationPivotHeld = false;
+    };
+    const clearModifiers = () => {
+      shiftHeld = false;
+      shiftVerticalConsumed = false;
+      rotationPivotHeld = false;
+      updateManualForceMode(false);
+    };
+    const beginGizmoDrag = (e: PointerEvent, value: string) => {
+      const piece = state.selected;
+      if (!piece || state.running) return;
+      const match = /^(move|rotate)-([xyz])$/.exec(value);
+      if (!match) return;
+      highlightGizmoHandle(value);
+      e.preventDefault();
+      e.stopPropagation();
+      const members = gizmoMembers(piece),
+        { pivot, axes, cardan } = gizmoFrame(piece, members),
+        axisName = match[2] as "x" | "y" | "z",
+        axis = axes[axisName].clone(),
+        pivotScreen = projectGizmoPoint(pivot).point,
+        endpoint = projectGizmoPoint(pivot.clone().add(axis)).point,
+        screenAxis = endpoint.clone().sub(pivotScreen),
+        screenAxisLength = screenAxis.length(),
+        bounds = renderer.domElement.getBoundingClientRect(),
+        distance = camera.position.distanceTo(pivot),
+        worldPerPixel =
+          (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
+          Math.max(1, bounds.height),
+        worldLength = Math.max(0.35, worldPerPixel * 92),
+        startPointer = new THREE.Vector2(e.clientX - bounds.left, e.clientY - bounds.top),
+        memberSet = new Set(members);
+      gizmoDrag = {
+        pointerId: e.pointerId,
+        kind: match[1] as "move" | "rotate",
+        axisName,
+        axis,
+        pivot,
+        pivotScreen,
+        worldLength,
+        screenAxis:
+          screenAxisLength > 1.0e-4
+            ? screenAxis.multiplyScalar(1 / screenAxisLength)
+            : new THREE.Vector2(0, -1),
+        startPointer,
+        startPointerAngle: Math.atan2(
+          startPointer.y - pivotScreen.y,
+          startPointer.x - pivotScreen.x,
+        ),
+        members,
+        startPositions: new Map(
+          members.map((member) => [member, member.mesh.position.clone()]),
+        ),
+        startQuaternions: new Map(
+          members.map((member) => [member, member.mesh.quaternion.clone()]),
+        ),
+        internalFrames: new Map(
+          state.connections
+            .filter(
+              (connection) => memberSet.has(connection.a) && memberSet.has(connection.b),
+            )
+            .map((connection) => [
+              connection,
+              { point: connection.point.clone(), axis: connection.axis.clone() },
+            ]),
+        ),
+        cardan,
+        prepared: false,
+        changed: false,
+      };
+      renderer.domElement.setPointerCapture(e.pointerId);
+    };
+    const moveGizmoDrag = (e: PointerEvent) => {
+      const draft = gizmoDrag;
+      if (!draft || e.pointerId !== draft.pointerId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const bounds = renderer.domElement.getBoundingClientRect(),
+        current = new THREE.Vector2(e.clientX - bounds.left, e.clientY - bounds.top);
+      if (!draft.prepared) {
+        if (current.distanceTo(draft.startPointer) <= 3) return;
+        draft.prepared = true;
+        state.recordHistory();
+        const memberSet = new Set(draft.members),
+          articulatingCardan = draft.kind === "rotate" && draft.cardan !== undefined,
+          affected = new Set<Piece>();
+        state.connections.forEach((connection) => {
+          const aInside = memberSet.has(connection.a),
+            bInside = memberSet.has(connection.b),
+            keepCardanAnchor =
+              articulatingCardan &&
+              (connection.a === draft.cardan!.first ||
+                connection.b === draft.cardan!.first ||
+                (draft.axisName === "y" &&
+                  (connection.a === draft.cardan!.third ||
+                    connection.b === draft.cardan!.third)));
+          if (aInside !== bInside && !keepCardanAnchor)
+            affected.add(aInside ? connection.b : connection.a);
+        });
+        state.connections = state.connections.filter(
+          (connection) =>
+            memberSet.has(connection.a) === memberSet.has(connection.b) ||
+            (articulatingCardan &&
+              (connection.a === draft.cardan!.first ||
+                connection.b === draft.cardan!.first ||
+                (draft.axisName === "y" &&
+                  (connection.a === draft.cardan!.third ||
+                    connection.b === draft.cardan!.third)))),
+        );
+        affected.forEach((member) => rebalanceSmartDefaults(state, member));
+        setConnectionRevision((value) => value + 1);
+      }
+      if (draft.kind === "move") {
+        const pixels = current.clone().sub(draft.startPointer).dot(draft.screenAxis),
+          rawDistance = pixels * (draft.worldLength / 92),
+          distance = state.gridStep
+            ? Math.round(rawDistance / state.gridStep) * state.gridStep
+            : rawDistance,
+          delta = draft.axis.clone().multiplyScalar(distance);
+        draft.members.forEach((member) => {
+          member.mesh.position.copy(draft.startPositions.get(member)!).add(delta);
+          member.mesh.updateMatrixWorld(true);
+        });
+        draft.internalFrames.forEach((frame, connection) => {
+          connection.point.copy(frame.point).add(delta);
+          connection.axis.copy(frame.axis);
+        });
+      } else {
+        const currentAngle = Math.atan2(
+            current.y - draft.pivotScreen.y,
+            current.x - draft.pivotScreen.x,
+          ),
+          facing = draft.axis.dot(camera.getWorldDirection(new THREE.Vector3())),
+          rawAngle = (currentAngle - draft.startPointerAngle) * (facing > 0 ? 1 : -1),
+          normalizedAngle = Math.atan2(Math.sin(rawAngle), Math.cos(rawAngle)),
+          snap = THREE.MathUtils.degToRad(state.rotationSnapStep),
+          angle = snap ? Math.round(normalizedAngle / snap) * snap : normalizedAngle,
+          rotation = new THREE.Quaternion().setFromAxisAngle(draft.axis, angle),
+          articulated = draft.cardan;
+        if (articulated) {
+          const { centre, first, third } = articulated,
+            centreFirst = centre.connectors[0],
+            centreThird = centre.connectors[1],
+            firstHinge = first.connectors.find(
+              (connector) => connector.rotationOnly && connector.kind === "round",
+            ),
+            thirdHinge = third.connectors.find(
+              (connector) => connector.rotationOnly && connector.kind === "round",
+            ),
+            thirdOuter = third.connectors.find(
+              (connector) => connector.role === "socket" && connector.kind === "axle",
+            ),
+            firstStart = draft.startQuaternions.get(first)!,
+            centreStart = draft.startQuaternions.get(centre)!,
+            thirdStart = draft.startQuaternions.get(third)!;
+          if (centreFirst && centreThird && firstHinge && thirdHinge && thirdOuter) {
+            const firstAxisStart = firstHinge.axis
+                .clone()
+                .applyQuaternion(firstStart)
+                .normalize(),
+              centreFirstStartAxis = centreFirst.axis
+                .clone()
+                .applyQuaternion(centreStart)
+                .normalize();
+            if (firstAxisStart.dot(centreFirstStartAxis) < 0) firstAxisStart.negate();
+            const thirdLengthLocal = thirdOuter.local
+                .clone()
+                .sub(thirdHinge.local)
+                .normalize(),
+              thirdDirectionStart = thirdLengthLocal
+                .clone()
+                .applyQuaternion(thirdStart)
+                .normalize(),
+              firstQuaternion =
+                draft.axisName === "y"
+                  ? firstStart.clone().premultiply(rotation).normalize()
+                  : firstStart.clone(),
+              firstAxis =
+                draft.axisName === "y"
+                  ? firstAxisStart.clone().applyQuaternion(rotation).normalize()
+                  : firstAxisStart.clone(),
+              // Red/blue aim the output shaft. Green keeps both shaft
+              // directions fixed and rotates only the input yoke. Solving the
+              // two perpendicular hinge axes then produces the Cardan's real,
+              // non-uniform output phase instead of a rigid 1:1 rotation.
+              thirdDirection =
+                draft.axisName === "y"
+                  ? thirdDirectionStart.clone()
+                  : thirdDirectionStart.clone().applyQuaternion(rotation).normalize(),
+              thirdAxisSign =
+                firstAxisStart
+                  .clone()
+                  .cross(thirdDirectionStart)
+                  .dot(thirdHinge.axis.clone().applyQuaternion(thirdStart)) < 0
+                  ? -1
+                  : 1,
+              thirdAxis = cardanSecondaryAxis(firstAxis, thirdDirection, thirdAxisSign);
+            if (thirdAxis) {
+              const centreQuaternion = quaternionFromAxisPairs(
+                  centreFirst.axis,
+                  centreThird.axis,
+                  firstAxis,
+                  thirdAxis,
+                ),
+                thirdQuaternion = quaternionFromAxisPairs(
+                  thirdHinge.axis,
+                  thirdLengthLocal,
+                  thirdAxis,
+                  thirdDirection,
+                );
+              first.mesh.quaternion.copy(firstQuaternion);
+              first.mesh.position
+                .copy(draft.pivot)
+                .sub(firstHinge.local.clone().applyQuaternion(firstQuaternion));
+              centre.mesh.quaternion.copy(centreQuaternion);
+              centre.mesh.position
+                .copy(draft.pivot)
+                .sub(centreFirst.local.clone().applyQuaternion(centreQuaternion));
+              third.mesh.quaternion.copy(thirdQuaternion);
+              third.mesh.position
+                .copy(draft.pivot)
+                .sub(thirdHinge.local.clone().applyQuaternion(thirdQuaternion));
+              draft.members.forEach((member) => member.mesh.updateMatrixWorld(true));
+              draft.internalFrames.forEach((frame, connection) => {
+                connection.point.copy(draft.pivot);
+                connection.axis.copy(
+                  connection.a === first || connection.b === first
+                    ? firstAxis
+                    : connection.a === third || connection.b === third
+                      ? thirdAxis
+                      : frame.axis,
+                );
+              });
+            }
+          }
+        } else {
+          draft.members.forEach((member) => {
+            member.mesh.position
+              .copy(draft.startPositions.get(member)!)
+              .sub(draft.pivot)
+              .applyQuaternion(rotation)
+              .add(draft.pivot);
+            member.mesh.quaternion
+              .copy(draft.startQuaternions.get(member)!)
+              .premultiply(rotation)
+              .normalize();
+            member.mesh.updateMatrixWorld(true);
+          });
+          draft.internalFrames.forEach((frame, connection) => {
+            connection.point
+              .copy(frame.point)
+              .sub(draft.pivot)
+              .applyQuaternion(rotation)
+              .add(draft.pivot);
+            connection.axis.copy(frame.axis).applyQuaternion(rotation).normalize();
+          });
+        }
+      }
+      draft.changed = true;
+      state.renderBatchesDirty = true;
+      updateTransformGizmo();
+    };
+    const endGizmoDrag = (e: PointerEvent) => {
+      const draft = gizmoDrag;
+      if (!draft || e.pointerId !== draft.pointerId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (renderer.domElement.hasPointerCapture(e.pointerId))
+        renderer.domElement.releasePointerCapture(e.pointerId);
+      gizmoDrag = undefined;
+      highlightGizmoHandle();
+      if (!draft.changed) return;
+      if (draft.members.some((member) => member.renderBatched))
+        state.rebuildRenderBatches();
+      else state.renderBatchesDirty = true;
+      refreshDebug();
+      scheduleRecoverySave();
+      setConnectorRevision((value) => value + 1);
+      setMessage(
+        languageRef.current === "es"
+          ? `${draft.kind === "move" ? "Movimiento" : "Giro"} ${draft.axisName.toUpperCase()} aplicado`
+          : isChineseLanguage()
+            ? `${draft.kind === "move" ? (isChineseLanguage() ? "移动" : "Move") : isChineseLanguage() ? "旋转" : "Rotation"} ${draft.axisName.toUpperCase()} 已应用`
+            : `${draft.kind === "move" ? (isChineseLanguage() ? "移动" : "Move") : isChineseLanguage() ? "旋转" : "Rotation"} ${draft.axisName.toUpperCase()} applied`,
+      );
+    };
+    const canvas = renderer.domElement;
+    let pointerMoveStarted = 0;
+    const beginMeasuredMove = () => {
+      pointerMoveStarted = performance.now();
+    };
+    const measuredMove = (event: PointerEvent) => {
+      const started = pointerMoveStarted || performance.now();
+      try {
+        move(event);
+      } finally {
+        state.pendingInputMs = Math.max(
+          state.pendingInputMs,
+          performance.now() - started,
+        );
+        if (
+          moving ||
+          gizmoDrag ||
+          pivotRotate ||
+          aimRotation ||
+          rubberGuideDrag ||
+          spring?.dragged
+        )
+          requestRender();
+      }
+    };
+    canvas.tabIndex = 0;
+    canvas.style.outline = "none";
+    canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointermove", beginMeasuredMove, true);
+    canvas.addEventListener("pointermove", measuredMove);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+    canvas.addEventListener("wheel", wheel, { passive: false });
+    canvas.addEventListener("dragover", (e) => e.preventDefault());
+    canvas.addEventListener("drop", drop);
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    canvas.addEventListener("auxclick", (e) => e.preventDefault());
+    window.addEventListener("resize", resize);
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(host);
+    window.addEventListener("keydown", keydown, true);
+    window.addEventListener("keyup", keyup, true);
+    window.addEventListener("blur", clearModifiers);
+    const maximumFps = 60,
+      minimumFrameIntervalMs = 1000 / maximumFps;
+    let frame = 0,
+      lastFrameStarted = performance.now(),
+      lastAnimationFrame = lastFrameStarted,
+      fpsWindowStarted = lastFrameStarted,
+      fpsFrames = 0,
+      previousFrameWorkMs = 0;
+    const lastCameraMatrix = camera.matrixWorld.clone(),
+      lastProjectionMatrix = camera.projectionMatrix.clone();
+    const pendingGpuTimers: {
+      query: WebGLQuery;
+      sample: FramePerformanceSample;
+    }[] = [];
+    const clock = new THREE.Clock();
+    // --- Render and simulation frame loop ----------------------------------
+    // Rapier advances only while state.running; rendering and input overlays
+    // continue in edit mode using the same requestAnimationFrame loop.
+    const animate = (animationFrameTime: number) => {
+      frame = requestAnimationFrame(animate);
+      const animationInterval = animationFrameTime - lastAnimationFrame;
+      if (animationInterval < minimumFrameIntervalMs) return;
+      lastAnimationFrame =
+        animationFrameTime - (animationInterval % minimumFrameIntervalMs);
+      const frameStarted = performance.now(),
+        frameIntervalMs = frameStarted - lastFrameStarted;
+      lastFrameStarted = frameStarted;
+      if (gpuTimerExtension) {
+        while (pendingGpuTimers.length) {
+          const pending = pendingGpuTimers[0],
+            available = gl.getQueryParameter(pending.query, gl.QUERY_RESULT_AVAILABLE),
+            disjoint = gl.getParameter(gpuTimerExtension.GPU_DISJOINT_EXT);
+          if (disjoint) {
+            pendingGpuTimers.splice(0).forEach(({ query }) => gl.deleteQuery(query));
+            break;
+          }
+          if (!available) break;
+          pending.sample.gpuMs =
+            Number(gl.getQueryParameter(pending.query, gl.QUERY_RESULT)) / 1000000;
+          gl.deleteQuery(pending.query);
+          pendingGpuTimers.shift();
+        }
+      }
+      camera.updateMatrixWorld(false);
+      const cameraChanged =
+        !camera.matrixWorld.equals(lastCameraMatrix) ||
+        !camera.projectionMatrix.equals(lastProjectionMatrix);
+      if (cameraChanged) {
+        lastCameraMatrix.copy(camera.matrixWorld);
+        lastProjectionMatrix.copy(camera.projectionMatrix);
+      }
+      const interactionActive = Boolean(
+        orbit ||
+        pan ||
+        moving ||
+        gizmoDrag ||
+        pivotRotate ||
+        aimRotation ||
+        rubberGuideDrag ||
+        spring?.dragged,
+      );
+      const pieceTransformsMayHaveChanged = Boolean(
+        state.running ||
+        renderRequested ||
+        state.renderBatchesDirty ||
+        moving ||
+        gizmoDrag ||
+        pivotRotate ||
+        aimRotation ||
+        rubberGuideDrag ||
+        spring?.dragged,
+      );
+      if (
+        !state.running &&
+        !renderRequested &&
+        !cameraChanged &&
+        !interactionActive &&
+        !state.renderBatchesDirty
+      ) {
+        clock.getDelta();
+        fpsWindowStarted = frameStarted;
+        fpsFrames = 0;
+        previousFrameWorkMs = 0;
+        return;
+      }
+      renderRequested = false;
+      fpsFrames++;
+      if (frameStarted - fpsWindowStarted >= 500) {
+        const fps = (fpsFrames * 1000) / (frameStarted - fpsWindowStarted),
+          counter = fpsRef.current;
+        const webGpuQualityActive = !!gpuSceneRenderer,
+          // WebGPU keeps native quality while it can sustain 30 FPS. Once it
+          // drops below that floor, reduce the scale; above it, restore 100%.
+          lowerFpsThreshold = webGpuQualityActive ? 30 : 15,
+          upperFpsThreshold = webGpuQualityActive ? 30 : 30;
+        let nextScale = renderScale;
+        if (!adaptiveRenderingEnabled) {
+          nextScale = 1;
+          healthyFpsWindows = 0;
+          lowFpsWindows = 0;
+        } else if (fps < lowerFpsThreshold) {
+          healthyFpsWindows = 0;
+          lowFpsWindows++;
+          if (lowFpsWindows >= 2) {
+            nextScale = Math.max(0.5, renderScale - 0.1);
+            lowFpsWindows = 0;
+          }
+        } else if (fps > upperFpsThreshold) {
+          lowFpsWindows = 0;
+          healthyFpsWindows++;
+          // Binary WebGPU policy: once above 30 FPS, do not remain at a
+          // degraded scale after a transient slow period.
+          nextScale = webGpuQualityActive ? 1 : renderScale;
+          if (!webGpuQualityActive && healthyFpsWindows >= 4) {
+            nextScale = Math.min(1, renderScale + 0.05);
+            healthyFpsWindows = 0;
+          }
+        } else {
+          healthyFpsWindows = 0;
+          lowFpsWindows = 0;
+        }
+        if (Math.abs(nextScale - renderScale) > 0.001) {
+          renderScale = nextScale;
+          state.renderScale = renderScale;
+          renderer.setPixelRatio(nativePixelRatio * renderScale);
+          renderer.setSize(host.clientWidth, host.clientHeight, false);
+          gpuSceneRenderer?.resize(
+            host.clientWidth,
+            host.clientHeight,
+            nativePixelRatio * renderScale,
+          );
+        }
+        if (counter) {
+          counter.textContent = `${Math.round(fps)} FPS · ${(1000 / Math.max(fps, 0.1)).toFixed(1)} ms · ${Math.round(renderScale * 100)}%`;
+          counter.dataset.level = fps < 15 ? "low" : fps < 40 ? "medium" : "high";
+        }
+        fpsWindowStarted = frameStarted;
+        fpsFrames = 0;
+      }
+      let forceResetMs = 0,
+        springMs = 0,
+        jointForcesMs = 0,
+        worldStepMs = 0,
+        syncMs = 0,
+        physicsLogMs = 0,
+        batchMs = 0,
+        activeBodies = 0,
+        sleepingBodies = 0;
+      if (state.running && state.world) {
+        try {
+          let phaseStarted = performance.now();
+          // Do not call RigidBody.isSleeping() here. Rapier's WASM bindings can
+          // still have the rigid-body set borrowed after a world rebuild (most
+          // visibly after placing a freshly downloaded catalog part). Querying
+          // isSleeping in that state triggers wasm-bindgen's "recursive use of
+          // an object" guard and the render loop then reports the same error on
+          // every frame. Handles are plain numbers, so they are also a safer way
+          // to deduplicate all pieces that share one rigid-island body.
+          const steppedBodyHandles = new Set<number>();
+          state.sleepingBodyHandles.clear();
+          state.pieces.forEach((p) => {
+            if (!p.body || steppedBodyHandles.has(p.body.handle)) return;
+            steppedBodyHandles.add(p.body.handle);
+            if (p.physicsIslandFixed) {
+              sleepingBodies++;
+            } else {
+              activeBodies++;
+            }
+          });
+          forceResetMs = performance.now() - phaseStarted;
+          phaseStarted = performance.now();
+          if (spring?.dragged && (!spring.piece || !spring.piece.physicsIslandFixed)) {
+            const anchor = springAnchor();
+            if (anchor) {
+              const delta = spring.target.clone().sub(anchor);
+              if (delta.length() > 3.5) delta.setLength(3.5);
+              state.world.applySpring({
+                body: spring.bodyId,
+                worldPoint: anchor,
+                target: spring.target,
+                stiffness: spring.rubberNodeId === undefined ? 72 : 2400,
+                damping: spring.rubberNodeId === undefined ? 9 : 90,
+                maxForce:
+                  spring.rubberNodeId === undefined
+                    ? 180 * Math.max(0.25, spring.piece?.body?.mass() ?? 0.25)
+                    : 240,
+              });
+            }
+          }
+          springMs = performance.now() - phaseStarted;
+          phaseStarted = performance.now();
+          // Axle guide projection and friction are applied in Rust before the
+          // Rapier step, so no per-connection JS correction pass is needed.
+          jointForcesMs = performance.now() - phaseStarted;
+          phaseStarted = performance.now();
+          const frameTimestep = Math.min(clock.getDelta(), 1 / 60);
+          state.world.timestep = frameTimestep;
+          // Gear motors and one-way restrictions are intentionally handled on
+          // the gear body itself, separate from shaft/joint motors.
+          state.pieces.forEach((piece) => {
+            if (!piece.body || !piece.gear) return;
+            const axis = gearAxisForPiece(piece);
+            if (piece.gearMotor && gearMotorHeldKeys.has(piece.gearMotor.key)) {
+              const angular = piece.body.angvel(),
+                currentSpeed = new THREE.Vector3(angular.x, angular.y, angular.z).dot(
+                  axis,
+                ),
+                error = piece.gearMotor.speed - currentSpeed,
+                impulse = THREE.MathUtils.clamp(
+                  error * piece.body.mass(),
+                  -Math.abs(piece.gearMotor.force),
+                  Math.abs(piece.gearMotor.force),
+                );
+              piece.body.applyTorqueImpulse(axis.clone().multiplyScalar(impulse));
+            }
+            const lock = piece.gearDirectionLock;
+            if (lock) {
+              const angular = piece.body.angvel();
+              const velocity = new THREE.Vector3(angular.x, angular.y, angular.z);
+              const projected = velocity.dot(axis);
+              if (projected * lock < 0)
+                piece.body.setAngvel({
+                  x: velocity.x - axis.x * projected,
+                  y: velocity.y - axis.y * projected,
+                  z: velocity.z - axis.z * projected,
+                });
+            }
+          });
+          // One boundary crossing advances forces, motors, joints, gear phase,
+          // Rapier and SIMD transform packing. No Rust-owned object is exposed
+          // to JavaScript, eliminating wasm-bindgen aliasing crashes.
+          state.world.step(frameTimestep);
+          const rustStats = state.world.stats();
+          activeBodies = rustStats.activeBodies;
+          sleepingBodies = rustStats.sleepingBodies;
+          const piecesById = new Map(state.pieces.map((piece) => [piece.id, piece])),
+            currentGearContacts = new Map<
+              string,
+              {
+                a: Piece;
+                b: Piece;
+                links: RuntimeGearLink[];
+              }
+            >();
+          // Existing gear links are topology constraints, not Rapier contact
+          // manifolds. Their dedicated collision envelopes are deliberately
+          // smaller than the tooth envelope (to avoid physical tooth kicks),
+          // so broadphase contact can disappear at the exact nominal pitch
+          // distance. Validate retained pairs from their real pitch geometry;
+          // otherwise a perfectly spaced train repeatedly loses and recreates
+          // its phase while rotating in one plane.
+          activeGearContacts.forEach((retained, key) => {
+            const stillEngaged = detectGearLinks(
+              [retained.a, retained.b],
+              state.rigidIslandByPiece,
+            );
+            if (stillEngaged.length) currentGearContacts.set(key, retained);
+          });
+          state.world.takeContactPairs().forEach(([leftId, rightId]) => {
+            const left = piecesById.get(leftId),
+              right = piecesById.get(rightId);
+            if (left?.gear && right?.gear) {
+              // Rapier limits candidates to collider pairs. The local two-item
+              // test then answers whether their green engagement envelopes
+              // actually overlap; no unrelated gear is inspected.
+              const links = detectGearLinks([left, right], state.rigidIslandByPiece);
+              const key = contactPairKey(left, right);
+              if (links.length && !currentGearContacts.has(key))
+                currentGearContacts.set(key, {
+                  a: left,
+                  b: right,
+                  links,
+                });
+            }
+            if (
+              left &&
+              right &&
+              (supportsDynamicAxleConnections(left) ||
+                supportsDynamicAxleConnections(right))
+            )
+              state.contactCandidates.set(contactPairKey(left, right), {
+                a: left,
+                b: right,
+              });
+          });
+          // While the user moves a mechanism, discover newly approaching gear
+          // pairs from pitch geometry as well. The physical gear colliders are
+          // intentionally inset and may not enter Rapier's broadphase until
+          // after the correct meshing distance has already been crossed.
+          if (spring?.dragged && state.dynamicConnectionFrame % 4 === 0) {
+            const scannedLinks = detectGearLinks(
+              state.pieces.filter((piece) => piece.gear),
+              state.rigidIslandByPiece,
+              differentialCarrierGearExclusions(state.pieces, state.connections),
+            );
+            scannedLinks.forEach((link) => {
+              const key = gearLinkKey(link),
+                retained = activeGearContacts.get(key),
+                current = currentGearContacts.get(key);
+              if (current) {
+                if (!current.links.some((item) => gearLinkKey(item) === key))
+                  current.links.push(link);
+              } else
+                currentGearContacts.set(
+                  key,
+                  retained ?? {
+                    a: link.a.value,
+                    b: link.b.value,
+                    links: [link],
+                  },
+                );
+            });
+          }
+          currentGearContacts.forEach((pair, key) => {
+            missedGearContactFrames.delete(key);
+            if (!activeGearContacts.has(key))
+              pendingGearContactChanges.set(key, { ...pair, touching: true });
+          });
+          activeGearContacts.forEach((pair, key) => {
+            if (currentGearContacts.has(key)) return;
+            const misses = (missedGearContactFrames.get(key) ?? 0) + 1;
+            if (misses < 3) {
+              missedGearContactFrames.set(key, misses);
+              currentGearContacts.set(key, pair);
+              return;
+            }
+            missedGearContactFrames.delete(key);
+            pendingGearContactChanges.set(key, {
+              ...pair,
+              links: [],
+              touching: false,
+            });
+          });
+          activeGearContacts = currentGearContacts;
+          if (spring?.dragged) {
+            spring.force = rustStats.maxSpringForce;
+            if (state.simLog)
+              state.simLog.maxSpringForce = Math.max(
+                state.simLog.maxSpringForce,
+                rustStats.maxSpringForce,
+              );
+            updateSpring();
+          }
+          worldStepMs = performance.now() - phaseStarted;
+          phaseStarted = performance.now();
+          const startup = performance.now() - (state.simStartedMs ?? 0) < 350;
+          state.pieces.forEach((p) => {
+            if (
+              p.body &&
+              (!state.largeSimulation ||
+                startup ||
+                !state.sleepingBodyHandles.has(p.body.handle))
+            ) {
+              const t = p.body.translation(),
+                q = p.body.rotation(),
+                bodyRotation = new THREE.Quaternion(q.x, q.y, q.z, q.w),
+                offset = (p.physicsOffset ?? new THREE.Vector3())
+                  .clone()
+                  .applyQuaternion(bodyRotation);
+              p.mesh.position.set(t.x + offset.x, t.y + offset.y, t.z + offset.z);
+              p.mesh.quaternion.copy(
+                bodyRotation.clone().multiply(p.physicsBase ?? new THREE.Quaternion()),
+              );
+            }
+          });
+          state.rubberBands.forEach((band) => {
+            const nodes = band.nodeBodyIds?.flatMap((id) => {
+              const point = state.world?.bodies.get(id)?.translation();
+              return point ? [new THREE.Vector3(point.x, point.y, point.z)] : [];
+            });
+            if (nodes && nodes.length >= 3) drawRubberBand(band, nodes);
+          });
+          state.dynamicConnectionFrame++;
+          if (
+            pendingGearContactChanges.size > 0 ||
+            state.contactCandidates.size > 0 ||
+            (state.dynamicConnectionFrame % 8 === 0 && dynamicMechanismsNeedScan())
+          )
+            updateDynamicMechanisms();
+          syncMs = performance.now() - phaseStarted;
+          phaseStarted = performance.now();
+          if (state.simLog) {
+            const time = (Date.now() - Date.parse(state.simLog.startedAt)) / 1000;
+            if (time >= (state.nextLogSample ?? 0)) {
+              const bodies = state.pieces.flatMap((p) => {
+                if (!p.body) return [];
+                const v = p.body.linvel(),
+                  w = p.body.angvel(),
+                  linear = Math.hypot(v.x, v.y, v.z),
+                  angular = Math.hypot(w.x, w.y, w.z);
+                state.simLog!.maxLinearSpeed = Math.max(
+                  state.simLog!.maxLinearSpeed,
+                  linear,
+                );
+                state.simLog!.maxAngularSpeed = Math.max(
+                  state.simLog!.maxAngularSpeed,
+                  angular,
+                );
+                return [
+                  {
+                    id: p.id,
+                    part: p.part,
+                    fixed: p.physicsIslandFixed ?? p.fixed,
+                    position: p.mesh.position.toArray(),
+                    rotation: p.mesh.quaternion.toArray(),
+                    linearVelocity: [v.x, v.y, v.z],
+                    angularVelocity: [w.x, w.y, w.z],
+                  },
+                ];
+              });
+              const rubberBands = state.rubberBands.map((band) => {
+                const nodes = (band.nodeBodyIds ?? []).flatMap((id) => {
+                  const body = state.world?.bodies.get(id);
+                  if (!body) return [];
+                  const position = body.translation(),
+                    velocity = body.linvel();
+                  return [
+                    {
+                      id,
+                      position: [position.x, position.y, position.z],
+                      linearVelocity: [velocity.x, velocity.y, velocity.z],
+                    },
+                  ];
+                });
+                const routeLength = rubberBandLength(
+                  nodes.map((node) => new THREE.Vector3().fromArray(node.position)),
+                );
+                const maxNodeSpeed = Math.max(
+                  0,
+                  ...nodes.map((node) => Math.hypot(...node.linearVelocity)),
+                );
+                return {
+                  id: band.id,
+                  part:
+                    band.owner?.part ?? (isChineseLanguage() ? "橡皮筋" : "Rubber band"),
+                  restLength: band.restLength,
+                  routeLength,
+                  stretch: routeLength - band.restLength,
+                  maxNodeSpeed,
+                  nodes,
+                };
+              });
+              state.simLog.samples.push({ time, bodies, rubberBands });
+              state.nextLogSample = time + (state.largeSimulation ? 0.75 : 0.2);
+            }
+          }
+          physicsLogMs = performance.now() - phaseStarted;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          console.error("Sim Studio physics frame stopped safely:", error);
+          state.simLog?.events.push(
+            isChineseLanguage()
+              ? `已恢复物理错误： ${detail}`
+              : `Error físico recuperado: ${detail}`,
+          );
+          state.running = false;
+          state.world.free();
+          state.world = undefined;
+          state.physicsJoints.clear();
+          if (spring) {
+            spring.overlay.remove();
+            spring.label.remove();
+            spring = undefined;
+          }
+          state.snapshot?.forEach((snapshot) => {
+            snapshot.piece.mesh.position.copy(snapshot.position);
+            snapshot.piece.mesh.quaternion.copy(snapshot.rotation);
+          });
+          state.pieces.forEach((piece) => {
+            piece.body = undefined;
+            piece.physicsOffset = undefined;
+            piece.physicsBase = undefined;
+            piece.physicsIsland = undefined;
+            piece.physicsIslandFixed = undefined;
+          });
+          state.snapshot = undefined;
+          state.snapshotConnections = undefined;
+          state.renderBatchesDirty = true;
+          setRunning(false);
+          setMessage(
+            languageRef.current === "es"
+              ? `Simulación detenida de forma segura: ${detail}`
+              : isChineseLanguage()
+                ? `模拟已安全停止： ${detail}`
+                : `Simulation stopped safely: ${detail}`,
+          );
+        }
+      } else clock.getDelta();
+      let phaseStarted = performance.now();
+      // WebGPU uploads piece matrices directly. Updating the hidden WebGL
+      // instance batches as well cost another 3–4 ms on every simulation
+      // frame. Keep them current only when WebGL is actually presenting.
+      if ((!gpuSceneRenderer && state.running) || state.renderBatchesDirty)
+        state.updateRenderBatches();
+      batchMs = performance.now() - phaseStarted;
+      phaseStarted = performance.now();
+      state.updateDebug();
+      const debugMs = performance.now() - phaseStarted;
+      phaseStarted = performance.now();
+      state.pieces.forEach((p) => {
+        if (p.fixed && p.lockSprite) {
+          const box = new THREE.Box3().setFromObject(p.mesh),
+            center = box.getCenter(new THREE.Vector3());
+          p.lockSprite.position.set(center.x, box.max.y + 0.55, center.z);
+          p.lockSprite.quaternion.copy(camera.quaternion);
+          p.lockSprite.updateMatrixWorld(true);
+        }
+      });
+      const locksMs = performance.now() - phaseStarted;
+      phaseStarted = performance.now();
+      const gridX =
+          Math.round(camera.position.x / GRID_RECENTER_STEP) * GRID_RECENTER_STEP,
+        gridZ = Math.round(camera.position.z / GRID_RECENTER_STEP) * GRID_RECENTER_STEP;
+      if (state.grid.position.x !== gridX || state.grid.position.z !== gridZ) {
+        state.grid.position.x = gridX;
+        state.grid.position.z = gridZ;
+        const axisX = state.grid.getObjectByName("grid-axis-x"),
+          axisZ = state.grid.getObjectByName("grid-axis-z");
+        if (axisX) axisX.position.z = -gridZ;
+        if (axisZ) axisZ.position.x = -gridX;
+        floor.position.x = gridX;
+        floor.position.z = gridZ;
+        state.grid.updateMatrixWorld();
+        floor.updateMatrixWorld();
+      }
+      const viewingFloorFromBelow = camera.position.y < 0;
+      if (viewingFloorFromBelow !== floorViewedFromBelow) {
+        floorViewedFromBelow = viewingFloorFromBelow;
+        const floorMaterial = floor.material as THREE.MeshStandardMaterial;
+        floorMaterial.opacity = viewingFloorFromBelow ? 0.06 : 1;
+        floorMaterial.depthWrite = !viewingFloorFromBelow;
+        floor.receiveShadow = !viewingFloorFromBelow;
+        floorMaterial.needsUpdate = true;
+      }
+      state.rubberBands.forEach((band) => {
+        if (!band.visual) return;
+        const showHandles = !state.running && band.owner === state.selected;
+        if (band.visual.userData.handlesVisible === showHandles) return;
+        band.visual.userData.handlesVisible = showHandles;
+        band.visual.children.forEach((child) => {
+          if (child.userData.rubberNode || child.userData.rubberMoveHandle)
+            child.visible = showHandles;
+        });
+        gpuSceneRenderer?.invalidate();
+      });
+      updateTransformGizmo();
+      const gpuExtras: THREE.Object3D[] = [
+        // The WebGPU mesh pipeline currently renders opaque RGB only. When
+        // looking from below, uploading the floor would therefore still
+        // occlude the scene even though the WebGL material is translucent.
+        // Omit it for that view until alpha materials are supported there.
+        ...(viewingFloorFromBelow ? [] : [state.floor]),
+        state.grid,
+        transformGizmoRoot,
+        cardanReferenceMarker,
+        // WebGPU already highlights selected geometry through the per-instance
+        // selected flag. The Three.js BoxHelper is the legacy WebGL selection
+        // outline; uploading it as an extra produced the second blue box.
+        ...debugRoot.children.filter(
+          (object) => object.userData.debugKind !== "selection-outline",
+        ),
+        ...state.rubberBands.flatMap((band) => (band.visual ? [band.visual] : [])),
+      ];
+      state.pieces.forEach((piece) => {
+        if (piece.lockSprite?.visible) gpuExtras.push(piece.lockSprite);
+      });
+      const gpuQuery =
+        !gpuSceneRenderer &&
+        gpuTimerExtension &&
+        state.performanceTrace.totalFrames % 4 === 0 &&
+        pendingGpuTimers.length < 16
+          ? gl.createQuery()
+          : null;
+      if (gpuQuery && gpuTimerExtension)
+        gl.beginQuery(gpuTimerExtension.TIME_ELAPSED_EXT, gpuQuery);
+      if (gpuSceneRenderer) {
+        gpuViewportCanvas.classList.add("active");
+        renderer.domElement.classList.add("webgpu-active");
+        try {
+          gpuSceneStats = gpuSceneRenderer.render(
+            scene,
+            camera,
+            state.pieces,
+            state.selectedPieces,
+            gpuExtras,
+            modelOutlinesVisibleRef.current,
+            pieceTransformsMayHaveChanged,
+          );
+        } catch (error) {
+          fallBackToWebGl(error);
+          renderer.render(scene, camera);
+        }
+      } else {
+        gpuSceneStats = null;
+        gpuViewportCanvas.classList.remove("active");
+        renderer.domElement.classList.remove("webgpu-active");
+        renderer.render(scene, camera);
+      }
+      if (gpuQuery && gpuTimerExtension) gl.endQuery(gpuTimerExtension.TIME_ELAPSED_EXT);
+      const renderMs = performance.now() - phaseStarted,
+        trace = state.performanceTrace,
+        sample: FramePerformanceSample = {
+          elapsedMs: performance.now() - trace.startedAtMs,
+          frameIntervalMs,
+          betweenFramesMs: Math.max(0, frameIntervalMs - previousFrameWorkMs),
+          totalMs: performance.now() - frameStarted,
+          inputMs: state.pendingInputMs,
+          forceResetMs,
+          springMs,
+          jointForcesMs,
+          worldStepMs,
+          syncMs,
+          physicsLogMs,
+          connectionScanMs: state.pendingConnectionMs,
+          batchMs,
+          debugMs,
+          locksMs,
+          instanceSyncMs: gpuSceneStats?.instanceSyncMs ?? 0,
+          renderMs,
+          gpuMs: null,
+          pieces: state.pieces.length,
+          connections: state.connections.length,
+          activeBodies,
+          sleepingBodies,
+          drawCalls: gpuSceneStats?.drawCalls ?? renderer.info.render.calls,
+          triangles: gpuSceneStats?.triangles ?? renderer.info.render.triangles,
+          lines: gpuSceneStats?.lines ?? renderer.info.render.lines,
+          resolutionScale: state.renderScale,
+        };
+      previousFrameWorkMs = sample.totalMs;
+      if (gpuQuery) pendingGpuTimers.push({ query: gpuQuery, sample });
+      state.pendingInputMs = 0;
+      state.pendingConnectionMs = 0;
+      trace.totalFrames++;
+      if (trace.samples.length < 600) trace.samples.push(sample);
+      else {
+        trace.samples[trace.cursor] = sample;
+        trace.cursor = (trace.cursor + 1) % trace.samples.length;
+      }
+    };
+    frame = requestAnimationFrame(animate);
+    return () => {
+      gpuInitializationCancelled = true;
+      cancelAimRotation(false);
+      cancelAnimationFrame(frame);
+      if (renderBatchRebuildFrame) cancelAnimationFrame(renderBatchRebuildFrame);
+      pendingGpuTimers.forEach(({ query }) => gl.deleteQuery(query));
+      window.removeEventListener("resize", resize);
+      resizeObserver.disconnect();
+      window.removeEventListener("keydown", keydown, true);
+      window.removeEventListener("keyup", keyup, true);
+      window.removeEventListener("blur", clearModifiers);
+      transformGizmoRoot.traverse((object) => {
+        const renderable = object as THREE.Mesh;
+        renderable.geometry?.dispose();
+        const materials = renderable.material
+          ? Array.isArray(renderable.material)
+            ? renderable.material
+            : [renderable.material]
+          : [];
+        materials.forEach((material) => material.dispose());
+      });
+      cardanReferenceMarker.geometry.dispose();
+      (cardanReferenceMarker.material as THREE.Material).dispose();
+      gpuSceneRenderer?.dispose();
+      gpuSceneRenderer = null;
+      if (gpuViewportCanvas.parentElement === host) host.removeChild(gpuViewportCanvas);
+      renderer.dispose();
+      document.removeEventListener("visibilitychange", flushRecovery);
+      host.removeChild(canvas);
+      appRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    const state = appRef.current;
+    if (!state) return;
+    const dark = theme === "dark",
+      background = new THREE.Color(dark ? 0x202328 : 0xdfe7ed);
+    state.scene.background = background;
+    if (state.scene.fog instanceof THREE.Fog) state.scene.fog.color.copy(background);
+    (state.floor.material as THREE.MeshStandardMaterial).color.setHex(
+      dark ? 0x2b3035 : 0xcbd6dd,
+    );
+    state.scene.remove(state.grid);
+    state.grid.traverse((object) => {
+      const renderable = object as THREE.Object3D & {
+        geometry?: THREE.BufferGeometry;
+        material?: THREE.Material | THREE.Material[];
+      };
+      renderable.geometry?.dispose();
+      const materials = renderable.material
+        ? Array.isArray(renderable.material)
+          ? renderable.material
+          : [renderable.material]
+        : [];
+      materials.forEach((material) => material.dispose());
+    });
+    state.grid = createStudioGrid(dark);
+    state.scene.add(state.grid);
+    state.renderer.setClearColor(background);
+    state.requestRender();
+  }, [theme]);
+  const visible = useMemo(
+    () =>
+      category === "imported" && search
+        ? results.filter(
+            (p) =>
+              !p.paletteHidden &&
+              (p.part + " " + p.name + " " + displayPartName(p.name, "zh-CN"))
+                .toLowerCase()
+                .includes(search.toLowerCase()),
+          )
+        : results.filter((p) => !p.paletteHidden),
+    [category, results, search],
+  );
+  const dragPart = (e: React.DragEvent, p: CatalogPart) => {
+    e.dataTransfer.setData("application/x-ldraw-part", JSON.stringify(p));
+    e.dataTransfer.effectAllowed = "copy";
+  };
+  const addReference = async () => {
+    const part = reference.trim().replace(/\.dat$/i, "");
+    if (!part) return;
+    setCatalogBusy(true);
+    const normalizedPart = part.toLowerCase(),
+      palettePart = resolvePaletteRequest(normalizedPart),
+      packaged = paletteParts.find(
+        (candidate) =>
+          candidate.part.toLowerCase() === palettePart ||
+          candidate.modelPart?.toLowerCase() === palettePart,
+      );
+    let found: CatalogPart = packaged
+      ? {
+          ...packaged,
+          origin: "catalog-search",
+          sourceKind: packaged.geometry ? "packaged-cache" : "ldraw-network",
+          requestedPart: part,
+          catalogReturnedPart: packaged.part,
+          resolvedPart: packaged.modelPart ?? packaged.part,
+          catalogQuery: part,
+        }
+      : {
+          part,
+          name: isChinese ? `LDraw 零件 ${part}` : `Pieza LDraw ${part}`,
+          kind: "beam",
+          color: 71,
+          origin: "catalog-search",
+          sourceKind: "ldraw-network",
+          requestedPart: part,
+          resolvedPart: part,
+          catalogQuery: part,
+        };
+    if (!packaged)
+      try {
+        const d = (await fetch(`/api/parts?q=${encodeURIComponent(part)}`).then((r) =>
+          r.json(),
+        )) as {
+          items?: CatalogPart[];
+        };
+        const exact = d.items?.find(
+          (x: { part: string }) => x.part.toLowerCase() === normalizedPart,
+        );
+        if (exact)
+          found = {
+            ...exact,
+            kind: kindFor("", exact.name),
+            color: exact.color ?? 71,
+            origin: "catalog-search",
+            sourceKind: exact.geometry ? "packaged-cache" : "external-catalog",
+            requestedPart: part,
+            catalogReturnedPart: exact.part,
+            resolvedPart: exact.modelPart ?? exact.part,
+            catalogQuery: part,
+          };
+      } catch {}
+    if (!belongsToDefaultPalette(found)) {
+      setImported((old) =>
+        old.some((x) => x.part === found.part) ? old : [found, ...old],
+      );
+      setCategory("imported");
+    } else if (packaged?.family) setCategory(packaged.family);
+    setReference("");
+    setCatalogBusy(false);
+    void appRef.current?.preloadPart(found);
+  };
+  const rotate = (axis: "x" | "y" | "z", dir = 1) => {
+    const s = appRef.current,
+      p = s?.selected;
+    if (!s || !p || running) return;
+    s.recordHistory();
+    p.mesh.updateMatrix();
+    const members = editorTransformMembers(s, p),
+      radians = THREE.MathUtils.degToRad(rotationAngle * dir);
+    let transform: THREE.Matrix4;
+    if (members.length > 1) {
+      const localAxis =
+          axis === "x"
+            ? new THREE.Vector3(1, 0, 0)
+            : axis === "y"
+              ? new THREE.Vector3(0, 1, 0)
+              : new THREE.Vector3(0, 0, 1),
+        step = THREE.MathUtils.degToRad(s.rotationSnapStep),
+        current = absoluteRotationAroundLocalAxis(p, localAxis),
+        appliedRadians = step
+          ? Math.round((current + radians) / step) * step - current
+          : radians,
+        worldAxis = localAxis.clone().transformDirection(p.mesh.matrixWorld).normalize(),
+        pivot = editorTransformPivot(s, p, members);
+      transform = new THREE.Matrix4()
+        .makeTranslation(pivot.x, pivot.y, pivot.z)
+        .multiply(new THREE.Matrix4().makeRotationAxis(worldAxis, appliedRadians))
+        .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z));
+    } else {
+      const before = p.mesh.matrix.clone();
+      rotatePieceAroundPivotWithGlobalSnap(p, axis, radians, s.rotationSnapStep);
+      p.mesh.updateMatrix();
+      transform = p.mesh.matrix.clone().multiply(before.invert());
+    }
+    members.forEach((member) => {
+      if (members.length === 1 && member === p) return;
+      member.mesh.updateMatrix();
+      transform
+        .clone()
+        .multiply(member.mesh.matrix)
+        .decompose(member.mesh.position, member.mesh.quaternion, member.mesh.scale);
+      member.mesh.updateMatrixWorld(true);
+    });
+    if (members.length > 1) {
+      const memberSet = new Set(members),
+        affected = new Set<Piece>();
+      s.connections.forEach((connection) => {
+        const aInside = memberSet.has(connection.a),
+          bInside = memberSet.has(connection.b);
+        if (aInside && bInside) {
+          connection.point.applyMatrix4(transform);
+          connection.axis.transformDirection(transform).normalize();
+        } else if (aInside !== bInside)
+          affected.add(aInside ? connection.b : connection.a);
+      });
+      s.connections = s.connections.filter(
+        (connection) => memberSet.has(connection.a) === memberSet.has(connection.b),
+      );
+      affected.forEach((member) => rebalanceSmartDefaults(s, member));
+    }
+    const disconnected = members.reduce(
+      (total, member) => total + removeMisalignedForcedConnections(s, member),
+      0,
+    );
+    if (members.some((member) => member.renderBatched)) s.rebuildRenderBatches();
+    else s.renderBatchesDirty = true;
+    s.refreshDebug();
+    s.scheduleRecoverySave();
+    if (disconnected || members.length > 1) setConnectionRevision((value) => value + 1);
+    if (members.length > 1) setConnectorRevision((value) => value + 1);
+    setSelectedId(p.id);
+    if (disconnected)
+      setMessage(
+        language === "es"
+          ? `${disconnected} unión forzada desconectada por desalineación`
+          : isChinese
+            ? `${disconnected} 强制连接因错位而断开`
+            : `${disconnected} forced joint disconnected after misalignment`,
+      );
+  };
+  const nudge = (axis: "x" | "y" | "z", amount: number) => {
+    const s = appRef.current,
+      p = s?.selected;
+    if (!s || !p || running) return;
+    s.recordHistory();
+    const members = editorTransformMembers(s, p),
+      memberSet = new Set(members),
+      delta = new THREE.Vector3(),
+      affected = new Set<Piece>();
+    delta[axis] = amount;
+    members.forEach((member) => {
+      member.mesh.position[axis] += amount;
+      member.mesh.updateMatrixWorld(true);
+    });
+    s.connections.forEach((connection) => {
+      const aInside = memberSet.has(connection.a),
+        bInside = memberSet.has(connection.b);
+      if (aInside && bInside) connection.point.add(delta);
+      else if (aInside !== bInside) affected.add(aInside ? connection.b : connection.a);
+    });
+    s.connections = s.connections.filter(
+      (connection) => memberSet.has(connection.a) === memberSet.has(connection.b),
+    );
+    affected.forEach((member) => rebalanceSmartDefaults(s, member));
+    if (members.some((member) => member.renderBatched)) s.rebuildRenderBatches();
+    else s.renderBatchesDirty = true;
+    s.refreshDebug();
+    s.scheduleRecoverySave();
+    setConnectionRevision((value) => value + 1);
+    setConnectorRevision((value) => value + 1);
+    setSelectedId(p.id);
+  };
+  const applyInspectorTransform = (
+    piece: Piece,
+    transform: THREE.Matrix4,
+    description: string,
+  ) => {
+    const state = appRef.current;
+    if (!state || running) return;
+    const members = editorTransformMembers(state, piece),
+      memberSet = new Set(members),
+      affected = new Set<Piece>();
+    state.recordHistory();
+    members.forEach((member) => {
+      member.mesh.updateMatrix();
+      transform
+        .clone()
+        .multiply(member.mesh.matrix)
+        .decompose(member.mesh.position, member.mesh.quaternion, member.mesh.scale);
+      member.mesh.updateMatrixWorld(true);
+    });
+    state.connections.forEach((connection) => {
+      const aInside = memberSet.has(connection.a),
+        bInside = memberSet.has(connection.b);
+      if (aInside !== bInside) affected.add(aInside ? connection.b : connection.a);
+      else if (aInside) {
+        connection.point.applyMatrix4(transform);
+        connection.axis.transformDirection(transform).normalize();
+      }
+    });
+    state.connections = state.connections.filter(
+      (connection) => memberSet.has(connection.a) === memberSet.has(connection.b),
+    );
+    affected.forEach((member) => rebalanceSmartDefaults(state, member));
+    if (members.some((member) => member.renderBatched)) state.rebuildRenderBatches();
+    else state.renderBatchesDirty = true;
+    state.refreshDebug();
+    state.scheduleRecoverySave();
+    setConnectionRevision((value) => value + 1);
+    setConnectorRevision((value) => value + 1);
+    setSelectedId(piece.id);
+    setMessage(description);
+  };
+  const setInspectorPosition = (axis: "x" | "y" | "z", value: number) => {
+    const state = appRef.current,
+      piece = state?.selected;
+    if (!state || !piece) return;
+    const members = editorTransformMembers(state, piece),
+      pivot = editorTransformPivot(state, piece, members),
+      delta = value - pivot[axis];
+    if (Math.abs(delta) < 1.0e-6) return;
+    const translation = new THREE.Vector3();
+    translation[axis] = delta;
+    applyInspectorTransform(
+      piece,
+      new THREE.Matrix4().makeTranslation(translation.x, translation.y, translation.z),
+      `${axis.toUpperCase()} = ${value.toFixed(3)}`,
+    );
+  };
+  const setInspectorRotation = (axis: "x" | "y" | "z", degrees: number) => {
+    const state = appRef.current,
+      piece = state?.selected;
+    if (!state || !piece) return;
+    const current = piece.mesh.quaternion.clone(),
+      euler = new THREE.Euler().setFromQuaternion(current, "XYZ");
+    euler[axis] = THREE.MathUtils.degToRad(degrees);
+    const target = new THREE.Quaternion().setFromEuler(euler),
+      rotation = target.multiply(current.clone().invert());
+    if (rotation.angleTo(new THREE.Quaternion()) < 1.0e-6) return;
+    const members = editorTransformMembers(state, piece),
+      pivot = editorTransformPivot(state, piece, members),
+      transform = new THREE.Matrix4()
+        .makeTranslation(pivot.x, pivot.y, pivot.z)
+        .multiply(new THREE.Matrix4().makeRotationFromQuaternion(rotation))
+        .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z));
+    applyInspectorTransform(
+      piece,
+      transform,
+      `${language === "es" ? "Giro" : isChinese ? "旋转" : "Rotation"} ${axis.toUpperCase()} = ${degrees.toFixed(2)}°`,
+    );
+  };
+  const setInspectorCardanCoordinate = (
+    coordinate: keyof CardanEditorCoordinates,
+    degrees: number,
+  ) => {
+    const state = appRef.current,
+      selectedPiece = state?.selected;
+    if (!state || !selectedPiece || running) return;
+    const members = editorAssemblyMembers(state.pieces, selectedPiece),
+      layout = cardanAssemblyLayout(members, state.connections),
+      pose = layout && cardanPoseParts(layout),
+      measured = layout && measureCardanCoordinates(layout);
+    if (!layout || !pose || !measured) return;
+    const coordinates = {
+        ...measured,
+        [coordinate]: THREE.MathUtils.degToRad(degrees),
+      },
+      inputDirection = pose.firstHinge.local
+        .clone()
+        .sub(pose.firstOuter.local)
+        .transformDirection(layout.first.mesh.matrixWorld)
+        .normalize(),
+      directions = cardanDirectionsFromCoordinates(inputDirection, coordinates),
+      currentThirdAxis = pose.thirdHinge.axis
+        .clone()
+        .transformDirection(layout.third.mesh.matrixWorld)
+        .normalize(),
+      currentFirstAxis = pose.firstHinge.axis
+        .clone()
+        .transformDirection(layout.first.mesh.matrixWorld)
+        .normalize(),
+      currentOutputDirection = pose.thirdOuter.local
+        .clone()
+        .sub(pose.thirdHinge.local)
+        .transformDirection(layout.third.mesh.matrixWorld)
+        .normalize(),
+      orientationSign =
+        currentFirstAxis.clone().cross(currentOutputDirection).dot(currentThirdAxis) < 0
+          ? -1
+          : 1,
+      thirdAxis = cardanSecondaryAxis(
+        directions.firstHingeAxis,
+        directions.outputDirection,
+        orientationSign,
+      );
+    if (!thirdAxis) {
+      setMessage(
+        language === "es"
+          ? "El cardán no puede alcanzar esa orientación: las bisagras quedarían alineadas"
+          : isChinese
+            ? "万向节无法达到该方向，因为铰链会共线"
+            : "The Cardan cannot reach that orientation because its hinges would align",
+      );
+      return;
+    }
+    const firstInputLocal = pose.firstHinge.local
+        .clone()
+        .sub(pose.firstOuter.local)
+        .normalize(),
+      thirdOutputLocal = pose.thirdOuter.local
+        .clone()
+        .sub(pose.thirdHinge.local)
+        .normalize(),
+      firstQuaternion = quaternionFromAxisPairs(
+        firstInputLocal,
+        pose.firstHinge.axis,
+        directions.inputDirection,
+        directions.firstHingeAxis,
+      ),
+      centreQuaternion = quaternionFromAxisPairs(
+        pose.centreFirst.axis,
+        pose.centreThird.axis,
+        directions.firstHingeAxis,
+        thirdAxis,
+      ),
+      thirdQuaternion = quaternionFromAxisPairs(
+        pose.thirdHinge.axis,
+        thirdOutputLocal,
+        thirdAxis,
+        directions.outputDirection,
+      ),
+      pivot = layout.centre.mesh.getWorldPosition(new THREE.Vector3()),
+      memberSet = new Set(members),
+      affected = new Set<Piece>();
+    state.recordHistory();
+    state.connections.forEach((connection) => {
+      const aInside = memberSet.has(connection.a),
+        bInside = memberSet.has(connection.b),
+        preservedExternal =
+          connection.a === layout.first ||
+          connection.b === layout.first ||
+          (coordinate === "roll" &&
+            (connection.a === layout.third || connection.b === layout.third));
+      if (aInside !== bInside && !preservedExternal)
+        affected.add(aInside ? connection.b : connection.a);
+    });
+    state.connections = state.connections.filter((connection) => {
+      const aInside = memberSet.has(connection.a),
+        bInside = memberSet.has(connection.b);
+      return (
+        aInside === bInside ||
+        connection.a === layout.first ||
+        connection.b === layout.first ||
+        (coordinate === "roll" &&
+          (connection.a === layout.third || connection.b === layout.third))
+      );
+    });
+    layout.first.mesh.quaternion.copy(firstQuaternion);
+    layout.first.mesh.position
+      .copy(pivot)
+      .sub(pose.firstHinge.local.clone().applyQuaternion(firstQuaternion));
+    layout.centre.mesh.quaternion.copy(centreQuaternion);
+    layout.centre.mesh.position
+      .copy(pivot)
+      .sub(pose.centreFirst.local.clone().applyQuaternion(centreQuaternion));
+    layout.third.mesh.quaternion.copy(thirdQuaternion);
+    layout.third.mesh.position
+      .copy(pivot)
+      .sub(pose.thirdHinge.local.clone().applyQuaternion(thirdQuaternion));
+    members.forEach((member) => member.mesh.updateMatrixWorld(true));
+    state.connections.forEach((connection) => {
+      if (!memberSet.has(connection.a) || !memberSet.has(connection.b)) return;
+      connection.point.copy(pivot);
+      connection.axis.copy(
+        connection.a === layout.first || connection.b === layout.first
+          ? directions.firstHingeAxis
+          : thirdAxis,
+      );
+    });
+    affected.forEach((member) => rebalanceSmartDefaults(state, member));
+    if (members.some((member) => member.renderBatched)) state.rebuildRenderBatches();
+    else state.renderBatchesDirty = true;
+    state.selected = layout.centre;
+    state.selectedPieces = new Set(members);
+    state.refreshDebug();
+    state.scheduleRecoverySave();
+    setConnectionRevision((value) => value + 1);
+    setConnectorRevision((value) => value + 1);
+    setSelectedId(layout.centre.id);
+    setMessage(
+      `${coordinate === "roll" ? (language === "es" ? "Giro del eje 1" : isChinese ? "输入轴自转" : "Input roll") : language === "es" ? `Inclinación ${coordinate === "aimX" ? "X" : "Z"}` : isChinese ? `定向 ${coordinate === "aimX" ? "X" : "Z"}` : `Aim ${coordinate === "aimX" ? "X" : "Z"}`} = ${degrees.toFixed(2)}°`,
+    );
+  };
+  const changeSelectedColor = async (color: number) => {
+    const s = appRef.current,
+      piece = s?.selected;
+    if (!s || !piece || running || piece.color === color) return;
+    s.recordHistory();
+    setMessage(t.changingColor);
+    const changed = await s.recolorPart(piece, color);
+    setMessage(
+      changed ? `${t.colorChanged} · LDraw ${color}` : `${t.colorError} · LDraw ${color}`,
+    );
+    setSelectedId(piece.id);
+    s.scheduleRecoverySave();
+  };
+  const remove = () => {
+    const s = appRef.current,
+      p = s?.selected;
+    if (!s || !p || running) return;
+    s.recordHistory();
+    s.scene.remove(p.mesh);
+    if (p.lockSprite) s.scene.remove(p.lockSprite);
+    s.rubberBands = s.rubberBands.filter((band) => {
+      if (band.owner !== p) return true;
+      s.scene.remove(band.line);
+      if (band.markers) s.scene.remove(band.markers);
+      if (band.visual) s.scene.remove(band.visual);
+      disposeRubberBand(band);
+      return false;
+    });
+    s.pieces = s.pieces.filter((x) => x !== p);
+    s.rebuildRenderBatches();
+    s.connections = s.connections.filter((c) => c.a !== p && c.b !== p);
+    rebalanceAllSmartDefaults(s);
+    s.selected = undefined;
+    s.refreshDebug();
+    setSelectedId(null);
+    setCount(s.pieces.length);
+  };
+  const reset = () => {
+    const s = appRef.current;
+    if (!s || physicsTransitionRef.current) return;
+    if (!s.running) s.recordHistory();
+    s.running = false;
+    s.connectionScanVersion++;
+    s.bulkConnecting = false;
+    s.disposeRenderBatches();
+    s.pieces.forEach((p) => {
+      s.scene.remove(p.mesh);
+      if (p.lockSprite) s.scene.remove(p.lockSprite);
+    });
+    s.rubberBands.forEach((band) => {
+      s.scene.remove(band.line);
+      if (band.markers) s.scene.remove(band.markers);
+      if (band.visual) s.scene.remove(band.visual);
+      disposeRubberBand(band);
+    });
+    s.rubberBands = [];
+    s.pieces = [];
+    s.connections = [];
+    s.gearLinks = [];
+    s.gearAngles.clear();
+    s.gearBodyRotations.clear();
+    s.gearPhases.clear();
+    s.physicsJoints.clear();
+    s.dynamicNoContactPairs.clear();
+    s.contactExclusions.clear();
+    s.contactCandidates.clear();
+    s.rigidIslandByPiece = undefined;
+    s.createPhysicsJoint = undefined;
+    s.connectionModes.clear();
+    s.pendingPlacement = undefined;
+    s.snapshot = undefined;
+    s.snapshotConnections = undefined;
+    s.world?.free();
+    s.world = undefined;
+    s.contactFilterStats = undefined;
+    s.selected = undefined;
+    s.refreshDebug();
+    setRunning(false);
+    setSelectedId(null);
+    setCount(0);
+    s.scheduleRecoverySave();
+  };
+  // --- Physics world lifecycle ---------------------------------------------
+  // Starting builds rigid islands, colliders and joints. Stopping restores the
+  // exact pre-simulation editor snapshot instead of keeping simulated poses.
+  const physics = async () => {
+    const s = appRef.current;
+    if (!s || physicsTransitionRef.current) return;
+    if (projectRestoringRef.current || s.bulkLoading) {
+      setMessage(
+        language === "es"
+          ? "Espera a que termine la carga antes de simular"
+          : isChinese
+            ? "请等待加载完成后再开始模拟"
+            : "Wait for loading to finish before starting the simulation",
+      );
+      return;
+    }
+    physicsTransitionRef.current = true;
+    setPhysicsBusy(true);
+    try {
+      if (!s.running) {
+        s.snapshot = s.pieces.map((piece) => ({
+          piece,
+          position: piece.mesh.position.clone(),
+          rotation: piece.mesh.quaternion.clone(),
+        }));
+        s.snapshotConnections = s.connections.map((connection) => ({
+          ...connection,
+          point: connection.point.clone(),
+          axis: connection.axis.clone(),
+          localAxisA: connection.localAxisA.clone(),
+          localPointA: connection.localPointA?.clone(),
+          localPointB: connection.localPointB?.clone(),
+        }));
+        s.simLog = {
+          startedAt: new Date().toISOString(),
+          connections: s.connections.map((connection) => ({
+            a: connection.a.part,
+            b: connection.b.part,
+            type: `${connection.profile}:${connection.mode}`,
+            point: connection.point.toArray(),
+          })),
+          samples: [],
+          maxLinearSpeed: 0,
+          maxAngularSpeed: 0,
+          maxSpringForce: 0,
+          events: [
+            isChinese
+              ? isChineseLanguage()
+                ? `开始模拟： ${s.pieces.length} 个零件和 ${s.connections.length} 个连接`
+                : `开始模拟： ${s.pieces.length} 个零件和 ${s.connections.length} uniones`
+              : isChineseLanguage()
+                ? `Inicio con ${s.pieces.length} piezas y ${s.connections.length} 个连接`
+                : `Inicio con ${s.pieces.length} piezas y ${s.connections.length} uniones`,
+            isChinese
+              ? "Rust/WASM SIMD 核心已启用；初始稳定阶段为 0.35 秒"
+              : "Núcleo Rust/WASM SIMD activo; estabilización inicial durante 0.35 s",
+          ],
+        };
+        s.nextLogSample = 0;
+        s.simStartedMs = performance.now();
+        // Build just the editor-side island index first because gear detection
+        // needs to know which parts already share a rigid body.
+        const parents = new Map(s.pieces.map((piece) => [piece, piece]));
+        const findRoot = (piece: Piece) => {
+          let root = piece;
+          while (parents.get(root) !== root) root = parents.get(root)!;
+          let current = piece;
+          while (parents.get(current) !== root) {
+            const next = parents.get(current)!;
+            parents.set(current, root);
+            current = next;
+          }
+          return root;
+        };
+        const merge = (left: Piece, right: Piece) => {
+          const leftRoot = findRoot(left);
+          const rightRoot = findRoot(right);
+          if (leftRoot !== rightRoot) parents.set(rightRoot, leftRoot);
+        };
+        if (structuralMode === "rigid")
+          s.connections.forEach((connection) => {
+            if (connection.mode === "fixed") merge(connection.a, connection.b);
+          });
+        const detectionIslandMap = new Map<Piece, Piece[]>();
+        s.pieces.forEach((piece) => {
+          const root = findRoot(piece);
+          const island = detectionIslandMap.get(root) ?? [];
+          island.push(piece);
+          detectionIslandMap.set(root, island);
+        });
+        const detectionIslandByPiece = new Map<Piece, Piece[]>();
+        detectionIslandMap.forEach((island) =>
+          island.forEach((piece) => detectionIslandByPiece.set(piece, island)),
+        );
+        s.gearAngles.clear();
+        s.gearBodyRotations.clear();
+        s.gearPhases.clear();
+        s.gearLinks = detectGearLinks(
+          s.pieces,
+          detectionIslandByPiece,
+          differentialCarrierGearExclusions(s.pieces, s.connections),
+        );
+        // Seed dynamic contact tracking from the geometry scan used to build
+        // the initial Rust graph. Rapier's smaller anti-kick gear colliders do
+        // not necessarily overlap at nominal pitch distance, so waiting for a
+        // broadphase callback would make a valid initial link impossible to
+        // validate or remove deterministically.
+        s.seedGearContacts(s.gearLinks);
+        const traversedConnectorPairs = detectShaftTraversals(s.pieces);
+        const excludedPairs = buildConnectorContactExclusions(
+          s.connections,
+          detectionIslandByPiece,
+          traversedConnectorPairs,
+        );
+        gearboxContactExclusionPairs(s.pieces).forEach(([ring, target]) =>
+          excludedPairs.add(contactPairKey(ring, target)),
+        );
+        s.contactExclusions.clear();
+        excludedPairs.forEach((key) => s.contactExclusions.add(key));
+        const built = buildRustPhysicsScene({
+          pieces: s.pieces,
+          connections: s.connections,
+          gearLinks: s.gearLinks,
+          structuralMode,
+          structuralStiffness,
+          physicsSettings: s.physicsSettings,
+          excludedPairs,
+          rubberBands: s.rubberBands,
+        });
+        const runtime = await RustPhysicsRuntime.create(built.scene);
+        if (appRef.current !== s) {
+          runtime.free();
+          return;
+        }
+        s.world = runtime;
+        s.largeSimulation = built.largeSimulation;
+        s.rigidIslandByPiece = built.rigidIslandByPiece;
+        s.physicsJoints.clear();
+        runtime.joints.forEach((joint, id) => s.physicsJoints.set(id, joint));
+        s.dynamicNoContactPairs.clear();
+        s.contactCandidates.clear();
+        s.contactFilterStats = { tested: 0, rejected: 0 };
+        s.pieces.forEach((piece) => {
+          const bodyId = built.bodyIdByPiece.get(piece);
+          piece.body = bodyId ? runtime.bodies.get(bodyId) : undefined;
+        });
+        s.createPhysicsJoint = (connection) => {
+          const joint = buildRustJointConfig(
+            connection,
+            built.bodyIdByPiece,
+            s.physicsSettings,
+          );
+          if (!joint || !runtime.addJoint(joint)) return undefined;
+          const proxy = runtime.joints.get(joint.id);
+          if (proxy) s.physicsJoints.set(joint.id, proxy);
+          return proxy;
+        };
+        const fixedConnectionCount = s.connections.filter(
+          (connection) => connection.mode === "fixed",
+        ).length;
+        s.simLog.events[0] = isChinese
+          ? isChineseLanguage()
+            ? `开始模拟： ${s.pieces.length} 个零件合并为 ${built.rigidIslands.length} 个刚体和 ${s.connections.length} 个连接`
+            : `开始模拟： ${s.pieces.length} 个零件合并为 ${built.rigidIslands.length} 个刚体和 ${s.connections.length} uniones`
+          : isChineseLanguage()
+            ? `Inicio con ${s.pieces.length} piezas agrupadas en ${built.rigidIslands.length} cuerpos rígidos y ${s.connections.length} 个连接`
+            : `Inicio con ${s.pieces.length} piezas agrupadas en ${built.rigidIslands.length} cuerpos rígidos y ${s.connections.length} uniones`;
+        s.simLog.events.push(
+          isChinese
+            ? `结构模式 ${structuralMode}；刚度 ${structuralStiffness}%`
+            : `Modo estructural ${structuralMode}; rigidez ${structuralStiffness}%`,
+          isChinese
+            ? `Rust Rapier SIMD: ${built.scene.settings.solverIterations} 次迭代 × ${built.scene.settings.internalPgsIterations} 次内部 PGS 迭代`
+            : `Rust Rapier SIMD: ${built.scene.settings.solverIterations} iteraciones × ${built.scene.settings.internalPgsIterations} PGS interno`,
+          isChinese
+            ? `${fixedConnectionCount} 个固定连接； ${built.movingJointCount} 个可动连接`
+            : `${fixedConnectionCount} conexiones fijas; ${built.movingJointCount} articulaciones móviles`,
+          isChinese
+            ? `${s.gearLinks.length} 对有效齿轮`
+            : `${s.gearLinks.length} pares de engranajes activos`,
+          isChinese
+            ? `${traversedConnectorPairs.length} 处轴/销交叉已识别； ${excludedPairs.size} 对无碰撞配对`
+            : `${traversedConnectorPairs.length} cruces eje/pin detectados; ${excludedPairs.size} pares sin colisión`,
+        );
+        if (built.redundantMovingJoints)
+          s.simLog.events.push(
+            isChinese
+              ? `${built.redundantMovingJoints} 个冗余内部连接已跳过`
+              : `${built.redundantMovingJoints} uniones internas redundantes omitidas`,
+          );
+        s.running = true;
+        setRunning(true);
+        setMessage(
+          isChinese
+            ? `${built.rigidIslands.length} 个刚体 · ${built.movingJointCount} 个可动连接 · ${
+                built.largeSimulation
+                  ? isChinese
+                    ? "大型组合性能模式"
+                    : "modo de rendimiento para ensamblaje grande"
+                  : isChinese
+                    ? "完整精度"
+                    : "precisión completa"
+              }`
+            : `${built.rigidIslands.length} cuerpos rígidos · ${built.movingJointCount} articulaciones móviles · ${
+                built.largeSimulation
+                  ? isChinese
+                    ? "大型组合性能模式"
+                    : "modo de rendimiento para ensamblaje grande"
+                  : isChinese
+                    ? "完整精度"
+                    : "precisión completa"
+              }`,
+        );
+      } else {
+        s.running = false;
+        s.seedGearContacts([]);
+        s.gearLinks = [];
+        s.gearAngles.clear();
+        s.gearBodyRotations.clear();
+        s.gearPhases.clear();
+        s.physicsJoints.clear();
+        s.dynamicNoContactPairs.clear();
+        s.contactExclusions.clear();
+        s.contactCandidates.clear();
+        s.rigidIslandByPiece = undefined;
+        s.createPhysicsJoint = undefined;
+        if (s.simLog) {
+          s.simLog.endedAt = new Date().toISOString();
+          s.simLog.duration =
+            (Date.parse(s.simLog.endedAt) - Date.parse(s.simLog.startedAt)) / 1000;
+          s.simLog.events.push(
+            isChinese
+              ? `结束：最大线速度 ${s.simLog.maxLinearSpeed.toFixed(3)}，角速度 ${s.simLog.maxAngularSpeed.toFixed(3)}，弹簧力 ${s.simLog.maxSpringForce.toFixed(3)}`
+              : `Fin: velocidad lineal máxima ${s.simLog.maxLinearSpeed.toFixed(3)}, angular ${s.simLog.maxAngularSpeed.toFixed(3)}, fuerza de resorte ${s.simLog.maxSpringForce.toFixed(3)}`,
+          );
+          if (s.contactFilterStats)
+            s.simLog.events.push(
+              isChinese
+                ? `接触筛选： ${s.contactFilterStats.tested} 对配对已检查； ${s.contactFilterStats.rejected} 处轴/销与零件间接触已忽略`
+                : `Filtro de contactos: ${s.contactFilterStats.tested} pares comprobados; ${s.contactFilterStats.rejected} contactos eje/pin ↔ pieza anulados`,
+            );
+          const encoded = JSON.stringify(s.simLog, null, 2);
+          try {
+            localStorage.setItem("sim-studio:physics-log", encoded);
+          } catch {}
+          setLastLog(encoded);
+        }
+        s.snapshot?.forEach((x) => {
+          x.piece.mesh.position.copy(x.position);
+          x.piece.mesh.quaternion.copy(x.rotation);
+          x.piece.body = undefined;
+          x.piece.physicsOffset = undefined;
+          x.piece.physicsBase = undefined;
+          x.piece.physicsIsland = undefined;
+          x.piece.physicsIslandFixed = undefined;
+          x.piece.physicsBodyId = undefined;
+        });
+        if (s.snapshotConnections) {
+          s.connections = s.snapshotConnections.map((connection) => {
+            const configured = s.connectionModes.get(connection.id);
+            return {
+              ...connection,
+              point: connection.point.clone(),
+              axis: connection.axis.clone(),
+              localAxisA: connection.localAxisA.clone(),
+              localPointA: connection.localPointA?.clone(),
+              localPointB: connection.localPointB?.clone(),
+              mode: configured?.mode ?? connection.mode,
+              motorSpeed: configured?.motorSpeed ?? connection.motorSpeed,
+              motorForce: configured?.motorForce ?? connection.motorForce,
+              motorPulse: configured?.motorPulse ?? connection.motorPulse,
+              motorPulseAngle: configured?.motorPulseAngle ?? connection.motorPulseAngle,
+              motorPulseInterval:
+                configured?.motorPulseInterval ?? connection.motorPulseInterval,
+              userConfigured: configured?.userConfigured ?? connection.userConfigured,
+            };
+          });
+          setConnectionRevision((value) => value + 1);
+        }
+        s.renderBatchesDirty = true;
+        s.rubberBands.forEach((band) => {
+          band.nodeBodyIds = undefined;
+          drawRubberBand(band);
+        });
+        s.snapshot = undefined;
+        s.snapshotConnections = undefined;
+        s.world?.free();
+        s.world = undefined;
+        s.contactFilterStats = undefined;
+        s.largeSimulation = undefined;
+        s.simStartedMs = undefined;
+        s.refreshDebug();
+        setRunning(false);
+        setMessage(
+          isChinese
+            ? "模拟已停止 · 状态已恢复 · 日志已更新"
+            : "Simulación detenida · estado restaurado · log actualizado",
+        );
+      }
+    } finally {
+      physicsTransitionRef.current = false;
+      setPhysicsBusy(false);
+    }
+  };
+  // --- LDraw / Studio import and export ------------------------------------
+  const importModel = async (file: File) => {
+    const s = appRef.current;
+    if (!s || s.running || physicsTransitionRef.current) return;
+    const empty: ImportDraft = {
+        fileName: file.name,
+        status: "reading",
+        progress: 0,
+        total: 0,
+        paletteCount: 0,
+        externalCount: 0,
+        placements: [],
+      },
+      token = ++importTokenRef.current,
+      stillActive = () => importTokenRef.current === token;
+    setImportDraft(empty);
+    try {
+      const source = file.name.toLowerCase().endsWith(".io")
+          ? extractStudioLDraw(await file.arrayBuffer())
+          : await file.text(),
+        rows = parseLDR(source);
+      if (!stillActive()) return;
+      if (!rows.length)
+        throw new Error(
+          isChinese ? "文件中没有 LDraw 零件" : "El archivo no contiene piezas LDraw",
+        );
+      const references = [...new Set(rows.map((row) => row.part.toLowerCase()))],
+        paletteMatches = new Map<string, CatalogPart[]>();
+      for (const part of paletteParts) {
+        for (const reference of [part.part, part.modelPart].filter(Boolean)) {
+          const key = reference!.toLowerCase(),
+            matches = paletteMatches.get(key) ?? [];
+          matches.push(part);
+          paletteMatches.set(key, matches);
+        }
+        for (const [alias, target] of Object.entries(paletteRequestAliases)) {
+          if (
+            target === part.part.toLowerCase() ||
+            target === part.modelPart?.toLowerCase()
+          ) {
+            const matches = paletteMatches.get(alias) ?? [];
+            matches.push(part);
+            paletteMatches.set(alias, matches);
+          }
+        }
+      }
+      const paletteReferences = references.filter((reference) =>
+          paletteMatches.has(reference),
+        ),
+        externalReferences = references.filter(
+          (reference) => !paletteMatches.has(reference),
+        );
+      setImportDraft({
+        ...empty,
+        status: "palette",
+        total: references.length,
+        paletteCount: paletteReferences.length,
+        externalCount: externalReferences.length,
+      });
+      let paletteLoaded = 0;
+      const paletteToLoad = paletteReferences.flatMap(
+        (reference) => paletteMatches.get(reference) ?? [],
+      );
+      await Promise.all(
+        [
+          ...new Map(
+            paletteToLoad.map((part) => [`${part.part}:${part.color}`, part]),
+          ).values(),
+        ].map(async (part) => {
+          await s.preloadPart(part);
+          if (!stillActive()) return;
+          paletteLoaded++;
+          setImportDraft((draft) =>
+            draft
+              ? {
+                  ...draft,
+                  progress: Math.min(paletteLoaded, paletteReferences.length),
+                }
+              : draft,
+          );
+        }),
+      );
+      if (!stillActive()) return;
+      setImportDraft((draft) =>
+        draft
+          ? { ...draft, status: "external", progress: paletteReferences.length }
+          : draft,
+      );
+      let externalItems: CatalogPart[] = [];
+      if (externalReferences.length)
+        try {
+          const response = await fetch(
+            `/api/parts?refs=${encodeURIComponent(externalReferences.join(","))}`,
+            { signal: AbortSignal.timeout(15000) },
+          );
+          if (response.ok) {
+            const data = (await response.json()) as {
+              items?: CatalogPart[];
+            };
+            externalItems = data.items ?? [];
+          }
+        } catch {}
+      if (!stillActive()) return;
+      let externalLoaded = 0;
+      const externalMap = new Map(
+          externalItems.map((part) => [part.part.toLowerCase(), part]),
+        ),
+        catalogFor = (row: LDrawPlacement): CatalogPart => {
+          const reference = row.part.toLowerCase(),
+            paletteOptions = paletteMatches.get(reference),
+            exactPalette = paletteOptions?.find((part) => part.color === row.color),
+            palette = exactPalette ?? paletteOptions?.[0],
+            external = externalMap.get(reference);
+          if (palette)
+            return {
+              ...palette,
+              color: row.color,
+              geometry: exactPalette?.geometry ?? palette.geometry,
+              sourceColor: exactPalette?.color ?? palette.color,
+              origin: "model-import",
+              sourceKind: palette.geometry ? "packaged-cache" : "ldraw-network",
+              requestedPart: row.part,
+              catalogReturnedPart: palette.part,
+              resolvedPart: palette.modelPart ?? palette.part,
+              importFile: file.name,
+            };
+          return {
+            ...(external ?? {}),
+            part: row.part,
+            name: external?.name ?? `LDraw ${row.part}`,
+            kind: kindFor("", external?.name ?? row.part),
+            color: row.color,
+            sourceColor: external?.color ?? 71,
+            origin: "model-import",
+            sourceKind: external?.geometry
+              ? "packaged-cache"
+              : external
+                ? "external-catalog"
+                : "ldraw-network",
+            requestedPart: row.part,
+            catalogReturnedPart: external?.part,
+            resolvedPart: external?.modelPart ?? external?.part ?? row.part,
+            catalogQuery: row.part,
+            importFile: file.name,
+          };
+        },
+        externalToLoad = externalReferences.map((reference) => {
+          const item = externalMap.get(reference);
+          return {
+            ...(item ?? {}),
+            part: item?.part ?? reference,
+            name: item?.name ?? `LDraw ${reference}`,
+            kind: kindFor("", item?.name ?? reference),
+            color: item?.color ?? 71,
+            sourceColor: item?.color ?? 71,
+            origin: "model-import",
+            sourceKind: item?.geometry
+              ? "packaged-cache"
+              : item
+                ? "external-catalog"
+                : "ldraw-network",
+            requestedPart: reference,
+            catalogReturnedPart: item?.part,
+            resolvedPart: item?.modelPart ?? item?.part ?? reference,
+            catalogQuery: reference,
+            importFile: file.name,
+          } as CatalogPart;
+        });
+      await Promise.all(
+        externalToLoad.map(async (part) => {
+          await s.preloadPart(part);
+          if (!stillActive()) return;
+          externalLoaded++;
+          setImportDraft((draft) =>
+            draft
+              ? {
+                  ...draft,
+                  progress: Math.min(
+                    paletteReferences.length + externalLoaded,
+                    draft.total,
+                  ),
+                }
+              : draft,
+          );
+        }),
+      );
+      if (!stillActive()) return;
+      const placements = rows.map((row) => {
+        const converted = ldrawToScenePlacement(row),
+          [a, b, c, d, e, f, g, h, i] = converted.matrix,
+          matrix = new THREE.Matrix4().set(
+            a,
+            b,
+            c,
+            0,
+            d,
+            e,
+            f,
+            0,
+            g,
+            h,
+            i,
+            0,
+            0,
+            0,
+            0,
+            1,
+          );
+        return {
+          catalog: catalogFor(row),
+          source: row,
+          position: new THREE.Vector3().fromArray(converted.position),
+          rotation: new THREE.Quaternion().setFromRotationMatrix(matrix),
+        };
+      });
+      setImportDraft((draft) =>
+        draft
+          ? { ...draft, status: "preview", progress: draft.total, placements }
+          : draft,
+      );
+      const preview = await s.renderImportPreview(placements);
+      if (!stillActive()) return;
+      setImportDraft((draft) =>
+        draft ? { ...draft, status: "ready", placements, preview } : draft,
+      );
+    } catch (error) {
+      if (!stillActive()) return;
+      setImportDraft((draft) => ({
+        ...(draft ?? empty),
+        status: "error",
+        error:
+          error instanceof Error
+            ? error.message
+            : isChinese
+              ? "无法导入模型"
+              : "No se pudo importar el modelo",
+      }));
+    }
+  };
+  const placeImportedModel = async () => {
+    const draft = importDraft,
+      s = appRef.current;
+    if (!draft || draft.status !== "ready" || !s) return;
+    importTokenRef.current++;
+    setImportDraft(null);
+    reset();
+    const pieces: Piece[] = [];
+    s.bulkLoading = true;
+    try {
+      for (let index = 0; index < draft.placements.length; index++) {
+        const placement = draft.placements[index],
+          piece = await s.addPart(
+            placement.catalog,
+            placement.position,
+            placement.rotation,
+          );
+        if (piece) pieces.push(piece);
+        if (index % 40 === 39)
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+    } finally {
+      s.bulkLoading = false;
+    }
+    const importedCatalog = [
+      ...new Map(
+        draft.placements.map((placement) => [
+          `${placement.catalog.part}:${placement.catalog.color}`,
+          placement.catalog,
+        ]),
+      ).values(),
+    ].filter((part) => !belongsToDefaultPalette(part));
+    setImported((old) => {
+      const merged = new Map(old.map((part) => [`${part.part}:${part.color}`, part]));
+      importedCatalog.forEach((part) => merged.set(`${part.part}:${part.color}`, part));
+      return [...merged.values()];
+    });
+    setCount(s.pieces.length);
+    if (!pieces.length) {
+      setMessage(
+        language === "es"
+          ? "No se pudo colocar ninguna pieza del modelo"
+          : isChinese
+            ? "无法放置模型中的零件"
+            : "No model parts could be placed",
+      );
+      return;
+    }
+    // Temporary performance mode: imported models keep their LDraw position
+    // and are finalized immediately instead of following the pointer.
+    s.pendingPlacement = undefined;
+    pieces.forEach((piece) => {
+      piece.mesh.visible = !s.rubberBands.some((band) => band.owner === piece);
+      piece.mesh.updateMatrixWorld(true);
+    });
+    const modelBounds = new THREE.Box3();
+    pieces.forEach((piece) => modelBounds.expandByObject(piece.mesh));
+    const groundY = s.grid.position.y;
+    if (!modelBounds.isEmpty() && modelBounds.min.y < groundY) {
+      const lift = groundY - modelBounds.min.y;
+      pieces.forEach((piece) => {
+        piece.mesh.position.y += lift;
+        piece.mesh.updateMatrixWorld(true);
+      });
+    }
+    let connections = s.connections.length;
+    if (AUTO_CONNECTIONS_ENABLED) {
+      setMessage(
+        language === "es"
+          ? "Optimizando conexiones por lotes…"
+          : isChinese
+            ? "正在分批优化连接…"
+            : "Optimizing connections in batches…",
+      );
+      connections = await s.verifyConnectionsAsync();
+    }
+    // IMPORTANTE:
+    // reconstruir el render cuando toda la importación y
+    // detección de conexiones haya terminado.
+    s.rebuildRenderBatches();
+    s.refreshDebug();
+    s.scheduleRecoverySave();
+    setMessage(
+      language === "es"
+        ? AUTO_CONNECTIONS_ENABLED
+          ? isChinese
+            ? `${pieces.length} piezas importadas directamente · ${connections} 个连接已识别`
+            : `${pieces.length} piezas importadas directamente · ${connections} conexiones detectadas`
+          : `${pieces.length} piezas importadas · conexiones automáticas desactivadas`
+        : AUTO_CONNECTIONS_ENABLED
+          ? isChinese
+            ? `${pieces.length} 个零件已直接导入 · ${connections} 个连接已识别`
+            : `${pieces.length} parts imported directly · ${connections} connections detected`
+          : isChinese
+            ? `${pieces.length} 个零件已导入 · 自动连接已关闭`
+            : `${pieces.length} parts imported · automatic connections disabled`,
+    );
+  };
+  const discardImport = () => {
+    importTokenRef.current++;
+    setImportDraft(null);
+  };
+  const exportModel = () => {
+    const s = appRef.current;
+    if (!s) return;
+    const ldrawBasis = new THREE.Matrix4().makeScale(1, -1, -1);
+    const lines = s.pieces.map((p) => {
+      const r = new THREE.Matrix4().makeRotationFromQuaternion(p.mesh.quaternion);
+      r.premultiply(ldrawBasis).multiply(ldrawBasis);
+      const e = r.elements,
+        n = (v: number) => (Math.abs(v) < 1e-8 ? 0 : +v.toFixed(5));
+      return `1 ${p.color} ${n(p.mesh.position.x * 20)} ${n(-p.mesh.position.y * 20)} ${n(-p.mesh.position.z * 20)} ${n(e[0])} ${n(e[4])} ${n(e[8])} ${n(e[1])} ${n(e[5])} ${n(e[9])} ${n(e[2])} ${n(e[6])} ${n(e[10])} ${p.modelPart ?? p.part}.dat`;
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([makeLDR(lines)]));
+    a.download = "sim-studio-model.ldr";
+    a.click();
+  };
+  const refreshProjectList = async () => {
+    try {
+      const nextProjects = await listBrowserProjects();
+      setProjects(nextProjects);
+      setProjectPage((page) =>
+        Math.min(page, Math.max(0, Math.ceil(nextProjects.length / 9) - 1)),
+      );
+    } catch {}
+  };
+  const downloadProjectDocument = (document: SimStudioProjectDocument) => {
+    const url = URL.createObjectURL(
+        new Blob([encodeProjectFile(document)], { type: PROJECT_MIME }),
+      ),
+      anchor = window.document.createElement("a");
+    anchor.href = url;
+    anchor.download = safeProjectFileName(document.name);
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  // --- Project manager actions ---------------------------------------------
+  const saveCurrentProject = async () => {
+    const state = appRef.current;
+    if (!state || running || projectBusy) return;
+    setProjectBusy(true);
+    const previousSavedRevision = savedProjectRevisionRef.current;
+    try {
+      projectNameRef.current =
+        projectName.trim() ||
+        (language === "es"
+          ? "Mecanismo sin título"
+          : isChinese
+            ? "未命名模型"
+            : "Untitled mechanism");
+      savedProjectRevisionRef.current = projectRevisionRef.current;
+      const document = state.createProjectDocument();
+      await saveBrowserProject(document);
+      await saveRecoveryProject(document);
+      await refreshProjectList();
+      setRecoveryStatus("saved");
+      setCurrentProjectSaved(true);
+      setProjectDirty(false);
+      setSaveNamePrompt(false);
+      setProjectNameEditing(false);
+      setMessage(
+        language === "es"
+          ? `Proyecto «${document.name}» guardado en el navegador`
+          : isChinese
+            ? `项目“${document.name}”已保存在此浏览器中`
+            : `Project “${document.name}” saved in this browser`,
+      );
+    } catch (error) {
+      savedProjectRevisionRef.current = previousSavedRevision;
+      setMessage(
+        `${language === "es" ? "No se pudo guardar" : isChinese ? "无法保存" : "Could not save"}: ${error instanceof Error ? error.message : "IndexedDB"}`,
+      );
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+  const requestProjectSave = () => {
+    if (running || projectBusy) return;
+    if (currentProjectSaved) {
+      void saveCurrentProject();
+      return;
+    }
+    setProjectMenuOpen(true);
+    setSaveNamePrompt(true);
+    setMessage(t.nameBeforeSave);
+    window.setTimeout(() => {
+      projectNameInputRef.current?.focus();
+      projectNameInputRef.current?.select();
+    }, 0);
+  };
+  saveShortcutRef.current = requestProjectSave;
+  const resolveMapUpdates = async (
+    candidates: MapUpdateCandidate[],
+    usePreloaded: boolean,
+  ) => {
+    if (!candidates.length || running) return;
+    const state = appRef.current,
+      affectedKeys = new Set(candidates.map((candidate) => candidate.key)),
+      hasRuntimeInstances =
+        state?.pieces.some((piece) => affectedKeys.has(correctionStorageKeyFor(piece))) ??
+        false;
+    let connectorsChanged = false,
+      runtimeChanged = false;
+    if (usePreloaded && state && hasRuntimeInstances) state.recordHistory();
+    for (const candidate of candidates) {
+      const current = preloadedMapFingerprint(candidate.key),
+        bundle = preloadedMapBundle(candidate.key),
+        provenance = preloadedMapProvenance(candidate.key),
+        hasBrowserCopy = candidate.sources.includes("browser");
+      try {
+        if (usePreloaded && hasBrowserCopy) {
+          if (candidate.layers.includes("connectors")) {
+            localStorage.removeItem(`sim-connectors-v4:${candidate.key}`);
+            localStorage.removeItem(`sim-connectors-revision:${candidate.key}`);
+          }
+          if (candidate.layers.includes("colliders"))
+            localStorage.removeItem(`sim-colliders-v1:${candidate.key}`);
+          if (candidate.layers.includes("gearColliders"))
+            localStorage.removeItem(`sim-gear-colliders-v1:${candidate.key}`);
+          if (candidate.layers.includes("specialGear"))
+            localStorage.removeItem(`sim-special-gear-v1:${candidate.key}`);
+        }
+        if (hasBrowserCopy) writeStoredMapBaseline(localStorage, candidate.key, current);
+      } catch {}
+      projectMapBaselinesRef.current[candidate.key] = current;
+      if (!usePreloaded || !state) continue;
+      const instances = state.pieces.filter(
+        (piece) => correctionStorageKeyFor(piece) === candidate.key,
+      );
+      if (!instances.length) continue;
+      runtimeChanged = true;
+      for (const piece of instances) {
+        piece.mapProvenance = {
+          ...piece.mapProvenance,
+          ...Object.fromEntries(
+            candidate.layers.map((layer) => [layer, provenance[layer]]),
+          ),
+        };
+        if (candidate.layers.includes("connectors") && Array.isArray(bundle.connectors)) {
+          const previousConnectors = piece.connectors,
+            replacementConnectors = bundle.connectors.map(runtimeConnectorFromStored);
+          state.connections.forEach((connection) => {
+            if (connection.a === piece) {
+              const index = previousConnectors.indexOf(connection.socket);
+              if (index >= 0 && replacementConnectors[index]?.role === "socket")
+                connection.socket = replacementConnectors[index];
+            }
+            if (connection.b === piece) {
+              const index = previousConnectors.indexOf(connection.shaft);
+              if (index >= 0 && replacementConnectors[index]?.role === "shaft")
+                connection.shaft = replacementConnectors[index];
+            }
+          });
+          piece.connectors = replacementConnectors;
+          piece.mesh.userData.connectorReach = connectorMapReach(piece.connectors);
+          connectorsChanged = true;
+        }
+        if (candidate.layers.includes("colliders") && Array.isArray(bundle.colliders))
+          piece.colliders = bundle.colliders.map(runtimeColliderFromStored);
+        if (
+          candidate.layers.includes("gearColliders") &&
+          Array.isArray(bundle.gearColliders)
+        )
+          piece.gearColliders = bundle.gearColliders.map(runtimeColliderFromStored);
+        if (candidate.layers.includes("specialGear") && bundle.specialGear !== undefined)
+          piece.specialGear = bundle.specialGear;
+      }
+    }
+    if (state && runtimeChanged) {
+      if (connectorsChanged) await state.verifyConnectionsAsync();
+      state.gearLinks = detectGearLinks(
+        state.pieces,
+        undefined,
+        differentialCarrierGearExclusions(state.pieces, state.connections),
+      );
+      state.rebuildRenderBatches();
+      state.refreshDebug();
+      state.scheduleRecoverySave();
+      setConnectorRevision((value) => value + 1);
+      setColliderRevision((value) => value + 1);
+      setConnectionRevision((value) => value + 1);
+    } else if (
+      state &&
+      candidates.some((candidate) => candidate.sources.includes("project"))
+    ) {
+      state.scheduleRecoverySave();
+    }
+    setMapUpdates((current) => {
+      const remaining = current.filter((candidate) => !affectedKeys.has(candidate.key));
+      if (!remaining.length) setMapUpdatesOpen(false);
+      return remaining;
+    });
+    setMessage(
+      usePreloaded
+        ? language === "es"
+          ? isChineseLanguage()
+            ? `${candidates.length} mapa${candidates.length === 1 ? "" : "s"} 已更新${candidates.length === 1 ? "" : "s"}`
+            : `${candidates.length} mapa${candidates.length === 1 ? "" : "s"} actualizado${candidates.length === 1 ? "" : "s"}`
+          : isChinese
+            ? `${candidates.length} 个零件映射已更新`
+            : `${candidates.length} part map${candidates.length === 1 ? "" : "s"} updated`
+        : language === "es"
+          ? `Se conserva la versión local de ${candidates.length} pieza${candidates.length === 1 ? "" : "s"}`
+          : isChinese
+            ? `已保留 ${candidates.length} 个零件的本地版本`
+            : `Kept the local version for ${candidates.length} part${candidates.length === 1 ? "" : "s"}`,
+    );
+  };
+  const performOpenSavedProject = async (id: string) => {
+    const state = appRef.current;
+    if (!state || running || projectBusy) return;
+    setProjectBusy(true);
+    try {
+      const document = await loadBrowserProject(id);
+      if (!document) throw new Error(isChinese ? "未找到项目" : "Project not found");
+      await state.restoreProjectDocument(document);
+      savedProjectRevisionRef.current = projectRevisionRef.current;
+      setCurrentProjectSaved(true);
+      setProjectDirty(false);
+      setProjectNameEditing(false);
+      setProjectMenuOpen(false);
+      setMessage(
+        language === "es"
+          ? `Proyecto «${document.name}» cargado sin recalcular conexiones`
+          : isChinese
+            ? `项目“${document.name}”已加载，沿用保存的连接`
+            : `Project “${document.name}” loaded without rescanning connections`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : isChinese
+            ? "无法打开项目"
+            : "Could not open project",
+      );
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+  const performCreateNewProject = () => {
+    if (running || projectBusy) return;
+    reset();
+    const id = createProjectId(),
+      createdAt = new Date().toISOString(),
+      name =
+        language === "es"
+          ? "Mecanismo sin título"
+          : isChinese
+            ? "未命名模型"
+            : "Untitled mechanism";
+    activeProjectIdRef.current = id;
+    projectCreatedAtRef.current = createdAt;
+    projectRevisionRef.current = 0;
+    savedProjectRevisionRef.current = null;
+    projectMapBaselinesRef.current = {};
+    projectNameRef.current = name;
+    suppressProjectNameDirtyRef.current = true;
+    setProjectName(name);
+    setImported([]);
+    setCurrentProjectSaved(false);
+    setProjectDirty(false);
+    setSaveNamePrompt(false);
+    setProjectNameEditing(false);
+    appRef.current?.scheduleRecoverySave(true, false);
+    setProjectMenuOpen(false);
+    setMessage(
+      language === "es" ? "Proyecto nuevo" : isChinese ? "新建项目" : "New project",
+    );
+  };
+  const requestCreateNewProject = () => {
+    if (projectDirty) setProjectConfirmation({ kind: "new" });
+    else performCreateNewProject();
+  };
+  const requestOpenSavedProject = (project: ProjectSummary) => {
+    if (projectDirty) setProjectConfirmation({ kind: "open", project });
+    else void performOpenSavedProject(project.id);
+  };
+  const exportCurrentProject = () => {
+    const state = appRef.current;
+    if (!state || running) return;
+    projectNameRef.current =
+      projectName.trim() || (isChinese ? "未命名模型" : "Untitled mechanism");
+    downloadProjectDocument(state.createProjectDocument());
+  };
+  const performImportProject = async (document: SimStudioProjectDocument) => {
+    const state = appRef.current;
+    if (!state || running || projectBusy) return;
+    setProjectBusy(true);
+    try {
+      const existingProjects = await listBrowserProjects(),
+        now = new Date().toISOString(),
+        importedDocument: SimStudioProjectDocument = {
+          ...document,
+          id: createProjectId(),
+          name: uniqueProjectName(
+            document.name,
+            existingProjects,
+            language === "es"
+              ? "Proyecto importado"
+              : isChinese
+                ? "导入的项目"
+                : "Imported project",
+          ),
+          createdAt: now,
+          updatedAt: now,
+        };
+      savedProjectRevisionRef.current = importedDocument.revision ?? 0;
+      importedDocument.savedRevision = savedProjectRevisionRef.current;
+      await saveBrowserProject(importedDocument);
+      await state.restoreProjectDocument(importedDocument);
+      setCurrentProjectSaved(true);
+      setProjectDirty(false);
+      setProjectNameEditing(false);
+      await refreshProjectList();
+      setProjectMenuOpen(false);
+      setMessage(
+        language === "es"
+          ? `Proyecto «${importedDocument.name}» importado como proyecto nuevo`
+          : isChinese
+            ? `项目“${importedDocument.name}”已作为新项目导入`
+            : `Project “${importedDocument.name}” imported as a new project`,
+      );
+    } catch (error) {
+      setMessage(
+        `${language === "es" ? "Archivo de proyecto no válido" : isChinese ? "项目文件无效" : "Invalid project file"}: ${error instanceof Error ? error.message : "error"}`,
+      );
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+  const importProjectFile = async (file: File) => {
+    try {
+      const document = decodeProjectFile(await file.arrayBuffer());
+      if (projectDirty) setProjectConfirmation({ kind: "import", document });
+      else void performImportProject(document);
+    } catch (error) {
+      setMessage(
+        `${language === "es" ? "Archivo de proyecto no válido" : isChinese ? "项目文件无效" : "Invalid project file"}: ${error instanceof Error ? error.message : "error"}`,
+      );
+    }
+  };
+  const performRemoveSavedProject = async (id: string) => {
+    if (projectBusy) return;
+    setProjectBusy(true);
+    try {
+      await deleteBrowserProject(id);
+      await refreshProjectList();
+      if (id === activeProjectIdRef.current) {
+        savedProjectRevisionRef.current = null;
+        setCurrentProjectSaved(false);
+        setProjectDirty(true);
+        appRef.current?.scheduleRecoverySave(true, false);
+      }
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+  const resolveProjectConfirmation = () => {
+    const confirmation = projectConfirmation;
+    setProjectConfirmation(null);
+    if (!confirmation) return;
+    if (confirmation.kind === "new") performCreateNewProject();
+    else if (confirmation.kind === "open")
+      void performOpenSavedProject(confirmation.project.id);
+    else if (confirmation.kind === "delete")
+      void performRemoveSavedProject(confirmation.project.id);
+    else if (confirmation.kind === "import")
+      void performImportProject(confirmation.document);
+  };
+  const beginProjectRename = () => {
+    if (!currentProjectSaved || projectBusy || running) return;
+    setProjectNameDraft(projectName);
+    setProjectNameEditing(true);
+    window.setTimeout(() => {
+      projectNameInputRef.current?.focus();
+      projectNameInputRef.current?.select();
+    }, 0);
+  };
+  const cancelProjectRename = () => {
+    setProjectNameDraft("");
+    setProjectNameEditing(false);
+  };
+  const confirmProjectRename = async () => {
+    const name = projectNameDraft.trim().slice(0, 20);
+    if (!name || !currentProjectSaved || projectBusy || running) return;
+    if (name === projectName) {
+      cancelProjectRename();
+      return;
+    }
+    setProjectBusy(true);
+    try {
+      const document = await loadBrowserProject(activeProjectIdRef.current);
+      if (!document) throw new Error(isChinese ? "未找到项目" : "Project not found");
+      document.name = name;
+      document.updatedAt = new Date().toISOString();
+      await saveBrowserProject(document);
+      suppressProjectNameDirtyRef.current = true;
+      projectNameRef.current = name;
+      setProjectName(name);
+      setProjectNameDraft("");
+      setProjectNameEditing(false);
+      appRef.current?.scheduleRecoverySave(true, false);
+      await refreshProjectList();
+      setMessage(
+        language === "es"
+          ? `Proyecto renombrado como «${name}»`
+          : isChinese
+            ? `项目已重命名为“${name}”`
+            : `Project renamed to “${name}”`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : isChinese
+            ? "无法重命名项目"
+            : "Could not rename project",
+      );
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+  const beginDuplicateProject = async () => {
+    if (!currentProjectSaved || projectBusy || running) return;
+    setProjectBusy(true);
+    try {
+      const document = await loadBrowserProject(activeProjectIdRef.current);
+      if (!document) throw new Error(isChinese ? "未找到项目" : "Project not found");
+      const suffix = language === "es" ? " copia" : " copy";
+      setDuplicateProjectDocument(document);
+      setDuplicateProjectName(
+        `${document.name.slice(0, Math.max(1, 20 - suffix.length))}${suffix}`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : isChinese
+            ? "无法复制项目"
+            : "Could not duplicate project",
+      );
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+  const confirmDuplicateProject = async () => {
+    const name = duplicateProjectName.trim().slice(0, 20),
+      source = duplicateProjectDocument;
+    if (!name || !source || projectBusy) return;
+    setProjectBusy(true);
+    try {
+      const existingProjects = await listBrowserProjects(),
+        uniqueName = uniqueProjectName(
+          name,
+          existingProjects,
+          language === "es" ? "Copia" : isChinese ? "副本" : "Copy",
+        ),
+        now = new Date().toISOString(),
+        copy: SimStudioProjectDocument = {
+          ...source,
+          id: createProjectId(),
+          name: uniqueName,
+          createdAt: now,
+          updatedAt: now,
+        };
+      await saveBrowserProject(copy);
+      setDuplicateProjectDocument(null);
+      setDuplicateProjectName("");
+      await refreshProjectList();
+      setMessage(
+        language === "es"
+          ? `Copia «${uniqueName}» creada`
+          : isChinese
+            ? `副本“${uniqueName}”已创建`
+            : `Copy “${uniqueName}” created`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : isChinese
+            ? "无法复制项目"
+            : "Could not duplicate project",
+      );
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+  const selected = appRef.current?.selected;
+  const selectedTransformPivot =
+    selected && appRef.current
+      ? editorTransformPivot(
+          appRef.current,
+          selected,
+          editorTransformMembers(appRef.current, selected),
+        )
+      : undefined;
+  const selectedEditorAssembly =
+    selected && appRef.current
+      ? editorAssemblyMembers(appRef.current.pieces, selected)
+      : [];
+  const selectedHasAdditionalPieces = appRef.current
+    ? [...appRef.current.selectedPieces].some(
+        (piece) => !selectedEditorAssembly.includes(piece),
+      )
+    : false;
+  const selectedCardanLayout =
+    appRef.current && !selectedHasAdditionalPieces
+      ? cardanAssemblyLayout(selectedEditorAssembly, appRef.current.connections)
+      : undefined;
+  const selectedCardanCoordinates = selectedCardanLayout
+    ? measureCardanCoordinates(selectedCardanLayout)
+    : undefined;
+  const selectedRubberBand = selected
+    ? appRef.current?.rubberBands.find((band) => band.owner === selected)
+    : undefined;
+  const selectedRubberRouteLength = selectedRubberBand
+    ? rubberBandLength(selectedRubberBand.guides)
+    : 0;
+  const gearMotors = appRef.current?.pieces.filter((piece) => piece.gearMotor) ?? [];
+  const selectedCollisionLayer = selected?.gear ? collisionLayer : "normal",
+    selectedCollisionPrimitives = selected
+      ? selectedCollisionLayer === "gear"
+        ? selected.gearColliders
+        : selected.colliders
+      : [];
+  const selectedConnections = selected
+    ? (appRef.current?.connections.filter(
+        (connection) => connection.a === selected || connection.b === selected,
+      ) ?? [])
+    : [];
+  const selectedGearboxSelectorPairs = selected
+    ? detectGearboxSelectorPairs(appRef.current?.pieces ?? []).filter(
+        ({ ring, selector }) => ring === selected || selector === selected,
+      )
+    : [];
+  const selectedGearSpec = selected
+      ? gearSpecFor(selected.modelPart ?? selected.part, selected.name)
+      : undefined,
+    selectedGearLinks = selected
+      ? (appRef.current?.gearLinks.filter(
+          (link) => link.a.value === selected || link.b.value === selected,
+        ) ?? [])
+      : [];
+  const selectedPivotOptions = selected
+    ? [
+        ...new Map(
+          (appRef.current?.connections ?? [])
+            .filter(
+              (connection) => connection.a === selected || connection.b === selected,
+            )
+            .map((connection) => {
+              const connector =
+                  connection.a === selected ? connection.socket : connection.shaft,
+                connectorIndex = selected.connectors.indexOf(connector),
+                other = connection.a === selected ? connection.b : connection.a,
+                local = selected.mesh.worldToLocal(
+                  connection.a.mesh.localToWorld(connection.socket.local.clone()),
+                );
+              const typeName =
+                connector.kind === "axle"
+                  ? connector.role === "shaft"
+                    ? language === "es"
+                      ? "eje morado"
+                      : isChinese
+                        ? "紫色十字轴"
+                        : "purple axle"
+                    : language === "es"
+                      ? "hueco verde"
+                      : isChinese
+                        ? "绿色轴孔"
+                        : "green socket"
+                  : connector.role === "shaft"
+                    ? language === "es"
+                      ? "pin naranja"
+                      : isChinese
+                        ? "橙色连接销"
+                        : "orange pin"
+                    : language === "es"
+                      ? "hueco azul"
+                      : isChinese
+                        ? "蓝色销孔"
+                        : "blue socket";
+              const key = jointPivotKey(connection);
+              return [
+                key,
+                {
+                  key,
+                  local: local.clone(),
+                  label: `${t.connectionPivot} ${connectorIndex + 1} · ${typeName} ↔ ${other.part}`,
+                },
+              ] as const;
+            }),
+        ).values(),
+      ]
+    : [];
+  const selectedPivotValue = selectedPivotOptions.some(
+    (option) => option.key === selected?.rotationPivotKey,
+  )
+    ? selected!.rotationPivotKey!
+    : "center";
+  const toggleDebug = (key: keyof DebugFlags) =>
+    setDebugViews((current) => {
+      const next = { ...current, [key]: !current[key] },
+        s = appRef.current;
+      if (s) {
+        s.debug = next;
+        s.refreshDebug();
+      }
+      return next;
+    });
+  const separateSelectedEditorAssembly = () => {
+    const state = appRef.current,
+      piece = state?.selected;
+    if (!state || !piece || running) return;
+    const members = editorAssemblyMembers(state.pieces, piece);
+    if (members.length < 2) return;
+    state.recordHistory();
+    members.forEach((member) => {
+      member.editorAssemblyId = undefined;
+      member.editorAssemblyDetached = true;
+    });
+    state.selectedPieces = new Set([piece]);
+    state.selected = piece;
+    state.refreshDebug();
+    state.scheduleRecoverySave();
+    setConnectionRevision((revision) => revision + 1);
+    setMessage(
+      language === "es"
+        ? `Conjunto separado: ${members.length} piezas independientes`
+        : isChinese
+          ? `已拆分组合： ${members.length} 个独立零件`
+          : `Assembly separated: ${members.length} independent parts`,
+    );
+  };
+  const swapSelectedCardanReference = () => {
+    const state = appRef.current,
+      piece = state?.selected;
+    if (!state || !piece || running) return;
+    const layout = cardanAssemblyLayout(
+      editorAssemblyMembers(state.pieces, piece),
+      state.connections,
+    );
+    if (!layout) return;
+    if (layout.referenceLockedBySingleAxle) {
+      setMessage(
+        language === "es"
+          ? "La pieza 1 se elige automáticamente porque solo ese extremo está conectado a un eje"
+          : isChinese
+            ? "仅此端连接了轴，因此自动选为第 1 端"
+            : "End 1 is automatic because only that end is connected to an axle",
+      );
+      return;
+    }
+    state.recordHistory();
+    layout.centre.editorCardanReferenceConnector =
+      layout.referenceConnector === 0 ? 1 : 0;
+    state.selected = layout.centre;
+    state.selectedPieces = new Set(editorAssemblyMembers(state.pieces, layout.centre));
+    state.refreshDebug();
+    state.scheduleRecoverySave();
+    setConnectorRevision((value) => value + 1);
+    setSelectedId(layout.centre.id);
+    setMessage(
+      language === "es"
+        ? "Referencia del cardán intercambiada: el otro extremo es ahora la pieza 1"
+        : isChinese
+          ? "万向节参考端已切换：另一端现为第 1 端"
+          : "Cardan reference swapped: the opposite end is now end 1",
+    );
+  };
+  const setConnectionMode = (id: string, mode: JointMode) => {
+    const state = appRef.current,
+      connection = state?.connections.find((item) => item.id === id);
+    if (
+      !state ||
+      !connection ||
+      running ||
+      !allowedModesForConnection(connection).includes(mode)
+    )
+      return;
+    state.recordHistory();
+    connection.mode = mode;
+    connection.userConfigured = true;
+    state.connectionModes.set(id, {
+      mode,
+      motorSpeed: connection.motorSpeed,
+      motorForce: connection.motorForce,
+      motorPulse: connection.motorPulse,
+      motorPulseAngle: connection.motorPulseAngle,
+      motorPulseInterval: connection.motorPulseInterval,
+      userConfigured: true,
+    });
+    rebalanceSmartDefaults(state, connection.b);
+    state.refreshDebug();
+    setConnectionRevision((value) => value + 1);
+    setMessage(`${profileLabels[connection.profile]} · ${modeLabels[mode]}`);
+  };
+  const setMotorSpeed = (id: string, motorSpeed: number) => {
+    const state = appRef.current,
+      connection = state?.connections.find((item) => item.id === id);
+    if (!state || !connection) return;
+    if (!running) state.recordHistory();
+    connection.motorSpeed = motorSpeed;
+    state.connectionModes.set(id, {
+      mode: connection.mode,
+      motorSpeed,
+      motorForce: connection.motorForce,
+      motorPulse: connection.motorPulse,
+      motorPulseAngle: connection.motorPulseAngle,
+      motorPulseInterval: connection.motorPulseInterval,
+      userConfigured: connection.userConfigured,
+    });
+    const activeJoint = state.physicsJoints.get(id);
+    if (running && activeJoint)
+      activeJoint.configureMotorVelocity(
+        motorSpeed,
+        connection.motorForce,
+        connection.motorPulse ? THREE.MathUtils.degToRad(connection.motorPulseAngle) : 0,
+        connection.motorPulse ? connection.motorPulseInterval : 0,
+      );
+    setConnectionRevision((value) => value + 1);
+    setMessage(
+      isChinese
+        ? `电机 ${motorSpeed.toFixed(1)} rad/s`
+        : `Motor ${motorSpeed.toFixed(1)} rad/s`,
+    );
+  };
+  const setMotorForce = (id: string, motorForce: number) => {
+    const state = appRef.current,
+      connection = state?.connections.find((item) => item.id === id);
+    if (!state || !connection) return;
+    if (!running) state.recordHistory();
+    connection.motorForce = motorForce;
+    state.connectionModes.set(id, {
+      mode: connection.mode,
+      motorSpeed: connection.motorSpeed,
+      motorForce,
+      motorPulse: connection.motorPulse,
+      motorPulseAngle: connection.motorPulseAngle,
+      motorPulseInterval: connection.motorPulseInterval,
+      userConfigured: connection.userConfigured,
+    });
+    const activeJoint = state.physicsJoints.get(id);
+    if (running && activeJoint)
+      activeJoint.configureMotorVelocity(
+        connection.motorSpeed,
+        motorForce,
+        connection.motorPulse ? THREE.MathUtils.degToRad(connection.motorPulseAngle) : 0,
+        connection.motorPulse ? connection.motorPulseInterval : 0,
+      );
+    setConnectionRevision((value) => value + 1);
+    setMessage(
+      isChinese
+        ? `电机扭矩 ${motorForce.toFixed(0)}`
+        : `Fuerza del motor ${motorForce.toFixed(0)}`,
+    );
+  };
+  const setMotorPulse = (
+    id: string,
+    update: Partial<
+      Pick<Connection, "motorPulse" | "motorPulseAngle" | "motorPulseInterval">
+    >,
+  ) => {
+    const state = appRef.current,
+      connection = state?.connections.find((item) => item.id === id);
+    if (!state || !connection || running) return;
+    state.recordHistory();
+    if (update.motorPulse !== undefined) connection.motorPulse = update.motorPulse;
+    if (update.motorPulseAngle !== undefined)
+      connection.motorPulseAngle = THREE.MathUtils.clamp(update.motorPulseAngle, 1, 360);
+    if (update.motorPulseInterval !== undefined)
+      connection.motorPulseInterval = THREE.MathUtils.clamp(
+        update.motorPulseInterval,
+        0.05,
+        60,
+      );
+    state.connectionModes.set(id, {
+      mode: connection.mode,
+      motorSpeed: connection.motorSpeed,
+      motorForce: connection.motorForce,
+      motorPulse: connection.motorPulse,
+      motorPulseAngle: connection.motorPulseAngle,
+      motorPulseInterval: connection.motorPulseInterval,
+      userConfigured: connection.userConfigured,
+    });
+    state.scheduleRecoverySave();
+    setConnectionRevision((value) => value + 1);
+    setMessage(
+      connection.motorPulse
+        ? isChinese
+          ? `脉冲电机 · ${connection.motorPulseAngle.toFixed(0)}°，间隔 ${connection.motorPulseInterval.toFixed(2)} s`
+          : `Motor por pulsos · ${connection.motorPulseAngle.toFixed(0)}° cada ${connection.motorPulseInterval.toFixed(2)} s`
+        : isChinese
+          ? "连续电机"
+          : "Motor continuo",
+    );
+  };
+  // --- Connection-map editor -----------------------------------------------
+  const connectorData = (piece: Piece) =>
+    piece.connectors.map((connector) => ({
+      local: connector.local.toArray(),
+      axis: connector.axis.toArray(),
+      kind: connector.kind,
+      role: connector.role,
+      diameter: connector.diameter,
+      length: connector.length,
+      rotationOnly: connector.rotationOnly,
+      sliding: connector.sliding,
+      connectionTarget: connector.connectionTarget
+        ? { ...connector.connectionTarget }
+        : undefined,
+      singleConnection: connector.singleConnection,
+    }));
+  const commitConnectorMap = (
+    piece: Piece,
+    connectors: MeshConnector[],
+    notice: string,
+    provenance: MapProvenance = { origin: "manual", source: "map-editor" },
+    preserveConnections = false,
+  ) => {
+    const state = appRef.current;
+    if (!state || running) return;
+    state.recordHistory();
+    const normalized = connectors.map((connector) => ({
+      ...connector,
+      local: connector.local.clone(),
+      axis:
+        connector.axis.lengthSq() > 0.0001
+          ? connector.axis.clone().normalize()
+          : new THREE.Vector3(1, 0, 0),
+    }));
+    for (const instance of state.pieces.filter((item) => item.part === piece.part)) {
+      const previousConnectors = instance.connectors,
+        replacementConnectors = normalized.map((connector) => ({
+          ...connector,
+          local: connector.local.clone(),
+          axis: connector.axis.clone(),
+        }));
+      if (preserveConnections) {
+        state.connections.forEach((connection) => {
+          if (connection.a === instance) {
+            const index = previousConnectors.indexOf(connection.socket);
+            if (index >= 0 && replacementConnectors[index]?.role === "socket")
+              connection.socket = replacementConnectors[index];
+          }
+          if (connection.b === instance) {
+            const index = previousConnectors.indexOf(connection.shaft);
+            if (index >= 0 && replacementConnectors[index]?.role === "shaft")
+              connection.shaft = replacementConnectors[index];
+          }
+        });
+      }
+      instance.mapProvenance = { ...instance.mapProvenance, connectors: provenance };
+      instance.connectors = replacementConnectors;
+      instance.mesh.userData.connectorReach = connectorMapReach(instance.connectors);
+      // Connector edits must not discard a reviewed collision map. Colliders
+      // are maintained by the collision-map editor and may be authored
+      // independently from the connector topology.
+    }
+    state.connections = state.connections.filter((connection) =>
+      preserveConnections
+        ? connection.a.connectors.includes(connection.socket) &&
+          connection.b.connectors.includes(connection.shaft) &&
+          pairProfile(connection.socket, connection.shaft) !== undefined &&
+          connectorPoliciesCompatible(
+            connection.a,
+            connection.socket,
+            connection.b,
+            connection.shaft,
+          )
+        : connection.a.part !== piece.part && connection.b.part !== piece.part,
+    );
+    rebalanceAllSmartDefaults(state);
+    try {
+      localStorage.setItem(
+        `sim-connectors-v4:${correctionStorageKeyFor(piece)}`,
+        JSON.stringify(connectorData({ ...piece, connectors: normalized })),
+      );
+      localStorage.setItem(
+        `sim-connectors-revision:${correctionStorageKeyFor(piece)}`,
+        CORRECTION_MAP_REVISION,
+      );
+    } catch {}
+    acknowledgeManualMapEdit(correctionStorageKeyFor(piece), ["connectors"]);
+    writeMapProvenance(localStorage, correctionStorageKeyFor(piece), {
+      connectors: provenance,
+    });
+    state.debug.connectors = true;
+    setDebugViews((current) => ({ ...current, connectors: true }));
+    state.refreshDebug();
+    setConnectorRevision((value) => value + 1);
+    setConnectionRevision((value) => value + 1);
+    setMessage(notice);
+  };
+  const updateConnector = (
+    index: number,
+    field: "kind" | "role" | "diameter" | "length" | "local" | "axis",
+    value: string,
+    component = 0,
+  ) => {
+    if (!selected || running) return;
+    const next = selected.connectors.map((connector) => ({
+        ...connector,
+        local: connector.local.clone(),
+        axis: connector.axis.clone(),
+      })),
+      connector = next[index];
+    if (field === "kind") connector.kind = value as MeshConnector["kind"];
+    else if (field === "role") connector.role = value as MeshConnector["role"];
+    else if (field === "diameter") connector.diameter = Math.max(0.01, +value || 0.01);
+    else if (field === "length") connector.length = Math.max(0.01, +value || 0.01);
+    else connector[field].setComponent(component, +value || 0);
+    commitConnectorMap(
+      selected,
+      next,
+      isChinese
+        ? isChineseLanguage()
+          ? `映射 ${selected.part}：连接点 ${index + 1} 已更新`
+          : `映射 ${selected.part}：连接点 ${index + 1} actualizado`
+        : isChineseLanguage()
+          ? `Mapa ${selected.part}: punto ${index + 1} 已更新`
+          : `Mapa ${selected.part}: punto ${index + 1} actualizado`,
+    );
+  };
+  const updateConnectorPolicy = (
+    index: number,
+    update: (connector: MeshConnector) => void,
+  ) => {
+    if (!selected || running) return;
+    const next = selected.connectors.map((connector) => ({
+        ...connector,
+        local: connector.local.clone(),
+        axis: connector.axis.clone(),
+        connectionTarget: connector.connectionTarget
+          ? { ...connector.connectionTarget }
+          : undefined,
+      })),
+      connector = next[index];
+    if (!connector) return;
+    update(connector);
+    commitConnectorMap(
+      selected,
+      next,
+      isChinese
+        ? isChineseLanguage()
+          ? `映射 ${selected.part}：连接点规则 ${index + 1} 已更新`
+          : `映射 ${selected.part}：连接点规则 ${index + 1} actualizadas`
+        : isChineseLanguage()
+          ? `Mapa ${selected.part}: reglas del conector ${index + 1} 已更新`
+          : `Mapa ${selected.part}: reglas del conector ${index + 1} actualizadas`,
+      { origin: "manual", source: "map-editor" },
+      true,
+    );
+  };
+  const addConnector = () => {
+    if (!selected || running) return;
+    const next = selected.connectors.map((connector) => ({
+      ...connector,
+      local: connector.local.clone(),
+      axis: connector.axis.clone(),
+    }));
+    next.push({
+      local: new THREE.Vector3(),
+      axis: new THREE.Vector3(0, 1, 0),
+      kind: "round",
+      role: "socket",
+      diameter: 0.8,
+      length: 1,
+    });
+    commitConnectorMap(
+      selected,
+      next,
+      isChinese
+        ? `映射 ${selected.part}：已添加连接点`
+        : `Mapa ${selected.part}: conector añadido`,
+    );
+  };
+  const regenerateConnectorMap = () => {
+    if (!selected || running) return;
+    const connectors = generatePartConnectors(selected.mesh, selected.name);
+    commitConnectorMap(
+      selected,
+      connectors,
+      isChinese
+        ? `映射 ${selected.part}: ${connectors.length} 个连接点已重新生成`
+        : `Mapa ${selected.part}: ${connectors.length} conectores regenerados`,
+      automaticMapProvenance(),
+    );
+  };
+  const removeConnector = (index: number) => {
+    if (!selected || running) return;
+    commitConnectorMap(
+      selected,
+      selected.connectors.filter((_, item) => item !== index),
+      isChinese
+        ? `映射 ${selected.part}：已删除连接点`
+        : `Mapa ${selected.part}: conector eliminado`,
+    );
+  };
+  const duplicateConnector = (index: number) => {
+    if (!selected || running) return;
+    const next = selected.connectors.map((connector) => ({
+        ...connector,
+        local: connector.local.clone(),
+        axis: connector.axis.clone(),
+      })),
+      source = next[index];
+    if (!source) return;
+    next.splice(index + 1, 0, {
+      ...source,
+      local: source.local.clone(),
+      axis: source.axis.clone(),
+      connectionTarget: source.connectionTarget
+        ? { ...source.connectionTarget }
+        : undefined,
+    });
+    commitConnectorMap(
+      selected,
+      next,
+      isChinese
+        ? isChineseLanguage()
+          ? `映射 ${selected.part}：连接点 ${index + 1} 已复制`
+          : `映射 ${selected.part}：连接点 ${index + 1} duplicado`
+        : isChineseLanguage()
+          ? `Mapa ${selected.part}: conector ${index + 1} 已复制`
+          : `Mapa ${selected.part}: conector ${index + 1} duplicado`,
+    );
+  };
+  const exportConnectorMap = () => {
+    if (!selected) return;
+    const payload = {
+        format: "sim-studio-connect-map",
+        version: 1,
+        mapProvenance: {
+          connectors: normalizeMapProvenance(selected.mapProvenance?.connectors),
+        },
+        part: selected.part,
+        name: selected.name,
+        connectors: connectorData(selected),
+      },
+      a = document.createElement("a");
+    a.href = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      }),
+    );
+    a.download = `${selected.part}-connections.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const importConnectorMap = async (file: File) => {
+    if (!selected || running) return;
+    try {
+      const payload = JSON.parse(await file.text()),
+        rows = Array.isArray(payload) ? payload : payload.connectors;
+      if (!Array.isArray(rows))
+        throw new Error(isChinese ? "格式不正确" : "Formato incorrecto");
+      const connectors: MeshConnector[] = rows.map(
+        (row: {
+          local: number[];
+          axis: number[];
+          kind: string;
+          role: string;
+          diameter?: number;
+          length?: number;
+          rotationOnly?: boolean;
+          sliding?: boolean;
+          connectionTarget?: {
+            partId?: string;
+            connectorId?: number;
+          };
+          singleConnection?: boolean;
+        }) => {
+          if (
+            !Array.isArray(row.local) ||
+            !Array.isArray(row.axis) ||
+            !["round", "axle", "half"].includes(row.kind) ||
+            !["socket", "shaft"].includes(row.role)
+          )
+            throw new Error(isChinese ? "连接点格式不正确" : "Conector incorrecto");
+          return {
+            local: new THREE.Vector3().fromArray(row.local),
+            axis: new THREE.Vector3().fromArray(row.axis),
+            kind: row.kind as MeshConnector["kind"],
+            role: row.role as MeshConnector["role"],
+            diameter: row.diameter ?? 0.24,
+            length: row.length,
+            rotationOnly: row.rotationOnly === true || undefined,
+            sliding: typeof row.sliding === "boolean" ? row.sliding : undefined,
+            connectionTarget:
+              row.connectionTarget && typeof row.connectionTarget.partId === "string"
+                ? {
+                    partId: row.connectionTarget.partId.trim(),
+                    connectorId:
+                      typeof row.connectionTarget.connectorId === "number" &&
+                      Number.isInteger(row.connectionTarget.connectorId) &&
+                      row.connectionTarget.connectorId > 0
+                        ? row.connectionTarget.connectorId
+                        : undefined,
+                  }
+                : undefined,
+            singleConnection: row.singleConnection === true || undefined,
+          };
+        },
+      );
+      commitConnectorMap(
+        selected,
+        connectors,
+        isChinese
+          ? `映射 ${selected.part}: ${connectors.length} 个连接点已导入`
+          : `Mapa ${selected.part}: ${connectors.length} conectores importados`,
+        payload.mapProvenance?.connectors
+          ? normalizeMapProvenance(payload.mapProvenance.connectors)
+          : { origin: "manual", source: "legacy-import" },
+      );
+    } catch (error) {
+      setMessage(
+        isChinese
+          ? `无法导入映射： ${error instanceof Error ? error.message : isChinese ? "JSON 无效" : "JSON inválido"}`
+          : `No se pudo importar el mapa: ${error instanceof Error ? error.message : isChinese ? "JSON 无效" : "JSON inválido"}`,
+      );
+    } finally {
+      if (connectorFileRef.current) connectorFileRef.current.value = "";
+    }
+  };
+  const cloneCollider = (primitive: CollisionPrimitive): CollisionPrimitive => ({
+      ...primitive,
+      center: primitive.center.clone(),
+      size: primitive.size?.clone(),
+      arcPoints: primitive.arcPoints?.map((point) => [...point]) as
+        ArcControlPoints | undefined,
+      rotation: primitive.rotation.clone(),
+    }),
+    colliderData = (colliders: CollisionPrimitive[]) =>
+      colliders.map((primitive) => ({
+        shape: primitive.shape,
+        center: primitive.center.toArray(),
+        size: primitive.size?.toArray(),
+        radius: primitive.radius,
+        innerRadius: primitive.innerRadius,
+        halfHeight: primitive.halfHeight,
+        startAngle: primitive.startAngle,
+        arcAngle: primitive.arcAngle,
+        arcPoints: primitive.arcPoints,
+        arcThickness: primitive.arcThickness,
+        segments: primitive.segments,
+        rotation: primitive.rotation.toArray(),
+        gearCollision: primitive.gearCollision,
+        gearRatio: primitive.gearRatio,
+      }));
+  // --- Collision-map editor ------------------------------------------------
+  const commitCollisionMap = (
+    piece: Piece,
+    colliders: CollisionPrimitive[],
+    notice: string,
+    layer: "normal" | "gear" = selectedCollisionLayer,
+    provenance: MapProvenance = { origin: "manual", source: "map-editor" },
+  ) => {
+    const state = appRef.current;
+    if (!state || running) return;
+    state.recordHistory();
+    const normalized = colliders.map(cloneCollider);
+    state.pieces
+      .filter((instance) => instance.part === piece.part)
+      .forEach((instance) => {
+        instance.mapProvenance = {
+          ...instance.mapProvenance,
+          [layer === "gear" ? "gearColliders" : "colliders"]: provenance,
+        };
+        if (layer === "gear") instance.gearColliders = normalized.map(cloneCollider);
+        else instance.colliders = normalized.map(cloneCollider);
+      });
+    try {
+      localStorage.setItem(
+        layer === "gear"
+          ? `sim-gear-colliders-v1:${correctionStorageKeyFor(piece)}`
+          : `sim-colliders-v1:${correctionStorageKeyFor(piece)}`,
+        JSON.stringify(colliderData(normalized)),
+      );
+      localStorage.setItem(
+        `sim-colliders-revision:${correctionStorageKeyFor(piece)}`,
+        collisionMapRevision(correctionStorageKeyFor(piece)),
+      );
+    } catch {}
+    acknowledgeManualMapEdit(correctionStorageKeyFor(piece), [
+      layer === "gear" ? "gearColliders" : "colliders",
+    ]);
+    state.debug.colliders = true;
+    writeMapProvenance(localStorage, correctionStorageKeyFor(piece), {
+      [layer === "gear" ? "gearColliders" : "colliders"]: provenance,
+    });
+    setDebugViews((current) => ({ ...current, colliders: true }));
+    state.refreshDebug();
+    setColliderRevision((value) => value + 1);
+    setMessage(notice);
+  };
+  const regenerateCollisionMap = () => {
+    if (!selected || running) return;
+    const colliders =
+      selectedCollisionLayer === "gear"
+        ? approximateGearCollisionPrimitives(selected.colliders)
+        : (straightAxleCollisionPrimitives(selected.name) ??
+          approximateCollisionPrimitives(
+            selected.mesh,
+            selected.name,
+            selected.connectors,
+          ));
+    commitCollisionMap(
+      selected,
+      colliders,
+      isChinese
+        ? `映射 ${selected.part}: ${colliders.length} 个碰撞体已重新生成`
+        : `Mapa ${selected.part}: ${colliders.length} colliders regenerados`,
+      selectedCollisionLayer,
+      automaticMapProvenance(),
+    );
+  };
+  const addCollider = (shape: CollisionPrimitive["shape"]) => {
+    if (!selected || running) return;
+    const next = selectedCollisionPrimitives.map(cloneCollider);
+    const primitive: CollisionPrimitive = {
+      shape,
+      center: new THREE.Vector3(),
+      rotation: new THREE.Quaternion(),
+    };
+    if (shape === "box") primitive.size = new THREE.Vector3(1, 1, 1);
+    else {
+      primitive.radius = shape === "sphere" || shape === "cylinder" ? 0.5 : 0.6;
+      if (shape !== "sphere") primitive.halfHeight = 0.5;
+      if (shape === "hollowCylinder" || shape === "arc") {
+        primitive.innerRadius = 0.35;
+        primitive.segments = shape === "arc" ? 8 : 24;
+      }
+      if (shape === "arc") {
+        primitive.startAngle = 0;
+        primitive.arcAngle = 90;
+        primitive.arcPoints = arcCollisionControlPoints(primitive);
+        primitive.arcThickness = 0.25;
+      }
+    }
+    next.push(primitive);
+    commitCollisionMap(
+      selected,
+      next,
+      isChinese
+        ? `映射 ${selected.part}：已添加碰撞体`
+        : `Mapa ${selected.part}: collider añadido`,
+    );
+  };
+  const setSpecialGear = (enabled: boolean) => {
+    const state = appRef.current;
+    if (!selected || !state || running) return;
+    state.recordHistory();
+    state.pieces
+      .filter((instance) => instance.part === selected.part)
+      .forEach((instance) => {
+        instance.specialGear = enabled;
+        instance.mapProvenance = {
+          ...instance.mapProvenance,
+          specialGear: { origin: "manual", source: "map-editor" },
+        };
+      });
+    localStorage.setItem(
+      `sim-special-gear-v1:${correctionStorageKeyFor(selected)}`,
+      JSON.stringify(enabled),
+    );
+    localStorage.setItem(
+      `sim-colliders-revision:${correctionStorageKeyFor(selected)}`,
+      collisionMapRevision(correctionStorageKeyFor(selected)),
+    );
+    acknowledgeManualMapEdit(correctionStorageKeyFor(selected), ["specialGear"]);
+    writeMapProvenance(localStorage, correctionStorageKeyFor(selected), {
+      specialGear: { origin: "manual", source: "map-editor" },
+    });
+    setColliderRevision((value) => value + 1);
+  };
+  const updateColliderGearMetadata = (
+    index: number,
+    values: Pick<CollisionPrimitive, "gearCollision" | "gearRatio">,
+  ) => {
+    if (!selected || running || selectedCollisionLayer !== "normal") return;
+    const next = selectedCollisionPrimitives.map(cloneCollider),
+      primitive = next[index];
+    if (!primitive) return;
+    if (values.gearCollision !== undefined)
+      primitive.gearCollision = values.gearCollision;
+    if ("gearRatio" in values) primitive.gearRatio = values.gearRatio;
+    commitCollisionMap(
+      selected,
+      next,
+      isChinese
+        ? `映射 ${selected.part}：已更新齿轮元数据`
+        : `Mapa ${selected.part}: metadatos de engranaje actualizados`,
+      "normal",
+    );
+  };
+  const updateCollider = (
+    index: number,
+    field:
+      | "shape"
+      | "center"
+      | "size"
+      | "rotation"
+      | "radius"
+      | "innerRadius"
+      | "halfHeight"
+      | "startAngle"
+      | "arcAngle"
+      | "arcPoint"
+      | "arcThickness"
+      | "segments",
+    value: string,
+    component = 0,
+  ) => {
+    if (!selected || running) return;
+    const next = selectedCollisionPrimitives.map(cloneCollider),
+      primitive = next[index];
+    if (!primitive) return;
+    if (field === "shape") {
+      primitive.shape = value as CollisionPrimitive["shape"];
+      if (primitive.shape === "box") {
+        primitive.size ??= new THREE.Vector3(1, 1, 1);
+        primitive.radius = undefined;
+        primitive.innerRadius = undefined;
+        primitive.halfHeight = undefined;
+        primitive.startAngle = undefined;
+        primitive.arcAngle = undefined;
+        primitive.arcPoints = undefined;
+        primitive.arcThickness = undefined;
+        primitive.segments = undefined;
+      } else {
+        primitive.size = undefined;
+        primitive.radius ??= 0.5;
+        if (primitive.shape === "sphere") {
+          primitive.innerRadius = undefined;
+          primitive.halfHeight = undefined;
+          primitive.startAngle = undefined;
+          primitive.arcAngle = undefined;
+          primitive.arcPoints = undefined;
+          primitive.arcThickness = undefined;
+          primitive.segments = undefined;
+        } else {
+          primitive.halfHeight ??= 0.5;
+          if (primitive.shape === "hollowCylinder" || primitive.shape === "arc") {
+            primitive.innerRadius = THREE.MathUtils.clamp(
+              primitive.innerRadius ?? primitive.radius * 0.55,
+              0.01,
+              primitive.radius - 0.01,
+            );
+            primitive.segments ??= primitive.shape === "arc" ? 8 : 24;
+          } else {
+            primitive.innerRadius = undefined;
+            primitive.segments = undefined;
+          }
+          if (primitive.shape === "arc") {
+            primitive.startAngle ??= 0;
+            primitive.arcAngle ??= 90;
+            primitive.arcPoints = arcCollisionControlPoints(primitive);
+            primitive.arcThickness ??= Math.max(
+              0.01,
+              primitive.radius - (primitive.innerRadius ?? primitive.radius * 0.55),
+            );
+          } else {
+            primitive.startAngle = undefined;
+            primitive.arcAngle = undefined;
+            primitive.arcPoints = undefined;
+            primitive.arcThickness = undefined;
+          }
+        }
+      }
+    } else if (field === "center") primitive.center.setComponent(component, +value || 0);
+    else if (field === "size")
+      primitive.size?.setComponent(component, Math.max(0.01, +value || 0.01));
+    else if (field === "radius") {
+      primitive.radius = Math.max(0.02, +value || 0.02);
+      if (primitive.innerRadius !== undefined)
+        primitive.innerRadius = Math.min(primitive.innerRadius, primitive.radius - 0.01);
+    } else if (field === "innerRadius")
+      primitive.innerRadius = THREE.MathUtils.clamp(
+        +value || 0.01,
+        0.01,
+        Math.max(0.01, (primitive.radius ?? 0.5) - 0.01),
+      );
+    else if (field === "halfHeight")
+      primitive.halfHeight = Math.max(0.01, +value || 0.01);
+    else if (field === "startAngle") primitive.startAngle = +value || 0;
+    else if (field === "arcAngle")
+      primitive.arcAngle = THREE.MathUtils.clamp(+value || 1, -360, 360);
+    else if (field === "arcPoint") {
+      const points = arcCollisionControlPoints(primitive),
+        pointIndex = Math.floor(component / 2),
+        coordinate = component % 2;
+      points[pointIndex][coordinate] = +value || 0;
+      primitive.arcPoints = points;
+    } else if (field === "arcThickness")
+      primitive.arcThickness = Math.max(0.01, +value || 0.01);
+    else if (field === "segments")
+      primitive.segments = THREE.MathUtils.clamp(Math.round(+value || 1), 1, 64);
+    else {
+      const rotation = new THREE.Euler().setFromQuaternion(primitive.rotation, "XYZ");
+      if (component === 0) rotation.x = THREE.MathUtils.degToRad(+value || 0);
+      else if (component === 1) rotation.y = THREE.MathUtils.degToRad(+value || 0);
+      else rotation.z = THREE.MathUtils.degToRad(+value || 0);
+      primitive.rotation.setFromEuler(rotation).normalize();
+    }
+    commitCollisionMap(
+      selected,
+      next,
+      isChinese
+        ? isChineseLanguage()
+          ? `映射 ${selected.part}：碰撞体 ${index + 1} 已更新`
+          : `映射 ${selected.part}：碰撞体 ${index + 1} actualizado`
+        : isChineseLanguage()
+          ? `Mapa ${selected.part}: collider ${index + 1} 已更新`
+          : `Mapa ${selected.part}: collider ${index + 1} actualizado`,
+    );
+  };
+  const removeCollider = (index: number) => {
+    if (!selected || running) return;
+    commitCollisionMap(
+      selected,
+      selectedCollisionPrimitives.filter((_, item) => item !== index),
+      isChinese
+        ? `映射 ${selected.part}：已删除碰撞体`
+        : `Mapa ${selected.part}: collider eliminado`,
+    );
+  };
+  const exportCollisionMap = () => {
+    if (!selected) return;
+    const payload = {
+        format: "sim-studio-collision-map",
+        version: 1,
+        mapProvenance: normalizeMapProvenanceSnapshot(selected.mapProvenance),
+        part: selected.part,
+        name: selected.name,
+        colliders: colliderData(selected.colliders),
+        gear: selected.gear,
+        specialGear: selected.specialGear,
+        gearColliders: colliderData(selected.gearColliders),
+      },
+      a = document.createElement("a");
+    a.href = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      }),
+    );
+    a.download = `${selected.part}-collisions.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const collisionPrimitiveFromData = (row: {
+    shape: string;
+    center: number[];
+    size?: number[];
+    radius?: number;
+    innerRadius?: number;
+    halfHeight?: number;
+    startAngle?: number;
+    arcAngle?: number;
+    arcPoints?: ArcControlPoints;
+    arcThickness?: number;
+    segments?: number;
+    rotation?: number[];
+    gearCollision?: boolean;
+    gearColision?: boolean;
+    gearRatio?: number;
+  }): CollisionPrimitive => {
+    if (
+      !["box", "cylinder", "sphere", "hollowCylinder", "arc"].includes(row.shape) ||
+      !Array.isArray(row.center) ||
+      row.center.length < 3
+    )
+      throw new Error(isChinese ? "碰撞体格式不正确" : "Collider incorrecto");
+    const shape = row.shape as CollisionPrimitive["shape"];
+    if (shape === "box" && (!Array.isArray(row.size) || row.size.length < 3))
+      throw new Error(isChinese ? "长方体尺寸不正确" : "Tamaño de caja incorrecto");
+    const radial = shape !== "box",
+      hollow = shape === "hollowCylinder" || shape === "arc",
+      radius = radial ? Math.max(0.02, row.radius ?? 0.5) : undefined;
+    return {
+      shape,
+      center: new THREE.Vector3().fromArray(row.center),
+      size:
+        shape === "box"
+          ? new THREE.Vector3()
+              .fromArray(row.size!)
+              .max(new THREE.Vector3(0.01, 0.01, 0.01))
+          : undefined,
+      radius,
+      innerRadius: hollow
+        ? THREE.MathUtils.clamp(
+            row.innerRadius ?? (radius ?? 0.5) * 0.55,
+            0.01,
+            (radius ?? 0.5) - 0.01,
+          )
+        : undefined,
+      halfHeight:
+        shape === "cylinder" || hollow
+          ? Math.max(0.01, row.halfHeight ?? 0.5)
+          : undefined,
+      startAngle: shape === "arc" ? (row.startAngle ?? 0) : undefined,
+      arcAngle:
+        shape === "arc"
+          ? THREE.MathUtils.clamp(row.arcAngle ?? 90, -360, 360) || 1
+          : undefined,
+      arcPoints:
+        shape === "arc" &&
+        Array.isArray(row.arcPoints) &&
+        row.arcPoints.length === 3 &&
+        row.arcPoints.every(
+          (point) =>
+            Array.isArray(point) &&
+            point.length >= 2 &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1]),
+        )
+          ? (row.arcPoints.map((point) => [point[0], point[1]]) as ArcControlPoints)
+          : undefined,
+      arcThickness:
+        shape === "arc"
+          ? Math.max(
+              0.01,
+              row.arcThickness ??
+                (radius ?? 0.5) - (row.innerRadius ?? (radius ?? 0.5) * 0.55),
+            )
+          : undefined,
+      segments: hollow
+        ? THREE.MathUtils.clamp(Math.round(row.segments ?? 24), 1, 64)
+        : undefined,
+      rotation:
+        Array.isArray(row.rotation) && row.rotation.length >= 4
+          ? new THREE.Quaternion().fromArray(row.rotation).normalize()
+          : new THREE.Quaternion(),
+      gearCollision: row.gearCollision === true || row.gearColision === true,
+      gearRatio:
+        Number.isFinite(row.gearRatio) && row.gearRatio! > 0 ? row.gearRatio : undefined,
+    };
+  };
+  const importCollisionMap = async (file: File) => {
+    if (!selected || running) return;
+    try {
+      const payload = JSON.parse(await file.text()),
+        rows = Array.isArray(payload) ? payload : payload.colliders;
+      if (!Array.isArray(rows))
+        throw new Error(isChinese ? "格式不正确" : "Formato incorrecto");
+      const colliders: CollisionPrimitive[] = rows.map(collisionPrimitiveFromData);
+      const importedSpecialGear = payload.specialGear ?? payload.especialGear;
+      if (typeof importedSpecialGear === "boolean") {
+        const state = appRef.current;
+        const provenance = payload.mapProvenance?.specialGear
+          ? normalizeMapProvenance(payload.mapProvenance.specialGear)
+          : { origin: "manual" as const, source: "legacy-import" };
+        state?.pieces
+          .filter((instance) => instance.part === selected.part)
+          .forEach((instance) => {
+            instance.specialGear = importedSpecialGear;
+            instance.mapProvenance = {
+              ...instance.mapProvenance,
+              specialGear: provenance,
+            };
+          });
+        localStorage.setItem(
+          `sim-special-gear-v1:${correctionStorageKeyFor(selected)}`,
+          String(importedSpecialGear),
+        );
+        writeMapProvenance(localStorage, correctionStorageKeyFor(selected), {
+          specialGear: provenance,
+        });
+      }
+      commitCollisionMap(
+        selected,
+        colliders,
+        isChinese
+          ? `映射 ${selected.part}: ${colliders.length} 个碰撞体已导入`
+          : `Mapa ${selected.part}: ${colliders.length} colliders importados`,
+        "normal",
+        payload.mapProvenance?.colliders
+          ? normalizeMapProvenance(payload.mapProvenance.colliders)
+          : { origin: "manual", source: "legacy-import" },
+      );
+      if (selected.gear && Array.isArray(payload.gearColliders)) {
+        const gearColliders = payload.gearColliders.map(collisionPrimitiveFromData);
+        commitCollisionMap(
+          selected,
+          gearColliders,
+          isChinese
+            ? `映射 ${selected.part}: ${colliders.length} 个普通碰撞体及 ${gearColliders.length} 个齿轮碰撞体已导入`
+            : `Mapa ${selected.part}: ${colliders.length} normales y ${gearColliders.length} de engranaje importados`,
+          "gear",
+          payload.mapProvenance?.gearColliders
+            ? normalizeMapProvenance(payload.mapProvenance.gearColliders)
+            : { origin: "manual", source: "legacy-import" },
+        );
+      }
+    } catch (error) {
+      setMessage(
+        isChinese
+          ? `无法导入碰撞映射： ${error instanceof Error ? error.message : isChinese ? "JSON 无效" : "JSON inválido"}`
+          : `No se pudo importar el mapa de colisiones: ${error instanceof Error ? error.message : isChinese ? "JSON 无效" : "JSON inválido"}`,
+      );
+    } finally {
+      if (colliderFileRef.current) colliderFileRef.current.value = "";
+    }
+  };
+  const downloadPhysicsLog = () => {
+    if (!lastLog) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lastLog], { type: "application/json" }));
+    a.download = "sim-studio-physics-log.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const downloadPerformanceLog = () => {
+    const state = appRef.current;
+    if (!state?.performanceTrace.samples.length) return;
+    const trace = state.performanceTrace,
+      samples =
+        trace.totalFrames > trace.samples.length
+          ? [
+              ...trace.samples.slice(trace.cursor),
+              ...trace.samples.slice(0, trace.cursor),
+            ]
+          : trace.samples.slice(),
+      metrics: (keyof FramePerformanceSample)[] = [
+        "frameIntervalMs",
+        "betweenFramesMs",
+        "totalMs",
+        "inputMs",
+        "forceResetMs",
+        "springMs",
+        "jointForcesMs",
+        "worldStepMs",
+        "syncMs",
+        "physicsLogMs",
+        "connectionScanMs",
+        "batchMs",
+        "debugMs",
+        "locksMs",
+        "instanceSyncMs",
+        "renderMs",
+        "gpuMs",
+      ],
+      percentile = (values: number[], amount: number) =>
+        values[Math.min(values.length - 1, Math.floor(values.length * amount))] ?? 0,
+      summary = Object.fromEntries(
+        metrics.map((metric) => {
+          const values = samples
+              .map((sample) => sample[metric])
+              .filter(
+                (value): value is number =>
+                  typeof value === "number" && Number.isFinite(value),
+              )
+              .sort((a, b) => a - b),
+            average = values.length
+              ? values.reduce((total, value) => total + value, 0) / values.length
+              : 0;
+          return [
+            metric,
+            {
+              average: +average.toFixed(3),
+              p50: +percentile(values, 0.5).toFixed(3),
+              p95: +percentile(values, 0.95).toFixed(3),
+              maximum: +(values.at(-1) ?? 0).toFixed(3),
+            },
+          ];
+        }),
+      ),
+      phaseNames = [
+        "betweenFramesMs",
+        "inputMs",
+        "forceResetMs",
+        "springMs",
+        "jointForcesMs",
+        "worldStepMs",
+        "syncMs",
+        "physicsLogMs",
+        "connectionScanMs",
+        "batchMs",
+        "debugMs",
+        "locksMs",
+        "instanceSyncMs",
+        "renderMs",
+        "gpuMs",
+      ],
+      dominantPhase = phaseNames
+        .map((name) => ({
+          name,
+          p95: (
+            summary[name] as {
+              p95: number;
+            }
+          ).p95,
+        }))
+        .sort((a, b) => b.p95 - a.p95)[0],
+      activeGpuCanvas = mountRef.current?.querySelector<HTMLCanvasElement>(
+        ".viewport-webgpu-canvas.active",
+      ),
+      viewportCanvas = activeGpuCanvas ?? state.renderer.domElement,
+      payload = {
+        format: "sim-studio-frame-profile",
+        version: 4,
+        generatedAt: new Date().toISOString(),
+        recordingStartedAt: trace.startedAt,
+        retainedFrames: samples.length,
+        totalFramesObserved: trace.totalFrames,
+        scene: {
+          pieces: state.pieces.length,
+          connections: state.connections.length,
+          simulationRunning: state.running,
+          largeSimulation: !!state.largeSimulation,
+          diagnostics: state.debug,
+          renderBatches: state.renderBatchStats,
+        },
+        environment: {
+          userAgent: navigator.userAgent,
+          hardwareConcurrency: navigator.hardwareConcurrency,
+          deviceMemory:
+            (
+              navigator as Navigator & {
+                deviceMemory?: number;
+              }
+            ).deviceMemory ?? null,
+          devicePixelRatio,
+          renderScale: state.renderScale,
+          gpuTimerSupported: state.gpuTimerSupported,
+          gpuRenderer: state.gpuRenderer,
+          gpuVendor: state.gpuVendor,
+          rendererMode: activeGpuCanvas ? "WebGPU" : "WebGL",
+          adaptiveRendering,
+          webgpuQuality: activeGpuCanvas
+            ? {
+                pixelRatio: Number(activeGpuCanvas.dataset.pixelRatio ?? 1),
+                msaaSamples: Number(activeGpuCanvas.dataset.msaaSamples ?? 1),
+              }
+            : null,
+          viewport: {
+            cssWidth: viewportCanvas.clientWidth,
+            cssHeight: viewportCanvas.clientHeight,
+            drawingBufferWidth: viewportCanvas.width,
+            drawingBufferHeight: viewportCanvas.height,
+          },
+        },
+        diagnosis: {
+          dominantPhaseByP95: dominantPhase,
+          framesOver16_7ms: samples.filter((sample) => sample.frameIntervalMs > 16.7)
+            .length,
+          framesOver33_3ms: samples.filter((sample) => sample.frameIntervalMs > 33.3)
+            .length,
+          framesOver50ms: samples.filter((sample) => sample.frameIntervalMs > 50).length,
+        },
+        summary,
+        slowestFrames: samples
+          .slice()
+          .sort((a, b) => b.frameIntervalMs - a.frameIntervalMs)
+          .slice(0, 100),
+        samples,
+      },
+      anchor = document.createElement("a");
+    anchor.href = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+    );
+    anchor.download = "sim-studio-performance-log.json";
+    anchor.click();
+    URL.revokeObjectURL(anchor.href);
+  };
+  const runGpuPrototype = async () => {
+    if (gpuPrototypeBusy) return;
+    setGpuPrototypeBusy(true);
+    setGpuPrototypeError("");
+    try {
+      const canvas = gpuCanvasRef.current;
+      if (!canvas)
+        throw new Error(
+          isChinese ? "无法创建 WebGPU 画布" : "No se pudo crear el canvas WebGPU",
+        );
+      cancelAnimationFrame(gpuPrototypeFrameRef.current);
+      gpuPrototypeRef.current?.dispose();
+      const prototype = await GpuRenderPrototype.create(canvas);
+      gpuPrototypeRef.current = prototype;
+      const result = prototype.benchmark(
+        Math.max(714, appRef.current?.pieces.length ?? 0),
+        240,
+      );
+      setGpuPrototypeResult(result);
+      setGpuPreviewRunning(true);
+      const renderGpuFrame = (time: number) => {
+        if (gpuPrototypeRef.current !== prototype) return;
+        try {
+          prototype.render(time);
+        } catch (error) {
+          prototype.dispose();
+          gpuPrototypeRef.current = null;
+          setGpuPreviewRunning(false);
+          const detail = error instanceof Error ? error.message : String(error);
+          setGpuPrototypeError(detail);
+          setMessage(`WebGPU: ${detail}`);
+          return;
+        }
+        gpuPrototypeFrameRef.current = requestAnimationFrame(renderGpuFrame);
+      };
+      gpuPrototypeFrameRef.current = requestAnimationFrame(renderGpuFrame);
+      setMessage(
+        language === "es"
+          ? `WebGPU Rust activo: ${result.instances} instancias en ${result.adapter}`
+          : isChinese
+            ? `Rust WebGPU 已启用： ${result.instances} 个实例，设备： ${result.adapter}`
+            : `Rust WebGPU active: ${result.instances} instances on ${result.adapter}`,
+      );
+    } catch (error) {
+      gpuPrototypeRef.current?.dispose();
+      gpuPrototypeRef.current = null;
+      setGpuPreviewRunning(false);
+      const detail = error instanceof Error ? error.message : String(error);
+      setGpuPrototypeError(detail);
+      setMessage(`WebGPU: ${detail}`);
+    } finally {
+      setGpuPrototypeBusy(false);
+    }
+  };
+  const stopGpuPrototype = () => {
+    cancelAnimationFrame(gpuPrototypeFrameRef.current);
+    gpuPrototypeRef.current?.dispose();
+    gpuPrototypeRef.current = null;
+    setGpuPreviewRunning(false);
+  };
+  const importStatusText = importDraft
+      ? {
+          reading: t.importReading,
+          palette: t.importPalette,
+          external: t.importExternal,
+          preview: t.importPreview,
+          ready: t.importReady,
+          error: importDraft.error ?? "Error",
+        }[importDraft.status]
+      : "",
+    importProgress = importDraft
+      ? importDraft.status === "ready"
+        ? 100
+        : importDraft.total
+          ? Math.round((importDraft.progress / importDraft.total) * 100)
+          : 4
+      : 0;
+  const inspectorWidthBounds = () => {
+    const studioWidth =
+      studioRef.current?.clientWidth ??
+      (typeof window === "undefined" ? 1200 : window.innerWidth);
+    return {
+      minimum: 270,
+      maximum: Math.max(270, Math.min(680, studioWidth - 300 - 360)),
+    };
+  };
+  const resizeInspectorBy = (change: number) => {
+    const { minimum, maximum } = inspectorWidthBounds();
+    setInspectorWidth((width) => Math.min(maximum, Math.max(minimum, width + change)));
+  };
+  const beginInspectorResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (window.innerWidth <= 950) return;
+    event.preventDefault();
+    const handle = event.currentTarget,
+      pointerId = event.pointerId,
+      startX = event.clientX,
+      startWidth = inspectorWidth;
+    handle.setPointerCapture(pointerId);
+    document.body.classList.add("resizing-inspector");
+    const move = (moveEvent: PointerEvent) => {
+      const { minimum, maximum } = inspectorWidthBounds();
+      setInspectorWidth(
+        Math.min(maximum, Math.max(minimum, startWidth + startX - moveEvent.clientX)),
+      );
+    };
+    const finish = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      document.body.classList.remove("resizing-inspector");
+      if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  };
+  const projectSaveState =
+      recoveryStatus === "saving"
+        ? "saving"
+        : currentProjectSaved && !projectDirty
+          ? "clean"
+          : "dirty",
+    projectSaveLabel =
+      projectSaveState === "saving"
+        ? t.autosaving
+        : projectSaveState === "clean"
+          ? t.projectUpToDate
+          : t.changesPending;
+  return (
+    <main
+      ref={studioRef}
+      className={`studio ${theme}`}
+      style={{ "--inspector-width": `${inspectorWidth}px` } as CSSProperties}
+    >
+      <header>
+        <div className="brand">
+          <span className="mark">S</span>
+          <div>
+            <strong>{isChinese ? "积木实验室" : "SIM STUDIO"}</strong>
+            <small>{t.subtitle}</small>
+          </div>
+        </div>
+        <div
+          className="language-toggle"
+          role="group"
+          aria-label={isChinese ? "选择语言" : "Language / Idioma"}
+        >
+          <button
+            className={language === "es" ? "active" : ""}
+            onClick={() => {
+              setLanguage("es");
+              setMessage("catalog-ready");
+            }}
+            aria-label="Español"
+            title="Español"
+          >
+            🇪🇸
+          </button>
+          <button
+            className={language === "en" ? "active" : ""}
+            onClick={() => {
+              setLanguage("en");
+              setMessage("catalog-ready");
+            }}
+            aria-label="English"
+            title="English"
+          >
+            🇬🇧
+          </button>
+          <button
+            className={isChinese ? "active" : ""}
+            onClick={() => {
+              setLanguage("zh-CN");
+              setMessage("catalog-ready");
+            }}
+            aria-label="简体中文"
+            title="简体中文"
+          >
+            中文
+          </button>
+        </div>
+        <button
+          className="theme-toggle"
+          onClick={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+          aria-label={t.switchTheme}
+          title={theme === "dark" ? t.light : t.dark}
+        >
+          <span>{theme === "dark" ? "☀" : "◐"}</span>
+          {theme === "dark" ? t.light : t.dark}
+        </button>
+        <button
+          className="project project-button"
+          onClick={() => setProjectMenuOpen(true)}
+          title={t.manageProjects}
+        >
+          <span>{t.project}</span>
+          <b>{projectName.slice(0, 20)}</b>
+          <small className={`recovery-dot ${projectSaveState}`} title={projectSaveLabel}>
+            {projectSaveState === "clean"
+              ? "✓"
+              : projectSaveState === "saving"
+                ? "…"
+                : "!"}
+          </small>
+        </button>
+        <div className="header-actions">
+          <input
+            ref={fileRef}
+            type="file"
+            hidden
+            accept=".ldr,.mpd,.io"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.currentTarget.value = "";
+              if (file) void importModel(file);
+            }}
+          />
+          <button
+            className="ghost project-manager-trigger"
+            onClick={() => setProjectMenuOpen(true)}
+            title={`${t.manageProjects} · Ctrl+S`}
+          >
+            ▣ {t.projectsButton}
+          </button>
+          <button
+            className={`ghost map-update-trigger ${mapUpdates.length ? "pending" : ""}`}
+            onClick={() => setMapUpdatesOpen(true)}
+            title={t.mapUpdates}
+          >
+            ↻ {t.mapUpdatesButton}
+            <b>{mapUpdates.length}</b>
+          </button>
+          <input
+            ref={projectFileRef}
+            type="file"
+            hidden
+            accept={PROJECT_EXTENSION}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.currentTarget.value = "";
+              if (file) void importProjectFile(file);
+            }}
+          />
+          <button
+            className="ghost"
+            style={{ minWidth: 34, padding: "10px 8px", fontSize: 16, lineHeight: 1 }}
+            disabled={running}
+            onClick={() => void appRef.current?.undo()}
+            aria-label={
+              language === "es"
+                ? isChinese
+                  ? "撤销"
+                  : "Deshacer"
+                : isChinese
+                  ? "撤销"
+                  : "Undo"
+            }
+            title={`${language === "es" ? (isChinese ? "撤销" : "Deshacer") : isChinese ? "撤销" : "Undo"} · Ctrl+Z`}
+          >
+            ↶
+          </button>
+          <button
+            className="ghost"
+            style={{ minWidth: 34, padding: "10px 8px", fontSize: 16, lineHeight: 1 }}
+            disabled={running}
+            onClick={() => void appRef.current?.redo()}
+            aria-label={
+              language === "es"
+                ? isChinese
+                  ? "重做"
+                  : "Rehacer"
+                : isChinese
+                  ? "重做"
+                  : "Redo"
+            }
+            title={`${language === "es" ? (isChinese ? "重做" : "Rehacer") : isChinese ? "重做" : "Redo"} · Ctrl+Y`}
+          >
+            ↷
+          </button>
+          <button
+            className="ghost"
+            style={{ minWidth: 34, padding: "10px 8px", fontSize: 16, lineHeight: 1 }}
+            disabled={running || !selected}
+            onClick={() => appRef.current?.copySelected()}
+            aria-label={
+              language === "es" ? "Copiar pieza" : isChinese ? "复制零件" : "Copy part"
+            }
+            title={`${language === "es" ? "Copiar pieza" : isChinese ? "复制零件" : "Copy part"} · Ctrl+C`}
+          >
+            ⧉
+          </button>
+          <button
+            className="ghost"
+            style={{ minWidth: 34, padding: "10px 8px", fontSize: 16, lineHeight: 1 }}
+            disabled={running}
+            onClick={() => void appRef.current?.pasteClipboard()}
+            aria-label={
+              language === "es" ? "Pegar pieza" : isChinese ? "粘贴零件" : "Paste part"
+            }
+            title={`${language === "es" ? "Pegar pieza" : isChinese ? "粘贴零件" : "Paste part"} · Ctrl+V`}
+          >
+            ⎘
+          </button>
+          <button className="ghost" onClick={() => fileRef.current?.click()}>
+            {t.import}
+          </button>
+          <button className="ghost" onClick={exportModel}>
+            {t.export}
+          </button>
+          <button
+            className={running ? "stop" : "play"}
+            onClick={physics}
+            disabled={physicsBusy}
+          >
+            {physicsBusy ? "…" : running ? t.stop : t.simulate}
+          </button>
+        </div>
+      </header>
+      {mapUpdatesOpen && (
+        <div className="project-backdrop map-update-backdrop" role="presentation">
+          <section
+            className="project-dialog map-update-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="map-updates-title"
+          >
+            <div className="project-dialog-head">
+              <div>
+                <small>{isChinese ? "积木实验室 · 缓存" : "SIM STUDIO · CACHE"}</small>
+                <h2 id="map-updates-title">{t.mapUpdates}</h2>
+              </div>
+              <button
+                className="project-close"
+                onClick={() => setMapUpdatesOpen(false)}
+                aria-label={t.close}
+              >
+                ×
+              </button>
+            </div>
+            <p className="map-update-help">{t.mapUpdatesHelp}</p>
+            <small className="map-update-light">⚡ {t.mapUpdatesLight}</small>
+            <div className="map-update-list">
+              {mapUpdates.length ? (
+                mapUpdates.map((candidate) => (
+                  <article key={candidate.key} className="map-update-card">
+                    <div className="map-update-part">
+                      {candidate.thumb ? (
+                        <img src={candidate.thumb} alt="" />
+                      ) : (
+                        <span className="map-update-part-icon">⚙</span>
+                      )}
+                      <div>
+                        <b>{candidate.part}</b>
+                        <span>{displayPartName(candidate.name, language)}</span>
+                        <small>
+                          {candidate.layers.map(mapLayerLabel).join(" · ")}
+                          {candidate.sources.includes("project")
+                            ? language === "es"
+                              ? " · proyecto cargado"
+                              : isChinese
+                                ? " · 已加载的项目"
+                                : " · loaded project"
+                            : ""}
+                        </small>
+                      </div>
+                    </div>
+                    <div className="map-update-comparison">
+                      <div>
+                        <span>{t.localVersion}</span>
+                        <b>
+                          {candidate.layers
+                            .filter((layer) => layer !== "specialGear")
+                            .map(
+                              (layer) =>
+                                `${mapLayerLabel(layer)}: ${candidate.localCounts[layer]}`,
+                            )
+                            .join(" · ") ||
+                            (candidate.localCounts.specialGear ? t.enabled : t.disabled)}
+                        </b>
+                      </div>
+                      <i>→</i>
+                      <div>
+                        <span>{t.preloadedVersion}</span>
+                        <b>
+                          {candidate.layers
+                            .filter((layer) => layer !== "specialGear")
+                            .map(
+                              (layer) =>
+                                `${mapLayerLabel(layer)}: ${candidate.preloadedCounts[layer]}`,
+                            )
+                            .join(" · ") ||
+                            (candidate.preloadedCounts.specialGear
+                              ? t.enabled
+                              : t.disabled)}
+                        </b>
+                      </div>
+                    </div>
+                    <div className="map-update-actions">
+                      <button
+                        className="ghost"
+                        disabled={running}
+                        onClick={() => void resolveMapUpdates([candidate], false)}
+                      >
+                        {t.keepLocalMap}
+                      </button>
+                      <button
+                        className="primary"
+                        disabled={running}
+                        onClick={() => void resolveMapUpdates([candidate], true)}
+                      >
+                        ↻ {t.updateMap}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="empty-projects">✓ {t.noMapUpdates}</p>
+              )}
+            </div>
+            <div className="map-update-footer">
+              <button className="ghost" onClick={() => setMapUpdatesOpen(false)}>
+                {t.close}
+              </button>
+              <button
+                className="primary"
+                disabled={!mapUpdates.length || running}
+                onClick={() => void resolveMapUpdates(mapUpdates, true)}
+              >
+                ↻ {t.updateAllMaps}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {projectMenuOpen && (
+        <div className="project-backdrop" role="presentation">
+          <section
+            className="project-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="projects-title"
+          >
+            <div className="project-dialog-head">
+              <div>
+                <small>
+                  {isChinese ? "积木实验室" : "SIM STUDIO"}
+                  {PROJECT_EXTENSION}
+                </small>
+                <h2 id="projects-title">{t.projects}</h2>
+              </div>
+              <button
+                className="project-close"
+                onClick={() => setProjectMenuOpen(false)}
+                aria-label={t.close}
+              >
+                ×
+              </button>
+            </div>
+            <div className="current-project-card">
+              <label>{t.currentProject}</label>
+              <div className="project-name-row">
+                <input
+                  ref={projectNameInputRef}
+                  value={
+                    currentProjectSaved
+                      ? projectNameEditing
+                        ? projectNameDraft
+                        : projectName
+                      : projectName
+                  }
+                  onChange={(event) => {
+                    const name = event.target.value.slice(0, 20);
+                    if (currentProjectSaved) setProjectNameDraft(name);
+                    else setProjectName(name);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!projectNameEditing) return;
+                    if (event.key === "Enter") void confirmProjectRename();
+                    if (event.key === "Escape") cancelProjectRename();
+                  }}
+                  aria-label={t.projectName}
+                  readOnly={currentProjectSaved && !projectNameEditing}
+                  className={currentProjectSaved && !projectNameEditing ? "locked" : ""}
+                  maxLength={20}
+                />
+                {currentProjectSaved && (
+                  <div className="project-name-actions">
+                    {projectNameEditing ? (
+                      <>
+                        <button
+                          className="confirm-name"
+                          onClick={() => void confirmProjectRename()}
+                          disabled={!projectNameDraft.trim() || projectBusy}
+                          title={t.confirmProjectName}
+                          aria-label={t.confirmProjectName}
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={cancelProjectRename}
+                          disabled={projectBusy}
+                          title={t.cancel}
+                          aria-label={t.cancel}
+                        >
+                          ×
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={beginProjectRename}
+                          disabled={projectBusy || running}
+                          title={t.editProjectName}
+                          aria-label={t.editProjectName}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => void beginDuplicateProject()}
+                          disabled={projectBusy || running}
+                          title={t.duplicateProject}
+                          aria-label={t.duplicateProject}
+                        >
+                          ⧉
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              {saveNamePrompt && <p className="save-name-prompt">{t.nameBeforeSave}</p>}
+              <p>
+                <span className={`recovery-dot ${projectSaveState}`}>
+                  {projectSaveState === "clean"
+                    ? "✓"
+                    : projectSaveState === "saving"
+                      ? "…"
+                      : "!"}
+                </span>
+                {projectSaveLabel}
+              </p>
+              <div className="project-primary-actions">
+                <button
+                  onClick={requestCreateNewProject}
+                  disabled={projectBusy || running}
+                >
+                  ＋ {t.newProject}
+                </button>
+                <button
+                  className="primary"
+                  onClick={() => void saveCurrentProject()}
+                  disabled={projectBusy || running}
+                >
+                  {projectBusy ? "…" : "✓"} {t.saveProject}
+                </button>
+                <small className="save-shortcut-hint">{t.saveShortcut}</small>
+              </div>
+              <div className="project-file-actions">
+                <button onClick={exportCurrentProject} disabled={running}>
+                  ↓ {t.exportProject}
+                </button>
+                <button
+                  onClick={() => projectFileRef.current?.click()}
+                  disabled={projectBusy || running}
+                >
+                  ↑ {t.importProject}
+                </button>
+              </div>
+            </div>
+            <div className="project-list-head">
+              <b>{t.localProjects}</b>
+              <span>{projects.length}</span>
+            </div>
+            <div className="project-list">
+              {projects.length ? (
+                projects.slice(projectPage * 9, projectPage * 9 + 9).map((project) => (
+                  <article
+                    key={project.id}
+                    className={project.id === activeProjectIdRef.current ? "active" : ""}
+                  >
+                    <button
+                      className="project-open"
+                      onClick={() => requestOpenSavedProject(project)}
+                      disabled={projectBusy || running}
+                    >
+                      <span className="project-file-icon">S</span>
+                      <span>
+                        <b>{project.name}</b>
+                        <small>
+                          {project.pieceCount} {t.pieces} ·{" "}
+                          {new Date(project.updatedAt).toLocaleString(language)}
+                        </small>
+                      </span>
+                    </button>
+                    <button
+                      className="project-delete"
+                      title={t.deleteProject}
+                      aria-label={`${t.deleteProject}: ${project.name}`}
+                      onClick={() => setProjectConfirmation({ kind: "delete", project })}
+                      disabled={projectBusy}
+                    >
+                      ×
+                    </button>
+                  </article>
+                ))
+              ) : (
+                <p className="empty-projects">{t.noProjects}</p>
+              )}
+            </div>
+            {projects.length > 9 && (
+              <nav className="project-pagination" aria-label={t.localProjects}>
+                <button
+                  onClick={() => setProjectPage((page) => Math.max(0, page - 1))}
+                  disabled={projectPage === 0}
+                  title={t.previousPage}
+                  aria-label={t.previousPage}
+                >
+                  ‹
+                </button>
+                <span>
+                  {projectPage + 1} / {Math.ceil(projects.length / 9)}
+                </span>
+                <button
+                  onClick={() =>
+                    setProjectPage((page) =>
+                      Math.min(Math.ceil(projects.length / 9) - 1, page + 1),
+                    )
+                  }
+                  disabled={projectPage >= Math.ceil(projects.length / 9) - 1}
+                  title={t.nextPage}
+                  aria-label={t.nextPage}
+                >
+                  ›
+                </button>
+              </nav>
+            )}
+          </section>
+        </div>
+      )}
+      {duplicateProjectDocument && (
+        <div className="project-confirm-backdrop" role="presentation">
+          <form
+            className="project-confirm-dialog duplicate-project-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="duplicate-project-title"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void confirmDuplicateProject();
+            }}
+          >
+            <span className="duplicate-project-icon">⧉</span>
+            <h2 id="duplicate-project-title">{t.duplicateTitle}</h2>
+            <p>{t.duplicateHelp}</p>
+            <label htmlFor="duplicate-project-name">{t.duplicateName}</label>
+            <input
+              id="duplicate-project-name"
+              autoFocus
+              value={duplicateProjectName}
+              onChange={(event) =>
+                setDuplicateProjectName(event.target.value.slice(0, 20))
+              }
+              maxLength={20}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicateProjectDocument(null);
+                  setDuplicateProjectName("");
+                }}
+                disabled={projectBusy}
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="submit"
+                className="duplicate-confirm"
+                disabled={!duplicateProjectName.trim() || projectBusy}
+              >
+                {projectBusy ? "…" : "⧉"} {t.createCopy}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {projectConfirmation && (
+        <div className="project-confirm-backdrop" role="presentation">
+          <section
+            className="project-confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="project-confirm-title"
+          >
+            <span className="project-confirm-icon">!</span>
+            <h2 id="project-confirm-title">
+              {projectConfirmation.kind === "delete" ? t.deleteTitle : t.unsavedTitle}
+            </h2>
+            <p>
+              {projectConfirmation.kind === "delete"
+                ? `${t.deleteWarning} «${projectConfirmation.project.name}»`
+                : t.unsavedWarning}
+            </p>
+            <div>
+              <button className="ghost" onClick={() => setProjectConfirmation(null)}>
+                {t.cancel}
+              </button>
+              <button className="danger-confirm" onClick={resolveProjectConfirmation}>
+                {projectConfirmation.kind === "delete"
+                  ? t.deleteProject
+                  : projectConfirmation.kind === "open" ||
+                      projectConfirmation.kind === "import"
+                    ? t.openAnyway
+                    : t.createAnyway}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {importDraft && (
+        <div className="import-backdrop" role="presentation">
+          <section
+            className="import-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-title"
+          >
+            <div className="import-dialog-head">
+              <div>
+                <small>LDR / MPD / IO</small>
+                <h2 id="import-title">{t.importTitle}</h2>
+              </div>
+              <b>{importDraft.fileName}</b>
+            </div>
+            <div className="import-preview">
+              {importDraft.preview ? (
+                <img src={importDraft.preview} alt={t.importTitle} />
+              ) : (
+                <div className="import-loader">
+                  <span />
+                  <b>{importProgress}%</b>
+                </div>
+              )}
+            </div>
+            <div className="import-status">
+              <b>{importStatusText}</b>
+              <div>
+                <i style={{ width: `${importProgress}%` }} />
+              </div>
+              <p>
+                {importDraft.placements.length || "—"} {t.importParts} ·{" "}
+                {importDraft.total || "—"} {t.importUnique}
+              </p>
+              <small>
+                {importDraft.paletteCount} {t.importFromPalette}
+                {" · "}
+                {importDraft.externalCount} {t.importExternalParts}
+              </small>
+            </div>
+            <div className="import-actions">
+              <button className="ghost" onClick={discardImport}>
+                {t.discard}
+              </button>
+              <button
+                className="play"
+                disabled={importDraft.status !== "ready"}
+                onClick={() => void placeImportedModel()}
+              >
+                {t.place}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      <aside className="library">
+        <div className="panel-title">
+          <span>{t.palette}</span>
+          <b>{count}</b>
+        </div>
+        <div className="part-search">
+          <span>⌕</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.search}
+          />
+        </div>
+        <div className="category-tabs">
+          {categories.map((c) => (
+            <button
+              key={c.id}
+              className={category === c.id ? "active" : ""}
+              onClick={() => {
+                setCategory(c.id);
+                setSearch("");
+              }}
+            >
+              <i>{c.icon}</i>
+              {t.categories[c.id]}
+            </button>
+          ))}
+        </div>
+        <div className="reference-box">
+          <b>{t.external}</b>
+          <div>
+            <input
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void addReference()}
+              placeholder={isChinese ? "例如：32524" : "Ej. 32524"}
+            />
+            <button onClick={() => void addReference()}>+</button>
+          </div>
+        </div>
+        <div className="catalog-head">
+          <b>{t.categories[categories.find((c) => c.id === category)?.id ?? "beams"]}</b>
+          <span>{`${visible.length} ${t.pieces}`}</span>
+        </div>
+        <div className="parts-grid">
+          {visible.map((p) => (
+            <article
+              key={`${p.part}-${p.color}`}
+              draggable
+              onDragStart={(e) => dragPart(e, p)}
+              onClick={() => {
+                setMessage(
+                  language === "es"
+                    ? `Arrastra ${p.part} a la mesa`
+                    : isChinese
+                      ? `拖动 ${p.part} 到工作区`
+                      : `Drag ${p.part} onto the workspace`,
+                );
+              }}
+            >
+              <div
+                className={
+                  compoundPreviewThumb[p.part]
+                    ? `thumb compound-thumb ${p.part === "18938u" ? "compound-thumb-top-primary" : ""}`
+                    : "thumb"
+                }
+              >
+                {p.thumb ? (
+                  <>
+                    {compoundPreviewThumb[p.part] && (
+                      <img
+                        className="compound-thumb-secondary"
+                        src={compoundPreviewThumb[p.part]}
+                        alt=""
+                        aria-hidden="true"
+                        style={{
+                          filter: palettePreviewFilter(
+                            compoundPreviewColor[p.part] ?? 71,
+                          ),
+                        }}
+                      />
+                    )}
+                    <img
+                      className={
+                        compoundPreviewThumb[p.part]
+                          ? "compound-thumb-primary"
+                          : undefined
+                      }
+                      src={p.thumb}
+                      alt={displayPartName(p.name, language)}
+                      onError={(event) => {
+                        if (p.sourceThumb && event.currentTarget.src !== p.sourceThumb) {
+                          event.currentTarget.src = p.sourceThumb;
+                        } else {
+                          event.currentTarget.style.display = "none";
+                        }
+                      }}
+                      style={{
+                        filter: p.rawThumb
+                          ? palettePreviewFilter(p.color)
+                          : previewFilter(p.color),
+                      }}
+                    />
+                  </>
+                ) : (
+                  <span>⚙</span>
+                )}
+                <i
+                  className="color-dot"
+                  style={{ background: colorHex[p.color] ?? colorHex[71] }}
+                  title={isChinese ? `LDraw 颜色 ${p.color}` : `Color LDraw ${p.color}`}
+                />
+              </div>
+              <b>{p.part}</b>
+              <small title={displayPartName(p.name, language)}>
+                {displayPartName(p.name, language)}
+              </small>
+              <em>⋮</em>
+            </article>
+          ))}
+        </div>
+        {!visible.length && <div className="no-results">{t.noResults}</div>}
+        <div className="drag-help">{t.dragHelp}</div>
+      </aside>
+      <section className="viewport" ref={mountRef}>
+        <div className="gizmo-toolbar" aria-label={isChinese ? "操作轴" : "Gizmo"}>
+          <button
+            type="button"
+            className={moveGizmoVisible ? "active" : ""}
+            disabled={running}
+            onClick={() => {
+              const next = !moveGizmoVisible;
+              moveGizmoVisibleRef.current = next;
+              setMoveGizmoVisible(next);
+              appRef.current?.requestRender();
+            }}
+            title={
+              language === "es"
+                ? "Mostrar ejes de movimiento"
+                : isChinese
+                  ? "显示移动轴"
+                  : "Show move axes"
+            }
+          >
+            ↔
+          </button>
+          <button
+            type="button"
+            className={rotateGizmoVisible ? "active" : ""}
+            disabled={running}
+            onClick={() => {
+              const next = !rotateGizmoVisible;
+              rotateGizmoVisibleRef.current = next;
+              setRotateGizmoVisible(next);
+              appRef.current?.requestRender();
+            }}
+            title={
+              language === "es"
+                ? "Mostrar aros de giro"
+                : isChinese
+                  ? "显示旋转环"
+                  : "Show rotation rings"
+            }
+          >
+            ⟳
+          </button>
+        </div>
+        <div className="fps-counter" ref={fpsRef} data-level="high">
+          -- FPS
+        </div>
+        <div className="view-label">
+          <span className={running ? "live" : ""} />
+          {running ? t.running : message === "catalog-ready" ? t.ready : message}
+          <small className="viewport-renderer-badge">{viewportRenderer}</small>
+        </div>
+        {controlsHelpVisible ? (
+          <div className="camera-help">
+            <span>{t.cameraHelp}</span>
+            <button
+              onClick={() => {
+                setControlsHelpVisible(false);
+                localStorage.setItem("sim-studio:controls-help-hidden", "1");
+              }}
+              title={t.hideControls}
+              aria-label={t.hideControls}
+            >
+              ×
+            </button>
+          </div>
+        ) : (
+          <button
+            className="controls-help-open"
+            onClick={() => {
+              setControlsHelpVisible(true);
+              localStorage.removeItem("sim-studio:controls-help-hidden");
+            }}
+            title={t.showControls}
+            aria-label={t.showControls}
+          >
+            ?
+          </button>
+        )}
+      </section>
+      <div
+        className="inspector-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={
+          language === "es"
+            ? "Cambiar el ancho del panel de propiedades"
+            : isChinese
+              ? "调整属性面板宽度"
+              : "Resize the properties panel"
+        }
+        aria-valuemin={270}
+        aria-valuemax={inspectorWidthBounds().maximum}
+        aria-valuenow={Math.round(inspectorWidth)}
+        tabIndex={0}
+        title={
+          language === "es"
+            ? "Arrastra para cambiar el ancho · doble clic para restablecer"
+            : isChinese
+              ? "拖动调整宽度 · 双击重置"
+              : "Drag to resize · double-click to reset"
+        }
+        onPointerDown={beginInspectorResize}
+        onDoubleClick={() => setInspectorWidth(270)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            resizeInspectorBy(20);
+          } else if (event.key === "ArrowRight") {
+            event.preventDefault();
+            resizeInspectorBy(-20);
+          } else if (event.key === "Home") {
+            event.preventDefault();
+            setInspectorWidth(270);
+          }
+        }}
+      />
+      <aside className="inspector">
+        <div className="panel-title">
+          <span>{t.properties}</span>
+        </div>
+        <div className="renderer-setting">
+          <label>
+            {language === "es"
+              ? "Motor gráfico"
+              : isChinese
+                ? "图形渲染器"
+                : "Graphics renderer"}
+          </label>
+          <div
+            className="renderer-mode"
+            role="group"
+            aria-label={
+              language === "es"
+                ? "Motor gráfico"
+                : isChinese
+                  ? "图形渲染器"
+                  : "Graphics renderer"
+            }
+          >
+            {(
+              [
+                [
+                  "auto",
+                  language === "es" ? "Automático" : isChinese ? "自动" : "Automatic",
+                ],
+                ["webgpu", "WebGPU"],
+                ["webgl", "WebGL"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={rendererPreference === value ? "active" : ""}
+                aria-pressed={rendererPreference === value}
+                onClick={() => setRendererPreference(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <small>
+            {language === "es" ? "Activo" : isChinese ? "当前" : "Active"}:{" "}
+            {viewportRenderer}
+            {rendererPreference === "auto"
+              ? language === "es"
+                ? " · usa WebGPU cuando está disponible"
+                : isChinese
+                  ? " · 可用时使用 WebGPU"
+                  : " · uses WebGPU when available"
+              : ""}
+          </small>
+          <label className="renderer-quality-label">
+            {language === "es"
+              ? "Escalado de calidad"
+              : isChinese
+                ? "画质缩放"
+                : "Quality scaling"}
+          </label>
+          <div
+            className="renderer-mode renderer-quality"
+            role="group"
+            aria-label={
+              language === "es"
+                ? "Escalado de calidad"
+                : isChinese
+                  ? "画质缩放"
+                  : "Quality scaling"
+            }
+          >
+            <button
+              type="button"
+              className={adaptiveRendering ? "active" : ""}
+              aria-pressed={adaptiveRendering}
+              onClick={() => setAdaptiveRendering(true)}
+            >
+              {language === "es" ? "Adaptativa" : isChinese ? "自适应" : "Adaptive"}
+            </button>
+            <button
+              type="button"
+              className={!adaptiveRendering ? "active" : ""}
+              aria-pressed={!adaptiveRendering}
+              onClick={() => setAdaptiveRendering(false)}
+            >
+              {language === "es" ? "Fija 100%" : isChinese ? "固定 100%" : "Fixed 100%"}
+            </button>
+          </div>
+          <small>
+            {adaptiveRendering
+              ? language === "es"
+                ? "Reduce resolución y MSAA si faltan FPS."
+                : isChinese
+                  ? "帧率下降时降低分辨率和多重采样抗锯齿。"
+                  : "Reduces resolution and MSAA when FPS drops."
+              : language === "es"
+                ? "Mantiene resolución completa y MSAA 4×."
+                : isChinese
+                  ? "保持完整分辨率和 4 倍多重采样抗锯齿。"
+                  : "Keeps full resolution and 4× MSAA."}
+          </small>
+          <label className="renderer-quality-label">
+            {language === "es"
+              ? "Apariencia del gizmo"
+              : isChinese
+                ? "操作轴外观"
+                : "Gizmo appearance"}
+          </label>
+          <div className="physics-parameter gizmo-appearance-parameter">
+            <div>
+              <span>{language === "es" ? "Escala" : isChinese ? "大小" : "Scale"}</span>
+              <output>{gizmoScale.toFixed(2)}×</output>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.05"
+              value={gizmoScale}
+              onChange={(event) => setGizmoScale(Number(event.target.value))}
+            />
+          </div>
+          <div className="physics-parameter gizmo-appearance-parameter">
+            <div>
+              <span>
+                {language === "es" ? "Grosor" : isChinese ? "粗细" : "Thickness"}
+              </span>
+              <output>{gizmoThickness.toFixed(2)}×</output>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="2.5"
+              step="0.05"
+              value={gizmoThickness}
+              onChange={(event) => setGizmoThickness(Number(event.target.value))}
+            />
+          </div>
+          <label>
+            {language === "es"
+              ? "Contorno negro de las piezas"
+              : isChinese
+                ? "零件轮廓"
+                : "Part outlines"}
+          </label>
+          <button
+            type="button"
+            className="map-toggle"
+            aria-pressed={modelOutlinesVisible}
+            onClick={() => {
+              const next = !modelOutlinesVisible,
+                state = appRef.current;
+              modelOutlinesVisibleRef.current = next;
+              setModelOutlinesVisible(next);
+              try {
+                localStorage.setItem("sim-studio:model-outlines", next ? "1" : "0");
+              } catch {}
+              if (!state) return;
+              state.renderLineBatchItems.forEach(({ line }) => {
+                line.visible = next;
+              });
+              const batchedPieces = new Set(
+                state.renderLineBatchItems.flatMap(({ pieces }) => pieces),
+              );
+              state.pieces.forEach((piece) => {
+                piece.mesh.traverse((object) => {
+                  if (object instanceof THREE.Line)
+                    object.visible = next && !batchedPieces.has(piece);
+                });
+              });
+              state.requestRender();
+            }}
+          >
+            {modelOutlinesVisible
+              ? language === "es"
+                ? "Desactivar contorno"
+                : isChinese
+                  ? "关闭轮廓"
+                  : "Disable outlines"
+              : language === "es"
+                ? "Activar contorno"
+                : isChinese
+                  ? "显示轮廓"
+                  : "Enable outlines"}
+          </button>
+        </div>
+        <div className="connection-editor gear-motor-editor">
+          <label>
+            {language === "es"
+              ? "Motores de engranaje"
+              : isChinese
+                ? "齿轮电机"
+                : "Gear motors"}
+          </label>
+          {gearMotors.length ? (
+            gearMotors.map((piece) => (
+              <div className="connection-card" key={`gear-motor-${piece.id}`}>
+                <div>
+                  <b>{piece.part}</b>
+                  <span>
+                    {motorKeyLabel(piece.gearMotor!.key)} · {piece.gearMotor!.speed} rad/s
+                    · {piece.gearMotor!.force} N·m
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={running}
+                  onClick={() => {
+                    appRef.current?.recordHistory();
+                    piece.gearMotor = undefined;
+                    setConnectionRevision((revision) => revision + 1);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className="no-connections">
+              {language === "es"
+                ? "No hay motores asignados."
+                : isChinese
+                  ? "尚未设置电机。"
+                  : "No motors assigned."}
+            </p>
+          )}
+        </div>
+        {selectedId && selected ? (
+          <>
+            <div className="selected-card">
+              <div className="cube">◆</div>
+              <div>
+                <small>
+                  {t.piece} {selected.part}
+                </small>
+                <b>{displayPartName(selected.name, language)}</b>
+              </div>
+            </div>
+            <label>
+              {language === "es"
+                ? "Información del modelo"
+                : isChinese
+                  ? "模型信息"
+                  : "Model information"}
+            </label>
+            <div className="model-provenance">
+              <div className="data-row">
+                <span>
+                  {language === "es" ? "Procedencia" : isChinese ? "来源" : "Origin"}
+                </span>
+                <b>
+                  {selected.origin === "model-import"
+                    ? language === "es"
+                      ? "Modelo importado"
+                      : isChinese
+                        ? "导入的模型"
+                        : "Imported model"
+                    : selected.origin === "catalog-search"
+                      ? language === "es"
+                        ? "Catálogo / referencia"
+                        : isChinese
+                          ? "零件库 / 编号"
+                          : "Catalog / reference"
+                      : language === "es"
+                        ? "Paleta predeterminada"
+                        : isChinese
+                          ? "默认零件库"
+                          : "Default palette"}
+                </b>
+              </div>
+              {selected.importFile && (
+                <div className="data-row">
+                  <span>
+                    {language === "es"
+                      ? "Archivo de origen"
+                      : isChinese
+                        ? "源文件"
+                        : "Source file"}
+                  </span>
+                  <b title={selected.importFile}>{selected.importFile}</b>
+                </div>
+              )}
+              <div className="data-row">
+                <span>
+                  {selected.origin === "model-import"
+                    ? language === "es"
+                      ? "Referencia en el archivo"
+                      : isChinese
+                        ? "文件中的编号"
+                        : "Reference in file"
+                    : language === "es"
+                      ? "Referencia solicitada"
+                      : isChinese
+                        ? "请求的编号"
+                        : "Requested reference"}
+                </span>
+                <b>{selected.requestedPart ?? selected.part}</b>
+              </div>
+              <div className="data-row">
+                <span>
+                  {language === "es"
+                    ? "Devuelto por catálogo"
+                    : isChinese
+                      ? "零件库结果"
+                      : "Catalog result"}
+                </span>
+                <b>
+                  {selected.catalogReturnedPart ??
+                    (selected.origin === "default-palette" ? selected.part : "—")}
+                </b>
+              </div>
+              <div className="data-row">
+                <span>
+                  {language === "es"
+                    ? "Modelo cargado"
+                    : isChinese
+                      ? "已加载的模型"
+                      : "Loaded model"}
+                </span>
+                <b>{selected.resolvedPart ?? selected.modelPart ?? selected.part}.dat</b>
+              </div>
+              <div className="data-row">
+                <span>
+                  {language === "es"
+                    ? "Fuente de geometría"
+                    : isChinese
+                      ? "几何数据来源"
+                      : "Geometry source"}
+                </span>
+                <b>
+                  {selected.sourceKind === "packaged-cache" || selected.geometry
+                    ? language === "es"
+                      ? "Precargada localmente"
+                      : isChinese
+                        ? "本地预加载缓存"
+                        : "Local preloaded cache"
+                    : selected.sourceKind === "external-catalog"
+                      ? language === "es"
+                        ? "Catálogo externo"
+                        : isChinese
+                          ? "外部零件库"
+                          : "External catalog"
+                      : "LDraw"}
+                </b>
+              </div>
+              {selected.catalogQuery && (
+                <div className="data-row">
+                  <span>
+                    {selected.origin === "model-import"
+                      ? language === "es"
+                        ? "Referencia pedida al catálogo"
+                        : isChinese
+                          ? "向零件库请求的编号"
+                          : "Reference requested from catalog"
+                      : language === "es"
+                        ? "Consulta enviada"
+                        : isChinese
+                          ? "零件库查询"
+                          : "Catalog query"}
+                  </span>
+                  <b>{selected.catalogQuery}</b>
+                </div>
+              )}
+              <div className="data-row">
+                <span>
+                  {language === "es"
+                    ? "Color solicitado / fuente"
+                    : isChinese
+                      ? "请求颜色 / 源颜色"
+                      : "Requested / source color"}
+                </span>
+                <b>
+                  {selected.color} / {selected.sourceColor ?? selected.color}
+                </b>
+              </div>
+              {selected.geometry && (
+                <div className="data-row">
+                  <span>
+                    {language === "es"
+                      ? "Recurso local"
+                      : isChinese
+                        ? "本地资源"
+                        : "Local resource"}
+                  </span>
+                  <b title={selected.geometry}>{selected.geometry}</b>
+                </div>
+              )}
+              {selected.downloadUrl && (
+                <div className="data-row">
+                  <span>
+                    {language === "es"
+                      ? "Enlace de carga usado"
+                      : isChinese
+                        ? "使用的下载来源"
+                        : "Download source used"}
+                  </span>
+                  <a
+                    className="model-source-link"
+                    href={selected.downloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={selected.downloadUrl}
+                  >
+                    {selected.downloadSource === "local"
+                      ? language === "es"
+                        ? "Recurso local ↗"
+                        : isChinese
+                          ? "本地资源 ↗"
+                          : "Local asset ↗"
+                      : selected.downloadSource === "legacy"
+                        ? language === "es"
+                          ? "CDN de respaldo ↗"
+                          : isChinese
+                            ? "备用 CDN ↗"
+                            : "Fallback CDN ↗"
+                        : language === "es"
+                          ? "CDN principal ↗"
+                          : isChinese
+                            ? "主 CDN ↗"
+                            : "Primary CDN ↗"}
+                  </a>
+                </div>
+              )}
+            </div>
+            {selectedRubberBand && (
+              <div className="map-editor rubber-map-editor">
+                <p>
+                  {language === "es"
+                    ? "Arrastra el nodo naranja central para mover toda la goma. Los nodos azules editan el recorrido."
+                    : isChinese
+                      ? "拖动中央橙色节点移动整条橡皮筋，蓝色节点用于编辑路径。"
+                      : "Drag the central orange node to move the whole band. Blue nodes edit the route."}
+                </p>
+                <div className="data-row">
+                  <span>
+                    {language === "es"
+                      ? "Longitud nominal"
+                      : isChinese
+                        ? "标称长度"
+                        : "Nominal length"}
+                  </span>
+                  <b>
+                    {selectedRubberBand.restLength.toFixed(2)} u · {selected.part}
+                  </b>
+                </div>
+                <div className="data-row">
+                  <span>
+                    {language === "es"
+                      ? "Recorrido actual"
+                      : isChinese
+                        ? "当前路径"
+                        : "Current route"}
+                  </span>
+                  <b>{selectedRubberRouteLength.toFixed(2)} u</b>
+                </div>
+                <div className="data-row">
+                  <span>
+                    {language === "es"
+                      ? "Tensión estimada"
+                      : isChinese
+                        ? "估算张力"
+                        : "Estimated tension"}
+                  </span>
+                  <b>
+                    {Math.max(
+                      0,
+                      4 * (selectedRubberRouteLength / selectedRubberBand.restLength - 1),
+                    ).toFixed(1)}{" "}
+                    N
+                  </b>
+                </div>
+                <div className="map-actions rubber-map-actions">
+                  <button
+                    disabled={running}
+                    onClick={() => {
+                      const state = appRef.current;
+                      if (!state) return;
+                      state.recordHistory();
+                      const guides = selectedRubberBand.guides;
+                      guides.push(guides.at(-1)!.clone().lerp(guides[0], 0.5));
+                      drawRubberBand(selectedRubberBand);
+                      state.scheduleRecoverySave();
+                      setConnectionRevision((revision) => revision + 1);
+                    }}
+                  >
+                    {language === "es"
+                      ? "＋ Añadir nodo"
+                      : isChinese
+                        ? "+ 添加节点"
+                        : "+ Add node"}
+                  </button>
+                </div>
+                {selectedRubberBand.guides.map((guide, index) => (
+                  <details
+                    className="connector-row rubber-node-row"
+                    key={`${selectedRubberBand.id}:${index}`}
+                  >
+                    <summary>
+                      <b>#{index + 1}</b>{" "}
+                      {language === "es"
+                        ? "Nodo de recorrido"
+                        : isChinese
+                          ? "路径节点"
+                          : "Route node"}
+                      <span className="connector-row-actions">
+                        <button
+                          aria-label={
+                            language === "es"
+                              ? "Eliminar nodo"
+                              : isChinese
+                                ? "删除节点"
+                                : "Delete node"
+                          }
+                          title={
+                            language === "es"
+                              ? "Eliminar nodo"
+                              : isChinese
+                                ? "删除节点"
+                                : "Delete node"
+                          }
+                          disabled={running || selectedRubberBand.guides.length <= 3}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const state = appRef.current;
+                            if (!state) return;
+                            state.recordHistory();
+                            selectedRubberBand.guides.splice(index, 1);
+                            drawRubberBand(selectedRubberBand);
+                            state.scheduleRecoverySave();
+                            setConnectionRevision((revision) => revision + 1);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    </summary>
+                    <label>{t.position}</label>
+                    <div className="vector-fields">
+                      {guide.toArray().map((value, component) => (
+                        <DeferredNumberInput
+                          key={component}
+                          step={0.05}
+                          value={+value.toFixed(4)}
+                          onCommit={(nextValue) => {
+                            const state = appRef.current;
+                            if (!state || running) return;
+                            state.recordHistory();
+                            guide.setComponent(component, nextValue);
+                            drawRubberBand(selectedRubberBand);
+                            state.scheduleRecoverySave();
+                            setConnectionRevision((revision) => revision + 1);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+            {!selectedRubberBand && (
+              <>
+                <label>{t.color}</label>
+                <div className="piece-color-control">
+                  <i
+                    style={{
+                      background: colorHex[selected.color] ?? colorHex[71],
+                    }}
+                  />
+                  <select
+                    aria-label={t.color}
+                    value={selected.color}
+                    disabled={running}
+                    onChange={(event) => void changeSelectedColor(+event.target.value)}
+                  >
+                    {!ldrawColorOptions.includes(selected.color) && (
+                      <option value={selected.color}>LDraw {selected.color}</option>
+                    )}
+                    {ldrawColorOptions.map((color) => (
+                      <option value={color} key={color}>
+                        {color} · {ldrawColorNames[color]?.[language] ?? `LDraw ${color}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+            {!selectedRubberBand && (
+              <label className="property-check exact-collider-check">
+                <input
+                  type="checkbox"
+                  checked={selected.exactCollider}
+                  disabled={running}
+                  onChange={(event) => {
+                    const state = appRef.current;
+                    if (!state) return;
+                    state.recordHistory();
+                    selected.exactCollider = event.target.checked;
+                    // Rebuild the diagnostics immediately so the visual mesh
+                    // always matches the collider selected for simulation.
+                    state.refreshDebug();
+                    setConnectorRevision((value) => value + 1);
+                    state.scheduleRecoverySave();
+                    setMessage(
+                      event.target.checked
+                        ? language === "es"
+                          ? "Colisión exacta activada para esta pieza (mayor coste físico)"
+                          : isChinese
+                            ? "此零件已启用精确碰撞（物理计算开销较高）"
+                            : "Exact collision enabled for this part (higher physics cost)"
+                        : language === "es"
+                          ? "La pieza vuelve a usar su colisión compuesta simplificada"
+                          : isChinese
+                            ? "此零件现已使用简化复合碰撞体"
+                            : "The part now uses its simplified compound collision",
+                    );
+                  }}
+                />
+                <span>
+                  {language === "es"
+                    ? "Usar la malla del modelo como colisión"
+                    : isChinese
+                      ? "使用模型网格进行碰撞"
+                      : "Use the model mesh as collision"}
+                  <small>
+                    {language === "es"
+                      ? "Más precisa, pero consume más recursos"
+                      : isChinese
+                        ? "更精确，但计算开销更大"
+                        : "More accurate, but more expensive"}
+                  </small>
+                </span>
+              </label>
+            )}
+            {!selectedRubberBand && (
+              <>
+                {selectedEditorAssembly.length > 1 && (
+                  <button
+                    type="button"
+                    className="map-toggle separate-assembly"
+                    disabled={running}
+                    onClick={separateSelectedEditorAssembly}
+                  >
+                    {language === "es"
+                      ? `Separar conjunto (${selectedEditorAssembly.length} piezas)`
+                      : isChinese
+                        ? `拆分组合（${selectedEditorAssembly.length} 个零件）`
+                        : `Separate assembly (${selectedEditorAssembly.length} parts)`}
+                  </button>
+                )}
+                <label>{t.move}</label>
+                <div className="transform-coordinate-grid">
+                  {(["x", "y", "z"] as const).map((axis) => (
+                    <label key={`position-${axis}`}>
+                      <span>{axis.toUpperCase()}</span>
+                      <DeferredNumberInput
+                        value={
+                          selectedTransformPivot?.[axis] ?? selected.mesh.position[axis]
+                        }
+                        step={gridStep || 0.01}
+                        onCommit={(value) => setInspectorPosition(axis, value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="control-grid">
+                  <button onClick={() => nudge("x", -(gridStep || 0.25))}>X−</button>
+                  <button onClick={() => nudge("y", gridStep || 0.25)}>Y+</button>
+                  <button onClick={() => nudge("z", -(gridStep || 0.25))}>Z−</button>
+                  <button onClick={() => nudge("x", gridStep || 0.25)}>X+</button>
+                  <button onClick={() => nudge("y", -(gridStep || 0.25))}>Y−</button>
+                  <button onClick={() => nudge("z", gridStep || 0.25)}>Z+</button>
+                </div>
+                <label>{t.rotationPivot}</label>
+                <select
+                  className="pivot-select"
+                  value={selectedPivotValue}
+                  disabled={running}
+                  onChange={(event) => {
+                    const state = appRef.current;
+                    if (!state) return;
+                    state.recordHistory();
+                    const option = selectedPivotOptions.find(
+                      (candidate) => candidate.key === event.target.value,
+                    );
+                    selected.rotationPivotKey = option?.key ?? "center";
+                    selected.rotationPivotLocal = option?.local.clone();
+                    state.refreshDebug();
+                    setConnectorRevision((value) => value + 1);
+                  }}
+                >
+                  <option value="center">{t.pieceCenter}</option>
+                  {selectedPivotOptions.map((option) => (
+                    <option value={option.key} key={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="angle-head">
+                  <label>{t.rotateAny}</label>
+                  <input
+                    type="number"
+                    min=".1"
+                    max="360"
+                    step=".1"
+                    value={rotationAngle}
+                    disabled={running}
+                    onChange={(event) =>
+                      setRotationAngle(
+                        Math.max(0.1, Math.min(360, +event.target.value || 0.1)),
+                      )
+                    }
+                  />
+                  <span>°</span>
+                </div>
+                {selectedCardanCoordinates ? (
+                  <>
+                    <button
+                      className="cardan-reference-button"
+                      disabled={
+                        running || selectedCardanLayout?.referenceLockedBySingleAxle
+                      }
+                      onClick={swapSelectedCardanReference}
+                      title={
+                        selectedCardanLayout?.referenceLockedBySingleAxle
+                          ? language === "es"
+                            ? "Referencia automática por conexión exterior de eje"
+                            : isChinese
+                              ? "根据外部轴连接自动选择参考端"
+                              : "Reference selected automatically by the external axle connection"
+                          : undefined
+                      }
+                    >
+                      <span className="cardan-reference-dot" />
+                      {language === "es"
+                        ? "Cambiar pieza 1"
+                        : isChinese
+                          ? "切换第 1 端"
+                          : "Swap end 1"}
+                      {selectedCardanLayout?.referenceLockedBySingleAxle
+                        ? language === "es"
+                          ? " · automática"
+                          : isChinese
+                            ? " · 自动"
+                            : " · automatic"
+                        : ""}
+                    </button>
+                    <p className="cardan-coordinate-note">
+                      {language === "es"
+                        ? "X y Z describen la dirección del extremo 3 respecto a la línea del extremo 1. El giro axial transmite la fase mediante las dos bisagras."
+                        : isChinese
+                          ? "X 和 Z 描述第 3 端相对第 1 端的方向；轴向自转通过两个铰链传递相位。"
+                          : "X and Z describe end 3 relative to end 1. Axial roll transmits phase through both hinges."}
+                    </p>
+                    <div className="transform-coordinate-grid rotation-coordinates cardan-coordinates">
+                      {(
+                        [
+                          [
+                            "aimX",
+                            language === "es"
+                              ? "Inclinación X°"
+                              : isChinese
+                                ? "X 向角度°"
+                                : "Aim X°",
+                          ],
+                          [
+                            "aimZ",
+                            language === "es"
+                              ? "Inclinación Z°"
+                              : isChinese
+                                ? "Z 向角度°"
+                                : "Aim Z°",
+                          ],
+                          [
+                            "roll",
+                            language === "es"
+                              ? "Giro eje 1°"
+                              : isChinese
+                                ? "输入轴转角°"
+                                : "Input roll°",
+                          ],
+                        ] as const
+                      ).map(([coordinate, label]) => (
+                        <label key={`cardan-${coordinate}`}>
+                          <span>{label}</span>
+                          <DeferredNumberInput
+                            value={THREE.MathUtils.radToDeg(
+                              selectedCardanCoordinates[coordinate],
+                            )}
+                            step={rotationSnapStep || 0.1}
+                            onCommit={(value) =>
+                              setInspectorCardanCoordinate(coordinate, value)
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="transform-coordinate-grid rotation-coordinates">
+                      {(["x", "y", "z"] as const).map((axis) => (
+                        <label key={`rotation-${axis}`}>
+                          <span>{axis.toUpperCase()}°</span>
+                          <DeferredNumberInput
+                            value={THREE.MathUtils.radToDeg(selected.mesh.rotation[axis])}
+                            step={rotationSnapStep || 0.1}
+                            onCommit={(value) => setInspectorRotation(axis, value)}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div className="control-grid rotate">
+                      <button onClick={() => rotate("x")}>↻ X</button>
+                      <button onClick={() => rotate("y")}>↻ Y</button>
+                      <button onClick={() => rotate("z")}>↻ Z</button>
+                      <button onClick={() => rotate("x", -1)}>↺ X</button>
+                      <button onClick={() => rotate("y", -1)}>↺ Y</button>
+                      <button onClick={() => rotate("z", -1)}>↺ Z</button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+            {(isAxlePart(selected) ||
+              selected.connectors.some(
+                (connector) => connector.role === "shaft" && connector.kind === "axle",
+              )) && (
+              <label className="property-check dynamic-axle-check">
+                <input
+                  type="checkbox"
+                  checked={selected.dynamicAxleConnections}
+                  disabled={running}
+                  onChange={(event) => {
+                    appRef.current?.recordHistory();
+                    selected.dynamicAxleConnections = event.target.checked;
+                    setConnectionRevision((value) => value + 1);
+                    setMessage(
+                      event.target.checked
+                        ? language === "es"
+                          ? "El eje podrá conectarse y desconectarse durante la simulación"
+                          : isChinese
+                            ? "模拟过程中轴可以连接或断开"
+                            : "The axle may connect and disconnect during simulation"
+                        : language === "es"
+                          ? "Conexiones dinámicas del eje desactivadas"
+                          : isChinese
+                            ? "动态轴连接已关闭"
+                            : "Dynamic axle connections disabled",
+                    );
+                  }}
+                />
+                <span>
+                  {language === "es"
+                    ? "Conectar/desconectar el eje durante la simulación"
+                    : isChinese
+                      ? "允许模拟过程中连接或断开轴"
+                      : "Connect/disconnect axle during simulation"}
+                </span>
+              </label>
+            )}
+            {selected.gear && selectedGearSpec && (
+              <div className="connection-editor gear-link-editor">
+                <label>
+                  {language === "es"
+                    ? "Engranaje"
+                    : isChinese
+                      ? "齿轮啮合"
+                      : "Gear coupling"}
+                </label>
+                <div className="data-row">
+                  <span>
+                    {language === "es" ? "Dientes" : isChinese ? "齿数" : "Teeth"}
+                  </span>
+                  <b>{selectedGearSpec.teeth}</b>
+                </div>
+                <div className="data-row">
+                  <span>
+                    {language === "es"
+                      ? "Radio primitivo"
+                      : isChinese
+                        ? "节圆半径"
+                        : "Pitch radius"}
+                  </span>
+                  <b>
+                    {selectedGearSpec.pitchRadius.toFixed(3)}
+                    {isChinese ? "格" : "studs"}
+                  </b>
+                </div>
+                <label className="property-check">
+                  <span>
+                    {language === "es"
+                      ? "Restricción de giro"
+                      : isChinese
+                        ? "转动限制"
+                        : "Rotation restriction"}
+                  </span>
+                  <select
+                    value={selected.gearDirectionLock ?? 0}
+                    disabled={running}
+                    onChange={(event) => {
+                      appRef.current?.recordHistory();
+                      const value = Number(event.target.value) as -1 | 0 | 1;
+                      selected.gearDirectionLock = value || undefined;
+                      appRef.current?.refreshDebug();
+                      setConnectionRevision((revision) => revision + 1);
+                    }}
+                  >
+                    <option value={0}>
+                      {language === "es" ? "Libre" : isChinese ? "自由" : "Free"}
+                    </option>
+                    <option value={1}>
+                      {language === "es"
+                        ? "Solo sentido horario"
+                        : isChinese
+                          ? "仅顺时针"
+                          : "Clockwise only"}
+                    </option>
+                    <option value={-1}>
+                      {language === "es"
+                        ? "Solo sentido antihorario"
+                        : isChinese
+                          ? "仅逆时针"
+                          : "Counter-clockwise only"}
+                    </option>
+                  </select>
+                </label>
+                <div className="connection-editor gear-motor-editor">
+                  <label>
+                    {language === "es"
+                      ? "Motor del engranaje"
+                      : isChinese
+                        ? "齿轮电机"
+                        : "Gear motor"}
+                  </label>
+                  {!selected.gearMotor ? (
+                    <button
+                      type="button"
+                      disabled={running}
+                      onClick={() => {
+                        appRef.current?.recordHistory();
+                        selected.gearMotor = { key: "KeyM", speed: 8, force: 20 };
+                        setConnectionRevision((revision) => revision + 1);
+                      }}
+                    >
+                      {language === "es"
+                        ? "Añadir motor a este engranaje"
+                        : isChinese
+                          ? "为此齿轮添加电机"
+                          : "Add motor to this gear"}
+                    </button>
+                  ) : (
+                    <>
+                      <div className="data-row">
+                        <span>
+                          {language === "es" ? "Tecla" : isChinese ? "按键" : "Key"}
+                        </span>
+                        <input
+                          value={motorKeyLabel(selected.gearMotor.key)}
+                          disabled={running}
+                          onChange={(event) => {
+                            selected.gearMotor = {
+                              key: normalizeMotorKey(event.target.value),
+                              speed: selected.gearMotor!.speed,
+                              force: selected.gearMotor!.force,
+                            };
+                            setConnectionRevision((revision) => revision + 1);
+                          }}
+                        />
+                      </div>
+                      <div className="data-row">
+                        <span>
+                          {language === "es" ? "Velocidad" : isChinese ? "速度" : "Speed"}
+                        </span>
+                        <input
+                          type="number"
+                          value={selected.gearMotor.speed}
+                          disabled={running}
+                          onChange={(event) => {
+                            selected.gearMotor = {
+                              key: selected.gearMotor!.key,
+                              speed: Number(event.target.value) || 0,
+                              force: selected.gearMotor!.force,
+                            };
+                            setConnectionRevision((revision) => revision + 1);
+                          }}
+                        />
+                      </div>
+                      <div className="data-row">
+                        <span>
+                          {language === "es" ? "Fuerza" : isChinese ? "力" : "Force"}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={selected.gearMotor.force}
+                          disabled={running}
+                          onChange={(event) => {
+                            selected.gearMotor = {
+                              key: selected.gearMotor!.key,
+                              speed: selected.gearMotor!.speed,
+                              force: Math.max(0, Number(event.target.value) || 0),
+                            };
+                            setConnectionRevision((revision) => revision + 1);
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={running}
+                        onClick={() => {
+                          appRef.current?.recordHistory();
+                          selected.gearMotor = undefined;
+                          setConnectionRevision((revision) => revision + 1);
+                        }}
+                      >
+                        {language === "es"
+                          ? "Quitar motor"
+                          : isChinese
+                            ? "移除电机"
+                            : "Remove motor"}
+                      </button>
+                    </>
+                  )}
+                  <small>
+                    {language === "es"
+                      ? "Mantén la tecla durante la simulación para accionar este engranaje."
+                      : isChinese
+                        ? "模拟时按住指定按键以驱动此齿轮。"
+                        : "Hold the key during simulation to drive this gear."}
+                  </small>
+                </div>
+                {selectedGearLinks.length ? (
+                  selectedGearLinks.map((link) => {
+                    const selectedIsA = link.a.value === selected,
+                      other = selectedIsA ? link.b : link.a,
+                      ratio = selectedIsA ? link.ratio : 1 / link.ratio;
+                    return (
+                      <div
+                        className="connection-card gear-link-card"
+                        key={`${link.a.value.id}:${link.b.value.id}`}
+                      >
+                        <div>
+                          <b>
+                            {language === "es"
+                              ? "Enlazado con"
+                              : isChinese
+                                ? "啮合对象"
+                                : "Meshed with"}{" "}
+                            {other.value.part}
+                          </b>
+                          <span>
+                            {selectedGearSpec.teeth}:{other.spec.teeth} ·{" "}
+                            {ratio.toFixed(3)}× ·{" "}
+                            {link.perpendicular
+                              ? language === "es"
+                                ? "engrane cónico a 90°"
+                                : isChinese
+                                  ? "90° 锥齿轮啮合"
+                                  : "90° bevel mesh"
+                              : language === "es"
+                                ? "giro inverso"
+                                : isChinese
+                                  ? "反向旋转"
+                                  : "opposite rotation"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="no-connections">
+                    {running
+                      ? language === "es"
+                        ? "No hay otro engranaje compatible a la distancia correcta."
+                        : isChinese
+                          ? "指定距离内没有兼容齿轮。"
+                          : "No compatible gear is at the required distance."
+                      : language === "es"
+                        ? "Los enlaces se detectan al iniciar la simulación."
+                        : isChinese
+                          ? "开始模拟时检测齿轮啮合。"
+                          : "Gear meshes are detected when simulation starts."}
+                  </p>
+                )}
+              </div>
+            )}
+            {(selectedConnections.length > 0 ||
+              selectedGearboxSelectorPairs.length > 0) && (
+              <div className="connection-editor">
+                <label>{t.pieceJoints}</label>
+                {selectedConnections.map((connection, index) => {
+                  const other = connection.a === selected ? connection.b : connection.a;
+                  return (
+                    <div className="connection-card" key={connection.id}>
+                      <div>
+                        <b>
+                          {t.joint} {index + 1} · {other.part}
+                        </b>
+                        <span>
+                          {profileLabels[connection.profile]} ·{" "}
+                          {modeLabels[connection.mode]}
+                          {connection.forced
+                            ? ` (${t.forcedJoint} ${(connection.forcedOffset ?? 0).toFixed(2)} u)`
+                            : ""}
+                        </span>
+                      </div>
+                      <select
+                        value={connection.mode}
+                        disabled={running}
+                        onChange={(event) =>
+                          setConnectionMode(
+                            connection.id,
+                            event.target.value as JointMode,
+                          )
+                        }
+                      >
+                        {allowedModesForConnection(connection).map((mode) => (
+                          <option value={mode} key={mode}>
+                            {modeLabels[mode]}
+                          </option>
+                        ))}
+                      </select>
+                      {connection.mode === "motor" && (
+                        <>
+                          <label className="motor-label">{t.speed}</label>
+                          <div className="motor-control">
+                            <input
+                              aria-label={isChinese ? "电机速度" : "Velocidad del motor"}
+                              type="range"
+                              min="-30"
+                              max="30"
+                              step=".5"
+                              value={connection.motorSpeed}
+                              onChange={(event) =>
+                                setMotorSpeed(connection.id, +event.target.value)
+                              }
+                            />
+                            <b>{connection.motorSpeed.toFixed(1)} rad/s</b>
+                          </div>
+                          <label className="motor-label">{t.torque}</label>
+                          <div className="motor-control">
+                            <input
+                              aria-label={isChinese ? "电机扭矩" : "Fuerza del motor"}
+                              type="range"
+                              min="5"
+                              max="10000"
+                              step="25"
+                              value={connection.motorForce}
+                              onChange={(event) =>
+                                setMotorForce(connection.id, +event.target.value)
+                              }
+                            />
+                            <b>{connection.motorForce.toFixed(0)} N·m</b>
+                          </div>
+                          <label className="motor-pulse-toggle">
+                            <input
+                              aria-label={
+                                isChinese ? "启用脉冲电机" : "Activar motor por pulsos"
+                              }
+                              type="checkbox"
+                              checked={connection.motorPulse}
+                              disabled={running}
+                              onChange={(event) =>
+                                setMotorPulse(connection.id, {
+                                  motorPulse: event.target.checked,
+                                })
+                              }
+                            />
+                            <span>
+                              {language === "es"
+                                ? "Motor por pulsos"
+                                : isChinese
+                                  ? "脉冲电机"
+                                  : "Pulse motor"}
+                            </span>
+                          </label>
+                          {connection.motorPulse && (
+                            <>
+                              <label className="motor-label">
+                                {language === "es"
+                                  ? isChinese
+                                    ? "每次脉冲角度"
+                                    : "Ángulo por pulso"
+                                  : isChinese
+                                    ? "每次脉冲角度"
+                                    : "Angle per pulse"}
+                              </label>
+                              <div className="motor-control">
+                                <input
+                                  aria-label={
+                                    isChinese ? "每次脉冲角度" : "Ángulo por pulso"
+                                  }
+                                  type="number"
+                                  min="1"
+                                  max="360"
+                                  step="1"
+                                  value={connection.motorPulseAngle}
+                                  disabled={running}
+                                  onChange={(event) =>
+                                    setMotorPulse(connection.id, {
+                                      motorPulseAngle: Number(event.target.value) || 1,
+                                    })
+                                  }
+                                />
+                                <b>{connection.motorPulseAngle.toFixed(0)}°</b>
+                              </div>
+                              <label className="motor-label">
+                                {language === "es"
+                                  ? isChinese
+                                    ? "脉冲间隔"
+                                    : "Tiempo entre pulsos"
+                                  : isChinese
+                                    ? "脉冲间隔"
+                                    : "Pulse interval"}
+                              </label>
+                              <div className="motor-control">
+                                <input
+                                  aria-label={
+                                    isChinese ? "脉冲间隔" : "Tiempo entre pulsos"
+                                  }
+                                  type="number"
+                                  min="0.05"
+                                  max="60"
+                                  step="0.05"
+                                  value={connection.motorPulseInterval}
+                                  disabled={running}
+                                  onChange={(event) =>
+                                    setMotorPulse(connection.id, {
+                                      motorPulseInterval:
+                                        Number(event.target.value) || 0.05,
+                                    })
+                                  }
+                                />
+                                <b>{connection.motorPulseInterval.toFixed(2)} s</b>
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+                {selectedGearboxSelectorPairs.map(({ ring, selector, layout }) => {
+                  const other = selected === ring ? selector : ring;
+                  return (
+                    <div
+                      className="connection-card"
+                      key={`gearbox-selector:${ring.id}:${selector.id}`}
+                    >
+                      <div>
+                        <b>
+                          {language === "es"
+                            ? "Selector especial"
+                            : isChinese
+                              ? "特殊选择器"
+                              : "Special selector"}
+                          {" · "}
+                          {other.part}
+                        </b>
+                        <span>
+                          {language === "es"
+                            ? `Contacto de leva con el anillo · ${layout === "coaxial" ? "en línea" : "ejes paralelos"}`
+                            : isChinese
+                              ? `凸轮与传动环接触 · ${layout === "coaxial" ? "in-line" : isChinese ? "平行轴" : "parallel axles"}`
+                              : `Cam contact with driving ring · ${layout === "coaxial" ? "in-line" : isChinese ? "平行轴" : "parallel axles"}`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="data-row">
+              <span>{t.connectMap}</span>
+              <b>
+                {selected.connectors.length} {t.points}
+              </b>
+            </div>
+            <button
+              className="map-toggle"
+              onClick={() => setConnectionMapOpen((value) => !value)}
+            >
+              {connectionMapOpen ? t.closeMap : t.editMap}
+            </button>
+            {connectionMapOpen && (
+              <div className="map-editor">
+                <div className="data-row">
+                  <span>
+                    {language === "es" ? "Origen" : isChinese ? "来源" : "Origin"}
+                  </span>
+                  <b>
+                    {selected.mapProvenance?.connectors?.origin === "manual"
+                      ? isChinese
+                        ? "手动"
+                        : "Manual"
+                      : selected.mapProvenance?.connectors?.origin === "automatic"
+                        ? language === "es"
+                          ? "Automático"
+                          : isChinese
+                            ? "自动"
+                            : "Automatic"
+                        : language === "es"
+                          ? "Desconocido"
+                          : isChinese
+                            ? "未知"
+                            : "Unknown"}
+                  </b>
+                </div>
+                <p>{t.mapHelp}</p>
+                <div className="map-actions">
+                  <button onClick={addConnector}>{t.addPoint}</button>
+                  <button onClick={regenerateConnectorMap}>{t.regenerateMap}</button>
+                  <button onClick={exportConnectorMap}>{t.exportJson}</button>
+                  <button onClick={() => connectorFileRef.current?.click()}>
+                    {t.importJson}
+                  </button>
+                  <input
+                    ref={connectorFileRef}
+                    hidden
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={(event) =>
+                      event.target.files?.[0] &&
+                      void importConnectorMap(event.target.files[0])
+                    }
+                  />
+                </div>
+                {selected.connectors.map((connector, index) => (
+                  <details
+                    className="connector-row"
+                    key={`${index}-${connector.role}-${connector.kind}`}
+                  >
+                    <summary>
+                      <b>#{index + 1}</b> {connector.role === "socket" ? t.hole : t.shaft}{" "}
+                      ·{" "}
+                      {connector.kind === "round"
+                        ? t.round
+                        : connector.kind === "axle"
+                          ? t.axle
+                          : t.halfRound}
+                      <span className="connector-row-actions">
+                        <button
+                          className="duplicate-connector"
+                          aria-label={t.duplicateConnector}
+                          title={t.duplicateConnector}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            duplicateConnector(index);
+                          }}
+                        >
+                          ⧉
+                        </button>
+                        <button
+                          aria-label={t.deleteConnector}
+                          title={t.deleteConnector}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            removeConnector(index);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    </summary>
+                    <div className="connector-types">
+                      <select
+                        value={connector.role}
+                        onChange={(event) =>
+                          updateConnector(index, "role", event.target.value)
+                        }
+                      >
+                        <option value="socket">{t.hole}</option>
+                        <option value="shaft">{t.shaft}</option>
+                      </select>
+                      <select
+                        value={connector.kind}
+                        onChange={(event) =>
+                          updateConnector(index, "kind", event.target.value)
+                        }
+                      >
+                        <option value="round">{t.round}</option>
+                        <option value="axle">{t.axle}</option>
+                        <option value="half">{t.halfRound}</option>
+                      </select>
+                    </div>
+                    <label>{t.position}</label>
+                    <div className="vector-fields">
+                      {connector.local.toArray().map((value, component) => (
+                        <DeferredNumberInput
+                          key={component}
+                          value={+value.toFixed(4)}
+                          onCommit={(nextValue) =>
+                            updateConnector(index, "local", String(nextValue), component)
+                          }
+                        />
+                      ))}
+                    </div>
+                    <label>{t.axis}</label>
+                    <div className="vector-fields">
+                      {connector.axis.toArray().map((value, component) => (
+                        <DeferredNumberInput
+                          key={component}
+                          value={+value.toFixed(4)}
+                          onCommit={(nextValue) =>
+                            updateConnector(index, "axis", String(nextValue), component)
+                          }
+                        />
+                      ))}
+                    </div>
+                    <div className="measure-fields">
+                      <label>
+                        {t.diameter}
+                        <DeferredNumberInput
+                          min={0.01}
+                          value={connector.diameter}
+                          onCommit={(nextValue) =>
+                            updateConnector(index, "diameter", String(nextValue))
+                          }
+                        />
+                      </label>
+                      <label>
+                        {t.length}
+                        <DeferredNumberInput
+                          min={0.01}
+                          value={connector.length ?? 0.5}
+                          onCommit={(nextValue) =>
+                            updateConnector(index, "length", String(nextValue))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <label className="property-check">
+                      <input
+                        type="checkbox"
+                        checked={connector.sliding === true}
+                        disabled={connector.kind !== "axle"}
+                        onChange={(event) =>
+                          updateConnectorPolicy(index, (next) => {
+                            next.sliding = event.target.checked;
+                          })
+                        }
+                      />
+                      {language === "es"
+                        ? "Deslizamiento por defecto"
+                        : isChinese
+                          ? "默认允许滑动"
+                          : "Slide by default"}
+                    </label>
+                    <label className="property-check">
+                      <input
+                        type="checkbox"
+                        checked={connector.connectionTarget !== undefined}
+                        onChange={(event) =>
+                          updateConnectorPolicy(index, (next) => {
+                            next.connectionTarget = event.target.checked
+                              ? { partId: "" }
+                              : undefined;
+                          })
+                        }
+                      />
+                      {language === "es"
+                        ? "Restringir a una pieza/conector"
+                        : isChinese
+                          ? "限定零件或连接点"
+                          : "Restrict to a part/connector"}
+                    </label>
+                    {connector.connectionTarget && (
+                      <div className="measure-fields connector-target-fields">
+                        <label>
+                          {language === "es"
+                            ? "ID de pieza"
+                            : isChinese
+                              ? "零件编号"
+                              : "Part ID"}
+                          <input
+                            value={connector.connectionTarget.partId}
+                            placeholder="62519"
+                            onChange={(event) =>
+                              updateConnectorPolicy(index, (next) => {
+                                next.connectionTarget = {
+                                  ...next.connectionTarget!,
+                                  partId: event.target.value,
+                                };
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          {language === "es"
+                            ? "Conector # (0 = cualquiera)"
+                            : isChinese
+                              ? "连接点编号（0 表示任意）"
+                              : "Connector # (0 = any)"}
+                          <DeferredNumberInput
+                            min={0}
+                            step={1}
+                            value={connector.connectionTarget.connectorId ?? 0}
+                            onCommit={(nextValue) =>
+                              updateConnectorPolicy(index, (next) => {
+                                const connectorId = Math.max(0, Math.round(nextValue));
+                                next.connectionTarget = {
+                                  ...next.connectionTarget!,
+                                  connectorId: connectorId || undefined,
+                                };
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                    )}
+                    <label className="property-check">
+                      <input
+                        type="checkbox"
+                        checked={connector.singleConnection === true}
+                        onChange={(event) =>
+                          updateConnectorPolicy(index, (next) => {
+                            next.singleConnection = event.target.checked || undefined;
+                          })
+                        }
+                      />
+                      {language === "es"
+                        ? "Permitir solo una conexión"
+                        : isChinese
+                          ? "仅允许一个连接"
+                          : "Allow only one connection"}
+                    </label>
+                  </details>
+                ))}
+              </div>
+            )}
+            <div className="data-row">
+              <span>{t.collisionMapEditor}</span>
+              <b>
+                {selected.colliders.length}
+                {selected.gear ? ` + ${selected.gearColliders.length}` : ""}
+                {isChinese ? "个形状" : "formas"}
+              </b>
+            </div>
+            <button
+              className="map-toggle collision-map-toggle"
+              onClick={() => {
+                const next = !collisionMapOpen;
+                setCollisionMapOpen(next);
+                if (next) {
+                  const state = appRef.current;
+                  if (state) {
+                    state.debug.colliders = true;
+                    state.refreshDebug();
+                  }
+                  setDebugViews((current) => ({
+                    ...current,
+                    colliders: true,
+                  }));
+                }
+              }}
+            >
+              {collisionMapOpen ? t.closeCollisionMap : t.editCollisionMap}
+            </button>
+            {collisionMapOpen && (
+              <div className="map-editor collision-map-editor">
+                <div className="data-row">
+                  <span>
+                    {language === "es" ? "Origen" : isChinese ? "来源" : "Origin"}
+                  </span>
+                  <b>
+                    {selected.mapProvenance?.[
+                      selectedCollisionLayer === "gear" ? "gearColliders" : "colliders"
+                    ]?.origin === "manual"
+                      ? isChinese
+                        ? "手动"
+                        : "Manual"
+                      : selected.mapProvenance?.[
+                            selectedCollisionLayer === "gear"
+                              ? "gearColliders"
+                              : "colliders"
+                          ]?.origin === "automatic"
+                        ? language === "es"
+                          ? "Automático"
+                          : isChinese
+                            ? "自动"
+                            : "Automatic"
+                        : language === "es"
+                          ? "Desconocido"
+                          : isChinese
+                            ? "未知"
+                            : "Unknown"}
+                  </b>
+                </div>
+                <p>{t.collisionMapHelp}</p>
+                {selected.gear && (
+                  <>
+                    <div className="collision-layer-tabs">
+                      <button
+                        className={collisionLayer === "normal" ? "active" : ""}
+                        onClick={() => setCollisionLayer("normal")}
+                      >
+                        {t.normalCollision}
+                      </button>
+                      <button
+                        className={collisionLayer === "gear" ? "active" : ""}
+                        onClick={() => setCollisionLayer("gear")}
+                      >
+                        {t.gearCollision}
+                      </button>
+                    </div>
+                    <p className="gear-collision-help">{t.gearCollisionHelp}</p>
+                    <label className="property-check">
+                      <input
+                        type="checkbox"
+                        checked={selected.specialGear}
+                        onChange={(event) => setSpecialGear(event.target.checked)}
+                      />
+                      {t.specialGear}
+                    </label>
+                  </>
+                )}
+                <div className="map-actions collision-map-actions">
+                  <button onClick={regenerateCollisionMap}>{t.regenerateMap}</button>
+                  <button onClick={() => addCollider("box")}>{t.addBox}</button>
+                  <button onClick={() => addCollider("cylinder")}>{t.addCylinder}</button>
+                  <button onClick={() => addCollider("sphere")}>{t.addSphere}</button>
+                  <button onClick={() => addCollider("hollowCylinder")}>
+                    {t.addHollowCylinder}
+                  </button>
+                  <button onClick={() => addCollider("arc")}>{t.addArc}</button>
+                  <button onClick={exportCollisionMap}>{t.exportJson}</button>
+                  <button onClick={() => colliderFileRef.current?.click()}>
+                    {t.importJson}
+                  </button>
+                  <input
+                    ref={colliderFileRef}
+                    hidden
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={(event) =>
+                      event.target.files?.[0] &&
+                      void importCollisionMap(event.target.files[0])
+                    }
+                  />
+                </div>
+                {selectedCollisionPrimitives.map((primitive, index) => {
+                  const rotation = new THREE.Euler().setFromQuaternion(
+                    primitive.rotation,
+                    "XYZ",
+                  );
+                  return (
+                    <details
+                      className="connector-row collision-row"
+                      key={`${index}-${primitive.shape}`}
+                    >
+                      <summary>
+                        <b>#{index + 1}</b>{" "}
+                        {primitive.shape === "box"
+                          ? t.box
+                          : primitive.shape === "cylinder"
+                            ? t.cylinder
+                            : primitive.shape === "sphere"
+                              ? t.sphere
+                              : primitive.shape === "hollowCylinder"
+                                ? t.hollowCylinder
+                                : t.arc}
+                        <button
+                          onClick={(event) => {
+                            event.preventDefault();
+                            removeCollider(index);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </summary>
+                      <div className="connector-types">
+                        <select
+                          value={primitive.shape}
+                          onChange={(event) =>
+                            updateCollider(index, "shape", event.target.value)
+                          }
+                        >
+                          <option value="box">{t.box}</option>
+                          <option value="cylinder">{t.cylinder}</option>
+                          <option value="sphere">{t.sphere}</option>
+                          <option value="hollowCylinder">{t.hollowCylinder}</option>
+                          <option value="arc">{t.arc}</option>
+                        </select>
+                      </div>
+                      {selected.specialGear && collisionLayer === "normal" && (
+                        <div className="measure-fields">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={primitive.gearCollision === true}
+                              onChange={(event) =>
+                                updateColliderGearMetadata(index, {
+                                  gearCollision: event.target.checked,
+                                })
+                              }
+                            />
+                            {t.greenGearCollision}
+                          </label>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={primitive.gearRatio !== undefined}
+                              onChange={(event) =>
+                                updateColliderGearMetadata(index, {
+                                  gearRatio: event.target.checked ? 1 : undefined,
+                                })
+                              }
+                            />
+                            {t.ratioZone}
+                          </label>
+                          {primitive.gearRatio !== undefined && (
+                            <label>
+                              {t.gearRatio}
+                              <DeferredNumberInput
+                                min={0.001}
+                                value={primitive.gearRatio}
+                                onCommit={(value) =>
+                                  updateColliderGearMetadata(index, {
+                                    gearRatio: Math.max(0.001, value),
+                                  })
+                                }
+                              />
+                            </label>
+                          )}
+                        </div>
+                      )}
+                      <label>{t.position}</label>
+                      <div className="vector-fields">
+                        {primitive.center.toArray().map((value, component) => (
+                          <DeferredNumberInput
+                            key={component}
+                            value={value}
+                            onCommit={(nextValue) =>
+                              updateCollider(
+                                index,
+                                "center",
+                                String(nextValue),
+                                component,
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                      <label>{t.rotation}</label>
+                      <div className="vector-fields">
+                        {[rotation.x, rotation.y, rotation.z].map((value, component) => (
+                          <DeferredNumberInput
+                            key={component}
+                            step={1}
+                            value={THREE.MathUtils.radToDeg(value)}
+                            onCommit={(nextValue) =>
+                              updateCollider(
+                                index,
+                                "rotation",
+                                String(nextValue),
+                                component,
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                      {primitive.shape === "box" ? (
+                        <>
+                          <label>{t.size}</label>
+                          <div className="vector-fields">
+                            {(primitive.size ?? new THREE.Vector3(1, 1, 1))
+                              .toArray()
+                              .map((value, component) => (
+                                <DeferredNumberInput
+                                  key={component}
+                                  min={0.01}
+                                  value={value}
+                                  onCommit={(nextValue) =>
+                                    updateCollider(
+                                      index,
+                                      "size",
+                                      String(nextValue),
+                                      component,
+                                    )
+                                  }
+                                />
+                              ))}
+                          </div>
+                        </>
+                      ) : primitive.shape === "sphere" ? (
+                        <div className="measure-fields">
+                          <label>
+                            {t.radius}
+                            <DeferredNumberInput
+                              min={0.02}
+                              value={primitive.radius ?? 0.5}
+                              onCommit={(nextValue) =>
+                                updateCollider(index, "radius", String(nextValue))
+                              }
+                            />
+                          </label>
+                        </div>
+                      ) : primitive.shape === "arc" ? (
+                        <div className="measure-fields">
+                          <label>
+                            {t.halfHeight}
+                            <DeferredNumberInput
+                              min={0.01}
+                              value={primitive.halfHeight ?? 0.5}
+                              onCommit={(nextValue) =>
+                                updateCollider(index, "halfHeight", String(nextValue))
+                              }
+                            />
+                          </label>
+                          <label>
+                            {t.arcThickness}
+                            <DeferredNumberInput
+                              min={0.01}
+                              value={primitive.arcThickness ?? 0.25}
+                              onCommit={(nextValue) =>
+                                updateCollider(index, "arcThickness", String(nextValue))
+                              }
+                            />
+                          </label>
+                          {arcCollisionControlPoints(primitive).map(
+                            (point, pointIndex) => (
+                              <div key={pointIndex}>
+                                <label>
+                                  {pointIndex === 0
+                                    ? t.arcStartPoint
+                                    : pointIndex === 1
+                                      ? t.arcMiddlePoint
+                                      : t.arcEndPoint}
+                                </label>
+                                <div className="vector-fields">
+                                  {point.map((value, coordinate) => (
+                                    <DeferredNumberInput
+                                      key={coordinate}
+                                      value={value}
+                                      onCommit={(nextValue) =>
+                                        updateCollider(
+                                          index,
+                                          "arcPoint",
+                                          String(nextValue),
+                                          pointIndex * 2 + coordinate,
+                                        )
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            ),
+                          )}
+                          <label>
+                            {t.segments}
+                            <DeferredNumberInput
+                              min={1}
+                              max={64}
+                              step={1}
+                              value={primitive.segments ?? 8}
+                              onCommit={(nextValue) =>
+                                updateCollider(index, "segments", String(nextValue))
+                              }
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="measure-fields">
+                          <label>
+                            {primitive.shape === "hollowCylinder"
+                              ? t.outerRadius
+                              : t.radius}
+                            <DeferredNumberInput
+                              min={0.02}
+                              value={primitive.radius ?? 0.5}
+                              onCommit={(nextValue) =>
+                                updateCollider(index, "radius", String(nextValue))
+                              }
+                            />
+                          </label>
+                          <label>
+                            {t.halfHeight}
+                            <DeferredNumberInput
+                              min={0.01}
+                              value={primitive.halfHeight ?? 0.5}
+                              onCommit={(nextValue) =>
+                                updateCollider(index, "halfHeight", String(nextValue))
+                              }
+                            />
+                          </label>
+                          {primitive.shape === "hollowCylinder" && (
+                            <>
+                              <label>
+                                {t.innerRadius}
+                                <DeferredNumberInput
+                                  min={0.01}
+                                  max={Math.max(0.01, (primitive.radius ?? 0.5) - 0.01)}
+                                  value={primitive.innerRadius ?? 0.25}
+                                  onCommit={(nextValue) =>
+                                    updateCollider(
+                                      index,
+                                      "innerRadius",
+                                      String(nextValue),
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label>
+                                {t.segments}
+                                <DeferredNumberInput
+                                  min={1}
+                                  max={64}
+                                  step={1}
+                                  value={primitive.segments ?? 24}
+                                  onCommit={(nextValue) =>
+                                    updateCollider(index, "segments", String(nextValue))
+                                  }
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </details>
+                  );
+                })}
+              </div>
+            )}
+            <div className="data-row">
+              <span>{t.activeJoints}</span>
+              <b>{selectedConnections.length}</b>
+            </div>
+            {selected.gear && (
+              <div className="data-row">
+                <span>{t.physicalTag}</span>
+                <b>⚙ {t.gearTag}</b>
+              </div>
+            )}
+            <button className="danger" onClick={remove}>
+              {t.deletePiece}
+            </button>
+          </>
+        ) : (
+          <div className="empty">
+            <span>◇</span>
+            <b>{t.nothing}</b>
+            <p>{t.selectHelp}</p>
+          </div>
+        )}
+        <div className="debug-tools">
+          <label>{t.technical}</label>
+          <button
+            className={debugViews.colliders ? "active" : ""}
+            aria-pressed={debugViews.colliders}
+            onClick={() => toggleDebug("colliders")}
+          >
+            <i className="green" />
+            {t.collisionMeshes}
+          </button>
+          <button
+            className={debugViews.connectors ? "active" : ""}
+            aria-pressed={debugViews.connectors}
+            onClick={() => toggleDebug("connectors")}
+          >
+            <i className="cyan" />
+            {t.connectionMap}
+          </button>
+          <div className="connect-legend">
+            <span>
+              <i className="socket-round" />
+              {t.blue}
+            </span>
+            <span>
+              <i className="shaft-round" />
+              {t.orange}
+            </span>
+            <span>
+              <i className="socket-axle" />
+              {t.green}
+            </span>
+            <span>
+              <i className="shaft-axle" />
+              {t.purple}
+            </span>
+            <span>
+              <i className="socket-half" />
+              {t.cyan}
+            </span>
+            <span>
+              <i className="shaft-half" />
+              {t.pink}
+            </span>
+          </div>
+          <button
+            className={debugViews.physics ? "active" : ""}
+            aria-pressed={debugViews.physics}
+            onClick={() => toggleDebug("physics")}
+          >
+            <i className="orange" />
+            {t.bodies}
+          </button>
+        </div>
+        <div className="log-tools">
+          <label>{t.physicsLog}</label>
+          <button disabled={!lastLog} onClick={downloadPhysicsLog}>
+            {lastLog ? t.downloadLog : t.stopForLog}
+          </button>
+          {lastLog && (
+            <details>
+              <summary>{t.readLog}</summary>
+              <pre>{lastLog}</pre>
+            </details>
+          )}
+        </div>
+        <div className="log-tools">
+          <label>{t.performanceLog}</label>
+          <p>{t.performanceHelp}</p>
+          <button onClick={downloadPerformanceLog}>{t.downloadPerformance}</button>
+        </div>
+        <div className="log-tools gpu-prototype-tools">
+          <label>
+            {language === "es"
+              ? "Render-core WebGPU"
+              : isChinese
+                ? "WebGPU 渲染核心"
+                : "WebGPU render-core"}
+          </label>
+          <p>
+            {language === "es"
+              ? "Renderiza instancias visibles con el nuevo pipeline WebGPU implementado en Rust/WASM."
+              : isChinese
+                ? "通过 Rust/WASM WebGPU 管线渲染可见实例。"
+                : "Render visible instances with the new Rust/WASM WebGPU pipeline."}
+          </p>
+          <canvas
+            ref={gpuCanvasRef}
+            className="gpu-prototype-canvas"
+            width={640}
+            height={360}
+            aria-label={
+              language === "es"
+                ? "Vista previa WebGPU"
+                : isChinese
+                  ? "WebGPU 预览"
+                  : "WebGPU preview"
+            }
+          />
+          <button
+            disabled={gpuPrototypeBusy}
+            onClick={() =>
+              gpuPreviewRunning ? stopGpuPrototype() : void runGpuPrototype()
+            }
+          >
+            {gpuPrototypeBusy
+              ? language === "es"
+                ? "Iniciando WebGPU…"
+                : isChinese
+                  ? "正在启动 WebGPU…"
+                  : "Starting WebGPU…"
+              : gpuPreviewRunning
+                ? language === "es"
+                  ? "Detener vista WebGPU"
+                  : isChinese
+                    ? "停止 WebGPU 预览"
+                    : "Stop WebGPU preview"
+                : language === "es"
+                  ? "Iniciar vista WebGPU"
+                  : isChinese
+                    ? "启动 WebGPU 预览"
+                    : "Start WebGPU preview"}
+          </button>
+          {gpuPrototypeResult && (
+            <div className="model-provenance">
+              <div className="data-row">
+                <span>
+                  {language === "es" ? "Adaptador" : isChinese ? "适配器" : "Adapter"}
+                </span>
+                <b>{gpuPrototypeResult.adapter}</b>
+              </div>
+              <div className="data-row">
+                <span>
+                  {language === "es" ? "Instancias" : isChinese ? "实例数" : "Instances"}
+                </span>
+                <b>{gpuPrototypeResult.instances}</b>
+              </div>
+              <div className="data-row">
+                <span>
+                  {language === "es"
+                    ? "Carga WASM → GPU"
+                    : isChinese
+                      ? "WASM → GPU 上传"
+                      : "WASM → GPU upload"}
+                </span>
+                <b>{gpuPrototypeResult.uploadMs.toFixed(3)} ms</b>
+              </div>
+              <div className="data-row">
+                <span>
+                  {language === "es"
+                    ? "Envío por frame"
+                    : isChinese
+                      ? "每帧提交"
+                      : "Submission per frame"}
+                </span>
+                <b>{gpuPrototypeResult.averageSubmitMs.toFixed(3)} ms</b>
+              </div>
+            </div>
+          )}
+          {gpuPrototypeError && <p className="no-connections">{gpuPrototypeError}</p>}
+        </div>
+        <div className="physics">
+          <label className="grid-setting-title">{t.gridSize}</label>
+          <div className="grid-setting" role="group" aria-label={t.gridSize}>
+            {([0.25, 0.5, 1, 0] as GridStep[]).map((step) => (
+              <button
+                key={step}
+                className={gridStep === step ? "active" : ""}
+                disabled={running}
+                onClick={() => setGridStep(step)}
+              >
+                {step === 0 ? t.noGridSnap : `${step} u`}
+              </button>
+            ))}
+          </div>
+          <label className="grid-setting-title">{t.axleSnap}</label>
+          <div className="grid-setting" role="group" aria-label={t.axleSnap}>
+            {([0.25, 0.125, 0.0625, 0] as AxleSnapStep[]).map((step) => (
+              <button
+                key={step}
+                className={axleSnapStep === step ? "active" : ""}
+                disabled={running}
+                onClick={() => setAxleSnapStep(step)}
+              >
+                {step === 0 ? t.noGridSnap : `${step} u`}
+              </button>
+            ))}
+          </div>
+          <label className="grid-setting-title">{t.rotationSnap}</label>
+          <div className="grid-setting" role="group" aria-label={t.rotationSnap}>
+            {([45, 22.5, 11.25, 0] as RotationSnapStep[]).map((step) => (
+              <button
+                key={step}
+                className={rotationSnapStep === step ? "active" : ""}
+                disabled={running}
+                onClick={() => setRotationSnapStep(step)}
+              >
+                {step === 0 ? t.noGridSnap : `${step}°`}
+              </button>
+            ))}
+          </div>
+          <div className="fog-settings">
+            <label className="fog-title">{t.fogDistance}</label>
+            <div className="structural-mode" role="group" aria-label={t.fogDistance}>
+              <button
+                className={fogSettings.enabled ? "active" : ""}
+                onClick={() =>
+                  setFogSettings((current) => ({ ...current, enabled: true }))
+                }
+              >
+                {t.enabled}
+              </button>
+              <button
+                className={!fogSettings.enabled ? "active" : ""}
+                onClick={() =>
+                  setFogSettings((current) => ({ ...current, enabled: false }))
+                }
+              >
+                {t.disabled}
+              </button>
+            </div>
+            <div className="fog-distance-summary">
+              {fogSettings.enabled
+                ? `${fogSettings.near.toFixed(0)}–${fogSettings.far.toFixed(0)} u`
+                : t.fogDisabled}
+            </div>
+            {fogSettings.enabled && (
+              <>
+                <div className="physics-parameter">
+                  <div>
+                    <span>{t.fogStart}</span>
+                    <output>{fogSettings.near.toFixed(0)} u</output>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="149"
+                    step="1"
+                    value={fogSettings.near}
+                    onChange={(event) =>
+                      setFogSettings((current) => ({
+                        ...current,
+                        near: Math.min(Number(event.target.value), current.far - 1),
+                      }))
+                    }
+                  />
+                </div>
+                <div className="physics-parameter">
+                  <div>
+                    <span>{t.fogEnd}</span>
+                    <output>{fogSettings.far.toFixed(0)} u</output>
+                  </div>
+                  <input
+                    type="range"
+                    min="2"
+                    max="160"
+                    step="1"
+                    value={fogSettings.far}
+                    onChange={(event) =>
+                      setFogSettings((current) => ({
+                        ...current,
+                        far: Math.max(Number(event.target.value), current.near + 1),
+                      }))
+                    }
+                  />
+                </div>
+              </>
+            )}
+            <button
+              className="fog-reset"
+              onClick={() => setFogSettings({ ...DEFAULT_FOG_SETTINGS })}
+            >
+              ↺ {t.resetFog}
+            </button>
+          </div>
+          <label className="structural-title">{t.structuralBehavior}</label>
+          <div className="structural-mode" role="group" aria-label={t.structuralBehavior}>
+            <button
+              className={structuralMode === "rigid" ? "active" : ""}
+              disabled={running}
+              onClick={() => setStructuralMode("rigid")}
+            >
+              {t.rigidStructure}
+            </button>
+            <button
+              className={structuralMode === "flexible" ? "active" : ""}
+              disabled={running}
+              onClick={() => setStructuralMode("flexible")}
+            >
+              {t.flexibleStructure}
+            </button>
+          </div>
+          <div className="stiffness-head">
+            <span>{t.structuralStiffness}</span>
+            <output>{structuralStiffness}%</output>
+          </div>
+          <input
+            className="stiffness-range"
+            type="range"
+            min="1"
+            max="100"
+            step="1"
+            value={structuralStiffness}
+            disabled={running}
+            onChange={(event) => setStructuralStiffness(+event.target.value)}
+          />
+          <p className="structural-help">
+            {structuralMode === "rigid" ? t.rigidStructureHelp : t.flexibleStructureHelp}
+          </p>
+          <label className="physics-parameters-title">{t.globalPhysicsParameters}</label>
+          {(
+            [
+              ["pieceFriction", t.pieceFriction, 0, 2, 0.01, ""],
+              ["frictionlessPinRotation", t.frictionlessPinRotation, 0, 5, 0.05, ""],
+              ["axleSlidingFriction", t.axleSlidingFriction, 0, 1, 0.01, ""],
+              ["axleRotationFriction", t.axleRotationFriction, 0, 1, 0.01, ""],
+              [
+                "axleTolerance",
+                t.axleTolerance,
+                0,
+                0.1,
+                0.005,
+                isChinese ? " 格" : " studs",
+              ],
+              [
+                "beamClearance",
+                t.beamClearance,
+                0,
+                0.1,
+                0.005,
+                isChinese ? " 格" : " studs",
+              ],
+            ] as [keyof PhysicsSettings, string, number, number, number, string][]
+          ).map(([key, label, min, max, step, unit]) => (
+            <div className="physics-parameter" key={key}>
+              <div>
+                <span>{label}</span>
+                <output>
+                  {physicsSettings[key].toFixed(step < 0.01 ? 3 : 2)}
+                  {unit}
+                </output>
+              </div>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={physicsSettings[key]}
+                disabled={running}
+                onChange={(event) =>
+                  setPhysicsSettings((current) => ({
+                    ...current,
+                    [key]: Number(event.target.value),
+                  }))
+                }
+              />
+            </div>
+          ))}
+          <p className="physics-parameters-help">{t.globalPhysicsHelp}</p>
+          <button
+            className="physics-reset"
+            disabled={running}
+            onClick={() => {
+              setStructuralMode("rigid");
+              setStructuralStiffness(85);
+              setPhysicsSettings({ ...DEFAULT_PHYSICS_SETTINGS });
+            }}
+          >
+            ↺ {t.resetPhysicsParameters}
+          </button>
+          <b>{t.physicsEngine}</b>
+          <span>
+            <i /> Rust + Rapier SIMD
+          </span>
+          <p>{t.physicsHelp}</p>
+        </div>
+      </aside>
+      <footer>
+        <span>
+          ● {t.grid}: {gridStep ? `${gridStep} u` : t.noGridSnap}
+        </span>
+        <a href="https://www.ldraw.org/" target="_blank" rel="noreferrer">
+          {t.ldrawCredit}
+        </a>
+        <span>Y ↑</span>
+        <span>
+          {count} {t.pieces} · {t.cache}
+        </span>
+      </footer>
+    </main>
+  );
+}

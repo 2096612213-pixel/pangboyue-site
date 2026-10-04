@@ -1,0 +1,2424 @@
+export type StoredCollisionPrimitive = {
+  shape: "box" | "cylinder" | "sphere" | "hollowCylinder" | "arc";
+  center: [number, number, number];
+  size?: [number, number, number];
+  radius?: number;
+  innerRadius?: number;
+  halfHeight?: number;
+  startAngle?: number;
+  arcAngle?: number;
+  arcPoints?: [[number, number], [number, number], [number, number]];
+  arcThickness?: number;
+  segments?: number;
+  rotation: [number, number, number, number];
+  gearCollision?: boolean;
+  gearRatio?: number;
+};
+
+// Generated from the reviewed maps exported by Sim Studio's collider editor.
+export const preloadedCollisionMaps: Record<string, StoredCollisionPrimitive[]> = {
+  "62519": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.16,
+      "halfHeight": 0.34,
+      "rotation": [0, 0, -0.7071067811865475, 0.7071067811865476]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.16,
+      "halfHeight": 0.34,
+      "rotation": [0, 0, 0, 1]
+    }
+  ],
+  "62520": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, -0.95],
+      "radius": 0.45,
+      "halfHeight": 0.55,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    }
+  ],
+  "2825": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        -0.25,
+        -1.5
+      ],
+      "size": [
+        3,
+        0.5,
+        0.9
+      ],
+      "rotation": [
+        0,
+        -0.7071067811865475,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        -0.25,
+        -3
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "3648": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1.6,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.48,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "3649": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 2.6,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 2,
+      "halfHeight": 0.4,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.6,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "3713": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.46,
+      "halfHeight": 0.5,
+      "rotation": [
+        -0.4999999999999999,
+        0.5,
+        -0.5,
+        0.5000000000000001
+      ]
+    }
+  ],
+  "6573": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -1.25
+      ],
+      "radius": 1.25,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "gearCollision": true
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -1.75
+      ],
+      "radius": 0.85,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "gearCollision": true
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -1.5
+      ],
+      "radius": 1.6,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "gearRatio": 1.5,
+      "gearCollision": false
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        1.075,
+        0
+      ],
+      "size": [
+        1,
+        0.15,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "gearCollision": true
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        -1.075,
+        0
+      ],
+      "size": [
+        1,
+        0.15,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "gearCollision": true
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        1.5
+      ],
+      "radius": 1.1,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "gearRatio": 1,
+      "gearCollision": false
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        1.12
+      ],
+      "radius": 1.25,
+      "halfHeight": 0.12,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "gearCollision": true
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        1.875
+      ],
+      "radius": 0.85,
+      "halfHeight": 0.125,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ],
+      "gearCollision": true
+    }
+  ],
+  "6589": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -0.1
+      ],
+      "radius": 0.6,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -0.175
+      ],
+      "radius": 0.8,
+      "halfHeight": 0.175,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "10928": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.65,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "18654": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "32013": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        -0.7071067811865475,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0.75
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.75,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "32016": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0.28701,
+        -0.69291
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.75,
+      "rotation": [
+        -0.5555702330196022,
+        0,
+        0,
+        0.8314696123025452
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0.75
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.75,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "32034": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 1.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "32039": [
+    {
+      "shape": "cylinder",
+      "center": [
+        -1.7763568394002505e-15,
+        5.551115123125783e-17,
+        0.25
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.75,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        1
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "32062": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        1,
+        0.2,
+        0.6
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        1,
+        0.6,
+        0.2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "32184": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        0.9,
+        2,
+        0.9
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        1,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "32192": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.45,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0.75
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.75,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0.53033,
+        -0.5303
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.75,
+      "rotation": [
+        -0.3826834323650898,
+        0,
+        0,
+        0.9238795325112867
+      ]
+    }
+  ],
+  "32198": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0.175
+      ],
+      "radius": 1.3,
+      "halfHeight": 0.175,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.6,
+      "halfHeight": 0.15,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "32269": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1.35,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32270": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.85,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32271": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        -3
+      ],
+      "size": [
+        6,
+        1,
+        0.9
+      ],
+      "rotation": [
+        0,
+        -0.7071067811865475,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0.8000000000000003,
+        0,
+        -6.6
+      ],
+      "size": [
+        2,
+        1,
+        0.9
+      ],
+      "rotation": [
+        0,
+        0.31622776601683794,
+        0,
+        0.948683298050514
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -6
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        1.6,
+        0,
+        -7.2
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "32498": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 2.35,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32556": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.32800000000000007,
+      "halfHeight": 1.41,
+      "rotation": [
+        0,
+        0,
+        -0.7071067811865475,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "45590": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        -0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        1,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        -0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "46372": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1.85,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "48496": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0.25,
+        0
+      ],
+      "size": [
+        0.9,
+        0.5,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        -0.5,
+        1
+      ],
+      "radius": 0.3,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        -0.5,
+        -1
+      ],
+      "radius": 0.3,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0.25,
+        -1
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0.25,
+        1
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        1.5,
+        1.25
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        1.5,
+        -1.25
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        1,
+        1.125
+      ],
+      "size": [
+        0.7,
+        1,
+        0.25
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        1,
+        -1.125
+      ],
+      "size": [
+        0.7,
+        1,
+        0.25
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "55615": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        1
+      ],
+      "radius": 0.3,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        2,
+        1
+      ],
+      "radius": 0.3,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 0.3,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        -1,
+        -2
+      ],
+      "radius": 0.3,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0.75,
+        0.025
+      ],
+      "size": [
+        0.9,
+        2.5,
+        0.95
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        2,
+        0.25
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        2,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        -0.025,
+        -0.75
+      ],
+      "size": [
+        0.9,
+        0.95,
+        2.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -2
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "60484": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        -1
+      ],
+      "size": [
+        2,
+        1,
+        0.9
+      ],
+      "rotation": [
+        0,
+        -0.7071067811865475,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        -2
+      ],
+      "size": [
+        2,
+        1,
+        0.9
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        -1,
+        0,
+        -2
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        1,
+        0,
+        -2
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "63869": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        -0.5,
+        0
+      ],
+      "size": [
+        1,
+        1,
+        0.9
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        -1,
+        0
+      ],
+      "size": [
+        2,
+        0.9,
+        0.9
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.5,
+        -0.4999999999999999,
+        0.5,
+        0.5000000000000001
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        1,
+        -1,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        -1,
+        -1,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "64179": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        3
+      ],
+      "size": [
+        4,
+        0.9,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        -3
+      ],
+      "size": [
+        4,
+        0.9,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        2,
+        0,
+        3
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        -2,
+        0,
+        3
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        -2,
+        0,
+        -3
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        2,
+        0,
+        -3
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.5,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        2,
+        0,
+        0
+      ],
+      "size": [
+        1,
+        1,
+        6
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        -2,
+        0,
+        0
+      ],
+      "size": [
+        1,
+        1,
+        6
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "87408": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0.5,
+        -2.220446049250313e-16
+      ],
+      "size": [
+        0.9,
+        1,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        1.25,
+        -1.25
+      ],
+      "size": [
+        0.9,
+        2.5,
+        0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        2.5,
+        -1.25
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        1.25,
+        1.25
+      ],
+      "size": [
+        0.9,
+        2.5,
+        0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        2.5,
+        1.25
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "94925": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1.08,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.6,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "99773": [
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        4,
+        0.5,
+        0.9
+      ],
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0,
+        0,
+        -1
+      ],
+      "size": [
+        2,
+        0.5,
+        0.9
+      ],
+      "rotation": [
+        0,
+        -0.7071067811865475,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        -2,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        2,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -2
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        0.6,
+        0,
+        -0.6
+      ],
+      "size": [
+        1.06,
+        0.5,
+        1.5
+      ],
+      "rotation": [
+        0,
+        0.3826834323650898,
+        0,
+        0.9238795325112867
+      ]
+    },
+    {
+      "shape": "box",
+      "center": [
+        -0.6,
+        0,
+        -0.6
+      ],
+      "size": [
+        1.06,
+        0.5,
+        1.5
+      ],
+      "rotation": [
+        0,
+        -0.3826834323650898,
+        0,
+        0.9238795325112867
+      ]
+    }
+  ],
+  "99010": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 1.45,
+      "halfHeight": 0.5,
+      "rotation": [0, 0, 0, 1]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, -0.175, 0],
+      "radius": 1.85,
+      "halfHeight": 0.32,
+      "rotation": [0, 0, 0, 1]
+    },
+    {
+      "shape": "cylinder",
+      "center": [1, 1, 0],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    },
+    {
+      "shape": "cylinder",
+      "center": [-1, 1, 0],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    }
+  ],
+  "4159": [
+    {
+      "shape": "arc",
+      "center": [1, 2.25, 0],
+      "radius": 0.6,
+      "innerRadius": 0.35,
+      "halfHeight": 0.25,
+      "startAngle": 0,
+      "arcAngle": 90,
+      "arcPoints": [[0, 0.7], [1, 0], [2.9085361479749636e-17, -0.7]],
+      "arcThickness": 0.25,
+      "segments": 16,
+      "rotation": [0.5, -0.5, -0.4999999999999999, 0.5000000000000001]
+    },
+    {
+      "shape": "cylinder",
+      "center": [1, 0, 0],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    },
+    {
+      "shape": "cylinder",
+      "center": [-1, 0, 0],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0.45, 0],
+      "radius": 0.45,
+      "halfHeight": 0.45,
+      "rotation": [0, 0, 0, 1]
+    },
+    {
+      "shape": "box",
+      "center": [0, 0.225, 0],
+      "size": [2, 0.45, 1],
+      "rotation": [0, 0, 0, 1]
+    },
+    {
+      "shape": "box",
+      "center": [1.45, 1, 0],
+      "size": [0.25, 1.5, 0.45],
+      "rotation": [-6.7146814663928614e-18, 2.6931116400174995e-17, -0.24192189559966773, 0.9702957262759965]
+    },
+    {
+      "shape": "box",
+      "center": [1, 0.8, 0],
+      "size": [0.5, 0.8, 0.45],
+      "rotation": [0, 0, 0, 1]
+    }
+  ],
+  "6628": [
+    {
+      "shape": "cylinder",
+      "center": [0.5, 0, 0],
+      "radius": 0.3,
+      "halfHeight": 0.5,
+      "rotation": [0, 0, -0.7071067811865475, 0.7071067811865476]
+    },
+    {
+      "shape": "sphere",
+      "center": [-0.5, 0, 0],
+      "radius": 0.4,
+      "rotation": [0, 0, 0, 1]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.2,
+      "halfHeight": 0.5,
+      "rotation": [0, 0, -0.7071067811865475, 0.7071067811865476]
+    }
+  ],
+  "3584": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 1.5,
+      "halfHeight": 1,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    }
+  ],
+  "6538": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.45,
+      "halfHeight": 1,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865475],
+      "gearCollision": false
+    }
+  ],
+  "32187": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.85,
+      "halfHeight": 0.45,
+      "rotation": [0.7071067811865476, 0, 0, 0.7071067811865476],
+      "gearCollision": false
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0.7],
+      "radius": 0.6,
+      "halfHeight": 0.3,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476],
+      "gearCollision": false
+    }
+  ],
+  "35186": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.85,
+      "halfHeight": 0.5,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865475]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0.7],
+      "radius": 0.6,
+      "halfHeight": 0.2,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    }
+  ],
+  "6539": [
+    {
+      "shape": "hollowCylinder",
+      "center": [0, 0, 0],
+      "radius": 0.65,
+      "innerRadius": 0.5,
+      "halfHeight": 1,
+      "segments": 24,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    },
+    {
+      "shape": "hollowCylinder",
+      "center": [0, 0, 0.35],
+      "radius": 1,
+      "innerRadius": 0.5,
+      "halfHeight": 0.1,
+      "segments": 24,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    },
+    {
+      "shape": "hollowCylinder",
+      "center": [0, 0, -0.35],
+      "radius": 1,
+      "innerRadius": 0.5,
+      "halfHeight": 0.1,
+      "segments": 24,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    }
+  ],
+  "6542": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, -0.125],
+      "radius": 0.85,
+      "halfHeight": 0.375,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865475]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 1.1,
+      "halfHeight": 0.25,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    }
+  ],
+  "4265c": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.45,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ]
+};
+
+// Optional second layer used exclusively for gear-to-gear contacts.
+export const preloadedGearCollisionMaps: Record<string, StoredCollisionPrimitive[]> = {
+  "3584": [],
+  "4159": [],
+  "6628": [],
+  "6538": [],
+  "32187": [],
+  "35186": [],
+  "6539": [],
+  "2825": [],
+  "3648": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1.3539019744873046,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "3649": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        -0.1337499976158143,
+        0
+      ],
+      "radius": 2.35,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "6573": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -1.5
+      ],
+      "radius": 1.3,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        1.5
+      ],
+      "radius": 0.8,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "6589": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -0.1
+      ],
+      "radius": 0.49,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -0.02
+      ],
+      "radius": 0.805,
+      "halfHeight": 0.02,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        -0.03
+      ],
+      "radius": 0.79,
+      "halfHeight": 0.029,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "10928": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.4,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32039": [],
+  "32062": [],
+  "32184": [],
+  "32198": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0.175
+      ],
+      "radius": 1,
+      "halfHeight": 0.175,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32269": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32270": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32271": [],
+  "32498": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 2,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "32556": [],
+  "45590": [],
+  "46372": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 1.5,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865475
+      ]
+    }
+  ],
+  "48496": [],
+  "55615": [],
+  "60484": [],
+  "63869": [],
+  "64179": [],
+  "94925": [
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.85,
+      "halfHeight": 0.25,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    },
+    {
+      "shape": "cylinder",
+      "center": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.5,
+      "halfHeight": 0.5,
+      "rotation": [
+        0.7071067811865475,
+        0,
+        0,
+        0.7071067811865476
+      ]
+    }
+  ],
+  "99773": [],
+  "99010": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 1.5,
+      "halfHeight": 0.5,
+      "rotation": [0, 0, 0, 1]
+    }
+  ],
+  "6542": [
+    {
+      "shape": "cylinder",
+      "center": [0, 0, -0.125],
+      "radius": 0.85,
+      "halfHeight": 0.375,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865475]
+    },
+    {
+      "shape": "cylinder",
+      "center": [0, 0, 0],
+      "radius": 0.45,
+      "halfHeight": 0.5,
+      "rotation": [0.7071067811865475, 0, 0, 0.7071067811865476]
+    }
+  ],
+  "4265c": []
+};
+
+export const preloadedSpecialGearParts = new Set(["6573"]);

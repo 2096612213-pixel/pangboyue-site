@@ -1,0 +1,304 @@
+use serde::{Deserialize, Serialize};
+
+pub type Vec3 = [f32; 3];
+pub type Quat = [f32; 4];
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneConfig {
+    #[serde(default = "default_gravity")]
+    pub gravity: Vec3,
+    pub settings: PhysicsSettings,
+    pub bodies: Vec<BodyConfig>,
+    #[serde(default)]
+    pub joints: Vec<JointConfig>,
+    #[serde(default)]
+    pub gears: Vec<GearConfig>,
+    #[serde(default)]
+    pub differentials: Vec<DifferentialConfig>,
+    #[serde(default)]
+    pub axial_stops: Vec<AxialStopConfig>,
+    #[serde(default)]
+    pub cam_followers: Vec<CamFollowerConfig>,
+    #[serde(default)]
+    pub rubber_bands: Vec<RubberBandConfig>,
+    #[serde(default)]
+    // JavaScript sends editor ids as Number values. Some legacy ids include a
+    // fractional random component, so the Rust boundary preserves their exact
+    // IEEE-754 representation rather than coercing them to an integer.
+    pub excluded_collider_pairs: Vec<[f64; 2]>,
+}
+
+fn default_gravity() -> Vec3 {
+    [0.0, -9.81, 0.0]
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhysicsSettings {
+    pub solver_iterations: usize,
+    pub internal_pgs_iterations: usize,
+    pub allowed_linear_error: f32,
+    pub max_ccd_substeps: usize,
+    pub large_simulation: bool,
+    pub axle_sliding_friction: f32,
+    pub axle_rotation_friction: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BodyConfig {
+    pub id: u32,
+    pub fixed: bool,
+    pub position: Vec3,
+    pub rotation: Quat,
+    pub mass: f32,
+    pub linear_damping: f32,
+    pub angular_damping: f32,
+    pub additional_solver_iterations: usize,
+    pub ccd: bool,
+    #[serde(default)]
+    pub colliders: Vec<ColliderConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColliderConfig {
+    /// Piece id owning this collider. Several pieces may share one rigid body.
+    pub owner_id: f64,
+    pub center: Vec3,
+    pub rotation: Quat,
+    pub friction: f32,
+    pub density: f32,
+    pub collision_group: u32,
+    pub collision_mask: u32,
+    pub shape: ColliderShape,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum ColliderShape {
+    Box {
+        half_extents: Vec3,
+    },
+    Cylinder {
+        half_height: f32,
+        radius: f32,
+    },
+    Ball {
+        radius: f32,
+    },
+    TriMesh {
+        vertices: Vec<f32>,
+        indices: Vec<u32>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum JointMode {
+    Fixed,
+    Rotation,
+    Linear,
+    RotationLinear,
+    Motor,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JointConfig {
+    pub id: String,
+    pub body_a: u32,
+    pub body_b: u32,
+    pub mode: JointMode,
+    pub world_anchor_a: Vec3,
+    pub world_anchor_b: Vec3,
+    pub world_axis_a: Vec3,
+    pub world_axis_b: Vec3,
+    pub travel: f32,
+    pub motor_speed: f32,
+    pub motor_force: f32,
+    #[serde(default)]
+    pub motor_pulse_angle: f32,
+    #[serde(default)]
+    pub motor_pulse_interval: f32,
+    pub passive_motor_force: f32,
+    pub dynamic_axle: bool,
+    #[serde(default)]
+    pub angular_limit: Option<f32>,
+    #[serde(default)]
+    pub linear_detents: Vec<f32>,
+    #[serde(default)]
+    pub linear_limits: Option<[f32; 2]>,
+    #[serde(default)]
+    pub detent_force: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearConfig {
+    pub id: String,
+    pub body_a: u32,
+    pub body_b: u32,
+
+    #[serde(default)]
+    pub carrier_body: Option<u32>,
+
+    #[serde(default)]
+    pub carrier_axis: Option<Vec3>,
+    pub axis_a: Vec3,
+    pub axis_b: Vec3,
+    pub center_a: Vec3,
+    pub center_b: Vec3,
+    #[serde(default)]
+    pub reference_a: Vec3,
+    #[serde(default)]
+    pub reference_b: Vec3,
+    pub teeth_a: f32,
+    pub teeth_b: f32,
+    pub sign_b: f32,
+    #[serde(default)]
+    pub phase_lock: bool,
+    #[serde(default)]
+    pub coaxial_clutch: bool,
+    #[serde(default)]
+    pub backlash: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DifferentialConfig {
+    pub id: String,
+    pub left_body: u32,
+    pub right_body: u32,
+    pub carrier_body: u32,
+    pub axis: Vec3,
+    #[serde(default)]
+    pub satellites: Vec<DifferentialSatelliteConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DifferentialSatelliteConfig {
+    pub body: u32,
+    pub side_body: u32,
+    pub axis: Vec3,
+    pub side_axis: Vec3,
+    pub center: Vec3,
+    pub side_center: Vec3,
+    pub reference: Vec3,
+    pub side_reference: Vec3,
+    pub coefficient: f32,
+    pub side_coefficient: f32,
+    pub phase_lock: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AxialStopConfig {
+    pub body_a: u32,
+    pub body_b: u32,
+    pub host_point: Vec3,
+    pub stop_point: Vec3,
+    pub world_axis: Vec3,
+    pub side: f32,
+    pub minimum_distance: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CamFollowerConfig {
+    pub guide_joint: String,
+    pub selector_body: u32,
+    pub follower_body: u32,
+    pub selector_center: Vec3,
+    pub follower_point: Vec3,
+    pub world_axis: Vec3,
+    pub world_reference: Vec3,
+    pub profile: Vec<f32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RubberBandConfig {
+    pub node_ids: Vec<u32>,
+    pub rest_length: f32,
+    pub stiffness: f32,
+    pub damping: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum PhysicsCommand {
+    Spring {
+        body: u32,
+        world_point: Vec3,
+        target: Vec3,
+        stiffness: f32,
+        damping: f32,
+        max_force: f32,
+    },
+    Impulse {
+        body: u32,
+        impulse: Vec3,
+        world_point: Option<Vec3>,
+    },
+    TorqueImpulse {
+        body: u32,
+        impulse: Vec3,
+    },
+    SetFixed {
+        body: u32,
+        fixed: bool,
+    },
+    SetTranslation {
+        body: u32,
+        position: Vec3,
+    },
+    SetRotation {
+        body: u32,
+        rotation: Quat,
+    },
+    SetLinearVelocity {
+        body: u32,
+        velocity: Vec3,
+    },
+    SetAngularVelocity {
+        body: u32,
+        velocity: Vec3,
+    },
+    SetDamping {
+        body: u32,
+        linear: f32,
+        angular: f32,
+    },
+    SetMotor {
+        joint: String,
+        speed: f32,
+        force: f32,
+        #[serde(default)]
+        motor_pulse_angle: Option<f32>,
+        #[serde(default)]
+        motor_pulse_interval: Option<f32>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StepStats {
+    pub bodies: usize,
+    pub active_bodies: usize,
+    pub sleeping_bodies: usize,
+    pub joints: usize,
+    pub gears: usize,
+    pub substeps: usize,
+    pub max_spring_force: f32,
+}

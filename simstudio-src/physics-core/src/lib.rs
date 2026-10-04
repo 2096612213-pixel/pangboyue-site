@@ -1,0 +1,651 @@
+mod math;
+mod model;
+mod systems;
+
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
+
+use js_sys::Float32Array;
+use rapier3d::prelude::*;
+use wasm_bindgen::prelude::*;
+
+use math::{clamp_length, pose, rotation_to_array, vector};
+use model::{
+    ColliderConfig, ColliderShape, GearConfig, JointConfig, PhysicsCommand, SceneConfig, StepStats,
+};
+use systems::{cams, differentials, forces, gears, joints, rubber, stops};
+
+const TRANSFORM_STRIDE: usize = 15;
+
+fn js_error(message: impl ToString) -> JsValue {
+    js_sys::Error::new(&message.to_string()).into()
+}
+
+fn pair_key(left: u64, right: u64) -> (u64, u64) {
+    if left <= right {
+        (left, right)
+    } else {
+        (right, left)
+    }
+}
+
+fn editor_id(value: f64, label: &str) -> Result<u64, JsValue> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(js_error(format!("Invalid {label}: {value}")));
+    }
+    // Piece ids created by older editor versions contain a fractional random
+    // component. Store the exact IEEE-754 bit pattern in Rapier's user_data so
+    // no rounding can merge two different pieces.
+    Ok(value.to_bits())
+}
+
+struct ContactFilter {
+    excluded: HashSet<(u64, u64)>,
+    candidates: Mutex<HashSet<(u64, u64)>>,
+}
+
+impl Default for ContactFilter {
+    fn default() -> Self {
+        Self {
+            excluded: HashSet::new(),
+            candidates: Mutex::new(HashSet::new()),
+        }
+    }
+}
+
+impl PhysicsHooks for ContactFilter {
+    fn filter_contact_pair(&self, context: &PairFilterContext) -> Option<SolverFlags> {
+        let owner_a = context.colliders[context.collider1].user_data as u64;
+        let owner_b = context.colliders[context.collider2].user_data as u64;
+        if owner_a != 0 && owner_b != 0 && owner_a != owner_b {
+            if let Ok(mut candidates) = self.candidates.lock() {
+                candidates.insert(pair_key(owner_a, owner_b));
+            }
+        }
+        if owner_a != 0 && owner_b != 0 && self.excluded.contains(&pair_key(owner_a, owner_b)) {
+            None
+        } else {
+            Some(SolverFlags::COMPUTE_IMPULSES)
+        }
+    }
+}
+
+/// The only object exported to JavaScript. Rapier bodies, colliders and joints
+/// never cross this boundary, preventing wasm-bindgen aliasing/ownership errors.
+#[wasm_bindgen]
+pub struct PhysicsEngine {
+    world: PhysicsWorld,
+    body_ids: HashMap<u32, RigidBodyHandle>,
+    ordered_bodies: Vec<(u32, RigidBodyHandle)>,
+    joints: Vec<joints::JointRuntime>,
+    joint_ids: HashMap<String, usize>,
+    gears: Vec<gears::GearRuntime>,
+    differentials: Vec<differentials::DifferentialRuntime>,
+    axial_stops: Vec<stops::AxialStopRuntime>,
+    cam_followers: Vec<cams::CamFollowerRuntime>,
+    rubber_bands: Vec<rubber::RubberBand>,
+    previous_gear_rotations: HashMap<RigidBodyHandle, Rotation>,
+    contact_filter: ContactFilter,
+    settings: model::PhysicsSettings,
+    transforms: Vec<f32>,
+    stats: StepStats,
+    elapsed_seconds: f32,
+}
+
+#[wasm_bindgen]
+impl PhysicsEngine {
+    #[wasm_bindgen(constructor)]
+    pub fn new(scene: JsValue) -> Result<PhysicsEngine, JsValue> {
+        let config: SceneConfig = serde_wasm_bindgen::from_value(scene)
+            .map_err(|error| js_error(format!("Invalid physics scene: {error}")))?;
+
+        let mut world = PhysicsWorld::new();
+        world.gravity = vector(config.gravity);
+        world.integration_parameters.num_solver_iterations =
+            config.settings.solver_iterations.max(1);
+        world.integration_parameters.num_internal_pgs_iterations =
+            config.settings.internal_pgs_iterations.max(1);
+        world.integration_parameters.normalized_allowed_linear_error =
+            config.settings.allowed_linear_error.max(1.0e-5);
+        // LEGO mechanisms often contain several almost-coplanar colliders and
+        // joint chains. Reusing the full previous impulse can feed numerical
+        // correction back into the next frame and create motion without an
+        // external force. A partial warm start keeps convergence fast without
+        // preserving those spikes indefinitely.
+        world.integration_parameters.warmstart_coefficient = 0.65;
+        world.integration_parameters.normalized_max_corrective_velocity = 1.0;
+        world.integration_parameters.num_internal_stabilization_iterations = 2;
+        world.integration_parameters.max_ccd_substeps = config.settings.max_ccd_substeps;
+
+        // Infinite-looking editor floor. Its collider remains finite but much
+        // larger than every practical LEGO mechanism.
+        let floor = ColliderBuilder::cuboid(5_000.0, 0.15, 5_000.0)
+            .translation(Vector::new(0.0, -0.2, 0.0))
+            .friction(0.9)
+            .collision_groups(InteractionGroups::new(
+                Group::GROUP_1,
+                Group::GROUP_1 | Group::GROUP_2,
+                InteractionTestMode::And,
+            ))
+            .build();
+        world.colliders.insert(floor);
+
+        let mut body_ids = HashMap::with_capacity(config.bodies.len());
+        let mut ordered_bodies = Vec::with_capacity(config.bodies.len());
+        for body in &config.bodies {
+            let builder = if body.fixed {
+                RigidBodyBuilder::fixed()
+            } else {
+                RigidBodyBuilder::dynamic()
+                    .linear_damping(body.linear_damping)
+                    .angular_damping(body.angular_damping)
+                    .ccd_enabled(body.ccd)
+                    .soft_ccd_prediction(if config.settings.large_simulation {
+                        0.0
+                    } else {
+                        // Adjacent Technic layers intentionally retain only a
+                        // very small clearance (typically about 0.04 stud).
+                        // A 0.1 prediction distance created speculative contacts
+                        // across that gap, causing hinges to stick and then
+                        // release their accumulated impulse as sudden spins.
+                        // Hard CCD remains enabled for actual fast impacts.
+                        0.01
+                    })
+                    .additional_solver_iterations(body.additional_solver_iterations)
+                    .additional_mass(body.mass.max(0.0001))
+            }
+            .pose(pose(body.position, body.rotation))
+            .user_data(body.id as u128);
+            let handle = world.bodies.insert(builder);
+            body_ids.insert(body.id, handle);
+            ordered_bodies.push((body.id, handle));
+
+            for collider in &body.colliders {
+                let collider = build_collider(collider)?;
+                world
+                    .colliders
+                    .insert_with_parent(collider, handle, &mut world.bodies);
+            }
+            // External impulses run before Rapier's first step, so they need
+            // the final compound mass and inertia, including additional mass.
+            world.bodies[handle].recompute_mass_properties_from_colliders(&world.colliders);
+        }
+        ordered_bodies.sort_unstable_by_key(|entry| entry.0);
+
+        let mut contact_filter = ContactFilter::default();
+        for [left, right] in config.excluded_collider_pairs {
+            contact_filter.excluded.insert(pair_key(
+                editor_id(left, "excluded collider owner id")?,
+                editor_id(right, "excluded collider owner id")?,
+            ));
+        }
+
+        let mut runtime_joints = Vec::new();
+        let mut joint_ids = HashMap::new();
+        for joint in &config.joints {
+            if let Some(runtime) = joints::create_joint(joint, &body_ids, &mut world) {
+                joint_ids.insert(runtime.id.clone(), runtime_joints.len());
+                runtime_joints.push(runtime);
+            }
+        }
+
+        let runtime_gears = gears::build_gears(&config.gears, &body_ids, &world);
+        let runtime_differentials =
+            differentials::build(&config.differentials, &body_ids, &world);
+        let axial_stops = stops::build(&config.axial_stops, &body_ids, &world);
+        let cam_followers = cams::build(&config.cam_followers, &body_ids, &world);
+        let rubber_bands = rubber::build(&config.rubber_bands, &body_ids);
+        rubber::configure_bodies(&rubber_bands, &mut world);
+        let previous_gear_rotations = ordered_bodies
+            .iter()
+            .map(|(_, handle)| (*handle, *world.bodies[*handle].rotation()))
+            .collect();
+        let stats = StepStats {
+            bodies: ordered_bodies.len(),
+            active_bodies: ordered_bodies
+                .iter()
+                .filter(|(_, handle)| !world.bodies[*handle].is_fixed())
+                .count(),
+            sleeping_bodies: 0,
+            joints: runtime_joints.len(),
+            gears: runtime_gears.len() + runtime_differentials.len(),
+            substeps: if runtime_gears.is_empty() && runtime_differentials.is_empty() {
+                1
+            } else if config.settings.large_simulation {
+                2
+            } else {
+                6
+            },
+            max_spring_force: 0.0,
+        };
+
+        Ok(PhysicsEngine {
+            world,
+            body_ids,
+            ordered_bodies,
+            joints: runtime_joints,
+            joint_ids,
+            gears: runtime_gears,
+            differentials: runtime_differentials,
+            axial_stops,
+            cam_followers,
+            rubber_bands,
+            previous_gear_rotations,
+            contact_filter,
+            settings: config.settings,
+            transforms: Vec::new(),
+            stats,
+            elapsed_seconds: 0.0,
+        })
+    }
+
+    /// Advances motors, forces, constraints and Rapier as one Rust operation.
+    /// The returned flat array contains 15 floats per body:
+    /// id, position(3), quaternion(4), linear velocity(3), angular velocity(3), sleeping.
+    pub fn step(&mut self, delta_seconds: f32, commands: JsValue) -> Result<Float32Array, JsValue> {
+        let commands: Vec<PhysicsCommand> = serde_wasm_bindgen::from_value(commands)
+            .map_err(|error| js_error(format!("Invalid physics commands: {error}")))?;
+        let timestep = delta_seconds.clamp(1.0 / 240.0, 1.0 / 60.0);
+        let substeps = if self.gears.is_empty()
+            && self.differentials.is_empty()
+            && self.rubber_bands.is_empty()
+            && self.cam_followers.is_empty()
+        {
+            1
+        } else if self.settings.large_simulation {
+            2
+        } else {
+            6
+        };
+
+        self.stats.max_spring_force =
+            forces::apply_commands(&commands, &self.body_ids, &mut self.world, timestep);
+        joints::update_motors(&commands, &self.joint_ids, &mut self.joints);
+        joints::apply_axle_friction(&self.joints, &mut self.world, self.settings, timestep);
+
+        let startup = self.elapsed_seconds < 0.35;
+        let substep_dt = timestep / substeps as f32;
+        self.world.integration_parameters.dt = substep_dt;
+        self.world.integration_parameters.warmstart_coefficient = if startup { 0.0 } else { 0.65 };
+        for _ in 0..substeps {
+            joints::apply_motor_impulses(&mut self.joints, &mut self.world, substep_dt);
+            rubber::apply(&self.rubber_bands, &mut self.world, substep_dt);
+            self.project_drivetrain(substep_dt);
+            self.world.step_with_events(&self.contact_filter, &());
+            differentials::accumulate_angles(&mut self.differentials, &self.world);
+            gears::accumulate_angles(
+                &mut self.gears,
+                &mut self.previous_gear_rotations,
+                &self.world,
+            );
+            self.project_drivetrain(0.0);
+        }
+        gears::accumulate_angles(
+            &mut self.gears,
+            &mut self.previous_gear_rotations,
+            &self.world,
+        );
+        stops::enforce(&self.axial_stops, &mut self.world);
+        self.elapsed_seconds += timestep;
+        if startup {
+            // The startup speed limiter must not leave cached joint impulses
+            // behind. Otherwise they are released on the first unrestricted
+            // frame, exactly like the spontaneous burst visible in log 20.
+            for (_, joint) in self.world.impulse_joints.iter_mut() {
+                joint.impulses.fill(0.0);
+            }
+        }
+        self.clamp_motion(self.elapsed_seconds);
+        // FINAL GEAR AUTHORITY:
+        // anything that changed gear motion earlier in the frame (forces,
+        // motors, Rapier, clamps, or state overwrites) is corrected here.
+        gears::accumulate_angles(
+            &mut self.gears,
+            &mut self.previous_gear_rotations,
+            &self.world,
+        );
+        self.project_drivetrain(0.0);
+        gears::accumulate_angles(
+            &mut self.gears,
+            &mut self.previous_gear_rotations,
+            &self.world,
+        );
+        // The final no-slip projection can redistribute a large velocity
+        // through an entire chain. Clamp after that authority as well; doing
+        // it only beforehand allowed the returned state to exceed the safety
+        // limit (92 rad/s in log 51) and tear every contact apart at once.
+        self.clamp_motion(self.elapsed_seconds);
+        self.collect_transforms();
+
+        self.stats.substeps = substeps;
+        self.stats.active_bodies = 0;
+        self.stats.sleeping_bodies = 0;
+        for (_, handle) in &self.ordered_bodies {
+            let body = &self.world.bodies[*handle];
+            if body.is_fixed() || body.is_sleeping() {
+                self.stats.sleeping_bodies += 1;
+            } else {
+                self.stats.active_bodies += 1;
+            }
+        }
+
+        Ok(Float32Array::from(self.transforms.as_slice()))
+    }
+
+    pub fn stats(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(&self.stats)
+            .map_err(|error| js_error(format!("Unable to serialize physics stats: {error}")))
+    }
+
+    pub fn transform_stride(&self) -> usize {
+        TRANSFORM_STRIDE
+    }
+
+    pub fn set_excluded_collider_pairs(&mut self, pairs: JsValue) -> Result<(), JsValue> {
+        let pairs: Vec<[f64; 2]> = serde_wasm_bindgen::from_value(pairs)
+            .map_err(|error| js_error(format!("Invalid collider exclusions: {error}")))?;
+        self.contact_filter.excluded.clear();
+        for [left, right] in pairs {
+            self.contact_filter.excluded.insert(pair_key(
+                editor_id(left, "excluded collider owner id")?,
+                editor_id(right, "excluded collider owner id")?,
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn set_excluded_collider_pair(
+        &mut self,
+        left: f64,
+        right: f64,
+        excluded: bool,
+    ) -> Result<(), JsValue> {
+        let key = pair_key(
+            editor_id(left, "excluded collider owner id")?,
+            editor_id(right, "excluded collider owner id")?,
+        );
+        if excluded {
+            self.contact_filter.excluded.insert(key);
+        } else {
+            self.contact_filter.excluded.remove(&key);
+        }
+        Ok(())
+    }
+
+    /// Returns and clears collider-owner pairs observed since the last call.
+    /// TypeScript uses this topology-only information to discover axle entries;
+    /// all contact solving remains in Rust.
+    pub fn take_contact_pairs(&mut self) -> Result<JsValue, JsValue> {
+        let mut candidates = self
+            .contact_filter
+            .candidates
+            .lock()
+            .map_err(|_| js_error("Contact candidate lock was poisoned"))?;
+        // Return numbers instead of BigInt: editor IDs stay below JS's exact
+        // integer limit, and all existing TypeScript maps use `number` keys.
+        let pairs: Vec<[f64; 2]> = candidates
+            .drain()
+            .map(|(left, right)| [f64::from_bits(left), f64::from_bits(right)])
+            .collect();
+        serde_wasm_bindgen::to_value(&pairs)
+            .map_err(|error| js_error(format!("Unable to serialize contacts: {error}")))
+    }
+
+    pub fn replace_gears(&mut self, gears: JsValue) -> Result<(), JsValue> {
+        let configs: Vec<GearConfig> = serde_wasm_bindgen::from_value(gears)
+            .map_err(|error| js_error(format!("Invalid gear graph: {error}")))?;
+        let previous: HashMap<_, _> = self
+            .gears
+            .drain(..)
+            .map(|gear| (gear.id.clone(), gear))
+            .collect();
+        let mut rebuilt = systems::gears::build_gears(&configs, &self.body_ids, &self.world);
+        for gear in &mut rebuilt {
+            let Some(old) = previous.get(&gear.id) else {
+                continue;
+            };
+            if old.body_a != gear.body_a
+                || old.body_b != gear.body_b
+                || (old.teeth_a - gear.teeth_a).abs() > 1.0e-6
+                || (old.signed_teeth_b - gear.signed_teeth_b).abs() > 1.0e-6
+            {
+                continue;
+            }
+            // Dynamic overlap scans must not redefine which tooth is engaged.
+            // Rebase the newly measured wrapped angles onto the old continuous
+            // coordinates and retain the original tooth-gap target.
+            gear.angle_a = old.angle_a + systems::gears::wrapped_delta(gear.angle_a, old.angle_a);
+            gear.angle_b = old.angle_b + systems::gears::wrapped_delta(gear.angle_b, old.angle_b);
+            gear.initial_phase = old.initial_phase;
+            gear.phase_target = old.phase_target;
+        }
+        self.gears = rebuilt;
+        self.previous_gear_rotations = self
+            .ordered_bodies
+            .iter()
+            .map(|(_, handle)| (*handle, *self.world.bodies[*handle].rotation()))
+            .collect();
+        self.stats.gears = self.gears.len() + self.differentials.len();
+        Ok(())
+    }
+
+    pub fn add_joint(&mut self, joint: JsValue) -> Result<bool, JsValue> {
+        let config: JointConfig = serde_wasm_bindgen::from_value(joint)
+            .map_err(|error| js_error(format!("Invalid joint: {error}")))?;
+        let Some(runtime) = systems::joints::create_joint(&config, &self.body_ids, &mut self.world)
+        else {
+            return Ok(false);
+        };
+        self.joint_ids.insert(runtime.id.clone(), self.joints.len());
+        self.joints.push(runtime);
+        self.stats.joints = self.joints.len();
+        Ok(true)
+    }
+
+    pub fn remove_joint(&mut self, id: String) -> bool {
+        let Some(index) = self.joint_ids.remove(&id) else {
+            return false;
+        };
+        let runtime = self.joints.swap_remove(index);
+        self.world.impulse_joints.remove(runtime.handle, true);
+        if let Some(swapped) = self.joints.get(index) {
+            self.joint_ids.insert(swapped.id.clone(), index);
+        }
+        self.stats.joints = self.joints.len();
+        true
+    }
+}
+
+impl PhysicsEngine {
+    fn project_drivetrain(&mut self, dt: Real) {
+        let count = self.gears.len() + self.differentials.len() + self.cam_followers.len();
+        if count == 0 { return; }
+        let passes = (count * 4).clamp(32, 128);
+        let mut previous = Vec::with_capacity(self.ordered_bodies.len());
+        for pass in 0..passes {
+            previous.clear();
+            previous.extend(self.ordered_bodies.iter().map(|(_, handle)| {
+                let body = &self.world.bodies[*handle];
+                (body.linvel(), body.angvel())
+            }));
+            joints::project_locked_velocities(&self.joints, &mut self.world);
+            cams::project_velocities(
+                &self.cam_followers,
+                &self.joint_ids,
+                &mut self.world,
+                dt,
+            );
+            differentials::project_velocities(&self.differentials, dt, &mut self.world);
+            if dt > 0.0 {
+                gears::project_velocities(&self.gears, &mut self.world, dt);
+            } else {
+                gears::project_exact_no_slip(&self.gears, &mut self.world);
+            }
+            if pass >= 3 && self.ordered_bodies.iter().zip(&previous).all(|((_, handle), (v, w))| {
+                let body = &self.world.bodies[*handle];
+                (body.linvel() - *v).length_squared() < 1.0e-12
+                    && (body.angvel() - *w).length_squared() < 1.0e-12
+            }) { break; }
+        }
+    }
+
+    fn clamp_motion(&mut self, elapsed_seconds: f32) {
+        let release = ((elapsed_seconds - 0.35) / 0.65).clamp(0.0, 1.0);
+        let linear_limit = 2.0 + 10.0 * release;
+        let free_angular_limit = 3.0 + 11.0 * release;
+        let gear_angular_limit = 20.0 + 60.0 * release;
+        let mut graph: HashMap<RigidBodyHandle, Vec<RigidBodyHandle>> = HashMap::new();
+        let mut connect = |a, b| {
+            graph.entry(a).or_default().push(b);
+            graph.entry(b).or_default().push(a);
+        };
+        for gear in &self.gears {
+            connect(gear.body_a, gear.body_b);
+            if let Some(carrier) = gear.carrier_body {
+                connect(gear.body_a, carrier);
+                connect(gear.body_b, carrier);
+            }
+        }
+        for differential in &self.differentials {
+            connect(differential.left, differential.right);
+            connect(differential.left, differential.carrier);
+            for satellite in &differential.satellites {
+                connect(satellite.body, differential.carrier);
+                connect(satellite.body, satellite.side_body);
+            }
+        }
+        let geared: HashSet<_> = graph.keys().copied().collect();
+        for joint in &self.joints {
+            // A fixed support cannot transmit a speed, and must not merge
+            // otherwise independent drivetrains into one speed-limited group.
+            if self.world.bodies[joint.body_a].is_dynamic()
+                && self.world.bodies[joint.body_b].is_dynamic()
+            {
+                graph.entry(joint.body_a).or_default().push(joint.body_b);
+                graph.entry(joint.body_b).or_default().push(joint.body_a);
+            }
+        }
+
+        // Scale a complete drivetrain together. Clamping each gear separately
+        // changed unequal ratios and looked exactly like tooth slip.
+        let mut visited = HashSet::new();
+        for root in geared {
+            if !visited.insert(root) {
+                continue;
+            }
+            let mut component = Vec::new();
+            let mut stack = vec![root];
+            while let Some(handle) = stack.pop() {
+                component.push(handle);
+                for neighbour in graph.get(&handle).into_iter().flatten() {
+                    if visited.insert(*neighbour) {
+                        stack.push(*neighbour);
+                    }
+                }
+            }
+            let maximum = component
+                .iter()
+                .filter_map(|handle| self.world.bodies.get(*handle))
+                .filter(|body| body.is_dynamic())
+                .map(|body| (body.angvel().length() / gear_angular_limit)
+                    .max(body.linvel().length() / linear_limit))
+                .fold(1.0_f32, f32::max);
+            if maximum <= 1.0 {
+                continue;
+            }
+            let scale = 1.0 / maximum;
+            for handle in component {
+                let body = &mut self.world.bodies[handle];
+                if !body.is_fixed() {
+                    body.set_linvel(body.linvel() * scale, true);
+                    body.set_angvel(body.angvel() * scale, true);
+                }
+            }
+        }
+        for (_, handle) in &self.ordered_bodies {
+            let body = &mut self.world.bodies[*handle];
+            if body.is_fixed() || visited.contains(handle) { continue; }
+            body.set_linvel(clamp_length(body.linvel(), linear_limit), true);
+            body.set_angvel(clamp_length(body.angvel(), free_angular_limit), true);
+        }
+    }
+
+    fn collect_transforms(&mut self) {
+        self.transforms.clear();
+        self.transforms
+            .reserve(self.ordered_bodies.len() * TRANSFORM_STRIDE);
+        for (id, handle) in &self.ordered_bodies {
+            let body = &self.world.bodies[*handle];
+            let position = body.translation();
+            let rotation = rotation_to_array(body.rotation());
+            let linear = body.linvel();
+            let angular = body.angvel();
+            self.transforms.extend_from_slice(&[
+                *id as f32,
+                position.x,
+                position.y,
+                position.z,
+                rotation[0],
+                rotation[1],
+                rotation[2],
+                rotation[3],
+                linear.x,
+                linear.y,
+                linear.z,
+                angular.x,
+                angular.y,
+                angular.z,
+                if body.is_sleeping() { 1.0 } else { 0.0 },
+            ]);
+        }
+    }
+}
+
+fn build_collider(config: &ColliderConfig) -> Result<Collider, JsValue> {
+    let owner_id = editor_id(config.owner_id, "collider owner id")?;
+    let builder = match &config.shape {
+        ColliderShape::Box { half_extents } => {
+            ColliderBuilder::cuboid(half_extents[0], half_extents[1], half_extents[2])
+        }
+        ColliderShape::Cylinder {
+            half_height,
+            radius,
+        } => ColliderBuilder::cylinder((*half_height).max(0.01), (*radius).max(0.01)),
+        ColliderShape::Ball { radius } => ColliderBuilder::ball((*radius).max(0.01)),
+        ColliderShape::TriMesh { vertices, indices } => {
+            let vertices = vertices
+                .chunks_exact(3)
+                .map(|value| Vector::new(value[0], value[1], value[2]))
+                .collect();
+            let indices = indices
+                .chunks_exact(3)
+                .map(|value| [value[0], value[1], value[2]])
+                .collect();
+            ColliderBuilder::trimesh_with_flags(
+                vertices,
+                indices,
+                TriMeshFlags::FIX_INTERNAL_EDGES
+                    | TriMeshFlags::MERGE_DUPLICATE_VERTICES
+                    | TriMeshFlags::DELETE_DEGENERATE_TRIANGLES
+                    | TriMeshFlags::DELETE_DUPLICATE_TRIANGLES,
+            )
+            .map_err(|error| js_error(format!("Invalid triangle collider: {error:?}")))?
+        }
+    };
+
+    let memberships = Group::from_bits_retain(config.collision_group);
+    let filter = Group::from_bits_retain(config.collision_mask);
+    Ok(builder
+        .position(pose(config.center, config.rotation))
+        .friction(config.friction.max(0.0))
+        .restitution(0.0)
+        .density(config.density.max(0.0))
+        .collision_groups(InteractionGroups::new(
+            memberships,
+            filter,
+            InteractionTestMode::And,
+        ))
+        .active_hooks(ActiveHooks::FILTER_CONTACT_PAIRS)
+        .user_data(owner_id as u128)
+        .build())
+}

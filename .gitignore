@@ -1,3 +1,9 @@
 .DS_Store
 sample-src/node_modules/
 sample-src/dist/
+
+simstudio-src/node_modules/
+simstudio-src/pages-dist/
+simstudio-src/.next/
+simstudio-src/.vinext/
+simstudio-src/*.tsbuildinfo
