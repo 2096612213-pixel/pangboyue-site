@@ -500,3 +500,8 @@ A股"上市多、退市少"的根本原因是一个**制度性、结构性的系
 第一 天黑之后不骑自行车 因为太危险 第二 下雨天加天黑之后不骑电动车和自行车
 
 ---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/week40-video-9928c636-poster.jpg" aria-label="周记视频">
+  <source src="/thoughts/2026-W40/media/week40-video-9928c636.mp4" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/week40-video-9928c636.mp4">打开视频</a>观看。
+</video>
