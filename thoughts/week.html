@@ -11,7 +11,7 @@
   <title>周记 | 各种想法与认识</title>
   <link rel="stylesheet" href="reading-headings.css?v=20261003-1">
   <link rel="stylesheet" href="image-toggle.css?v=20261005-1">
-  <link rel="stylesheet" href="journal-video.css?v=20261005-1">
+  <link rel="stylesheet" href="journal-video.css?v=20261005-2">
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #111; color: #ddd; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
@@ -51,7 +51,7 @@
     import { getWeek, getWeekMarkdown } from "./api.js";
     import { mountReadingHeadings } from "./reading-headings.js?v=20261003-1";
     import { mountImageToggle } from "./image-toggle.js?v=20261005-1";
-    import { renderJournalContent } from './journal-video.js?v=20261005-1';
+    import { renderJournalContent } from './journal-video.js?v=20261005-2';
     const content = document.getElementById('content');
     const week = new URLSearchParams(location.search).get('week');
     getWeek(week)

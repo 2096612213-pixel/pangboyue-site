@@ -8,6 +8,13 @@ export function renderJournalContent(content, html) {
   }
   let active = null;
 
+  function prepareMediaUrl(rawUrl, position = 0) {
+    if (!rawUrl) return '';
+    const targetTime = position > 0 ? position : 0.001;
+    const [base] = rawUrl.split('#');
+    return `${base}#t=${targetTime}`;
+  }
+
   function release(state) {
     const video = state.video;
     if (!video) return;
@@ -15,8 +22,7 @@ export function renderJournalContent(content, html) {
     state.video = null;
     video.pause();
     video.removeAttribute('src');
-    video.load(); // Abort the previous download, rather than only pausing playback.
-    video.hidden = true; // Hide it instead of removing it from DOM
+    video.load(); // Abort the previous download
     state.button.hidden = false;
     state.label.textContent = state.position > 0 ? '▶ 继续播放' : '▶ 点击播放';
     if (active === state) active = null;
@@ -29,12 +35,24 @@ export function renderJournalContent(content, html) {
     const height = Number(original.getAttribute('height'));
     box.style.setProperty('--video-ratio', width > 0 && height > 0 ? `${width} / ${height}` : '16 / 9');
     
+    const poster = original.getAttribute('poster');
+    const url = original.getAttribute('src') || original.querySelector('source[src]')?.getAttribute('src');
+
+    // Create the video element directly in the box under the cover overlay.
+    // It remains inert (no src, preload="none") until user clicks play.
+    const video = document.createElement('video');
+    video.controls = true;
+    video.playsInline = true;
+    video.preload = 'none';
+    if (poster) video.poster = poster;
+    if (width > 0) video.width = width;
+    if (height > 0) video.height = height;
+
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'journal-video-play';
     button.setAttribute('aria-label', `播放视频：${original.getAttribute('aria-label') || '周记视频'}`);
     
-    const poster = original.getAttribute('poster');
     if (poster) {
       const cover = document.createElement('img');
       cover.className = 'journal-video-cover';
@@ -55,7 +73,6 @@ export function renderJournalContent(content, html) {
     message.setAttribute('role', 'status');
     message.hidden = true;
     
-    const url = original.getAttribute('src') || original.querySelector('source[src]')?.getAttribute('src');
     message.append(document.createTextNode('视频加载失败，请点击封面重试，或'));
     if (url) {
       const link = document.createElement('a');
@@ -66,78 +83,74 @@ export function renderJournalContent(content, html) {
       message.append(link);
     }
 
-    // iOS Safari workaround: Create the video element UPFRONT and put it in the DOM,
-    // but keep it hidden and without a src. This avoids the WebKit bug where newly
-    // created video elements in a click handler fail to reliably capture the user gesture
-    // or initialize their media pipeline, leading to a 00:00 stall.
-    const videoNode = document.createElement('video');
-    videoNode.controls = true;
-    videoNode.playsInline = true;
-    videoNode.preload = 'none'; // Prevent loading before click
-    videoNode.hidden = true;
-    if (poster) videoNode.poster = poster;
-    if (width > 0) videoNode.width = width;
-    if (height > 0) videoNode.height = height;
-
     const state = {button, label, video: null, position: 0};
 
-    // Attach listeners once
-    videoNode.addEventListener('loadedmetadata', () => {
-      if (state.video === videoNode && state.position > 0 && Number.isFinite(videoNode.duration)) {
-        videoNode.currentTime = Math.min(state.position, Math.max(0, videoNode.duration - 0.1));
+    const revealPlayingVideo = () => {
+      if (state.video === video) {
+        button.hidden = true;
+      }
+    };
+
+    video.addEventListener('playing', revealPlayingVideo);
+    video.addEventListener('timeupdate', () => {
+      if (video.currentTime > 0) revealPlayingVideo();
+    });
+
+    video.addEventListener('loadedmetadata', () => {
+      if (state.video === video && state.position > 0 && Number.isFinite(video.duration)) {
+        video.currentTime = Math.min(state.position, Math.max(0, video.duration - 0.1));
       }
     });
-    
-    videoNode.addEventListener('ended', () => { 
-      if (state.video === videoNode) {
-        state.position = 0; 
-      }
+
+    video.addEventListener('ended', () => {
+      state.position = 0;
+      release(state);
     });
-    
-    videoNode.addEventListener('error', () => {
-      if (state.video !== videoNode) return;
+
+    const showError = () => {
+      if (state.video !== video) return;
       release(state);
       label.textContent = '↻ 点击重试';
       message.hidden = false;
-    });
+    };
+    video.addEventListener('error', showError);
 
     button.addEventListener('click', () => {
       if (state.video) return;
       if (active) release(active);
       message.hidden = true;
       
-      state.video = videoNode;
+      state.video = video;
       active = state;
-      button.hidden = true;
-      
-      videoNode.hidden = false;
-      
-      // FORCE WEBKIT LAYOUT:
-      // iOS Safari's AVPlayer layer is only attached after the element gets a layout.
-      // Since it was hidden (display: none), we must force a synchronous layout
-      // calculation before assigning src and calling play(), otherwise the media 
-      // engine stalls at -00:00.
-      void videoNode.offsetWidth;
-      
-      videoNode.preload = 'auto';
-      videoNode.src = url;
-      videoNode.load(); // Force iOS to fetch
+      label.textContent = '⏳ 加载中…';
 
-      videoNode.focus({preventScroll: true});
-      videoNode.play().catch(error => {
-        // Keep native controls for gesture restrictions; a switched-out player
-        // may reject with AbortError and must not alter the new active player.
-        if (error.name !== 'NotAllowedError' && error.name !== 'AbortError') {
-          if (state.video === videoNode) {
-            release(state);
-            label.textContent = '↻ 点击重试';
-            message.hidden = false;
+      // Appending #t=0.001 forces iOS Safari AVPlayer to execute a range request
+      // and seek to 1ms, eliminating the cellular 00:00 decoding stall.
+      const mediaUrl = prepareMediaUrl(url, state.position);
+      video.src = mediaUrl;
+
+      // Keep play() synchronous in user gesture
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          if (error.name !== 'NotAllowedError' && error.name !== 'AbortError') {
+            showError();
+          } else {
+            button.hidden = false;
+            label.textContent = state.position > 0 ? '▶ 继续播放' : '▶ 点击播放';
           }
+        });
+      }
+
+      // Fallback: If playing event doesn't fire within 1.2s but playback started, reveal
+      setTimeout(() => {
+        if (state.video === video && !video.paused) {
+          revealPlayingVideo();
         }
-      });
+      }, 1200);
     });
 
-    box.append(button, videoNode, message);
+    box.append(video, button, message);
     original.replaceWith(box);
   }
   content.replaceChildren(template.content);
