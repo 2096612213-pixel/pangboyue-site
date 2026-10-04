@@ -1,0 +1,17 @@
+#content .journal-video { margin: 24px 0; }
+#content .journal-video video { margin: 0; aspect-ratio: var(--video-ratio); object-fit: contain; }
+.journal-video-play {
+  display: block; position: relative; width: 100%; aspect-ratio: var(--video-ratio);
+  padding: 0; overflow: hidden; border: 0; border-radius: 12px;
+  background: #000; color: #fff; cursor: pointer; font: inherit;
+}
+.journal-video-play[hidden], .journal-video-message[hidden] { display: none; }
+#content .journal-video-cover { display: block; width: 100%; height: 100%; object-fit: contain; }
+.journal-video-play-label {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  padding: 12px 20px; border: 1px solid #ffffff55; border-radius: 999px;
+  white-space: nowrap; background: #111d; font-size: 16px; line-height: 1.5;
+}
+.journal-video-play:hover .journal-video-play-label { background: #222; }
+.journal-video-play:focus-visible { outline: 2px solid #b9d7ff; outline-offset: 4px; }
+.journal-video-message { padding: 12px 0; font-size: 14px; line-height: 1.7; }

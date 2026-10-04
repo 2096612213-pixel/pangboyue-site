@@ -213,8 +213,8 @@ time flys like an arrow and fruit flies like bananas
 ### 一个工具罢了，丢了就丢了… 为何我却如此心痛** 视频时长：4 分 44 秒
 
 <video controls playsinline preload="none" width="640" height="480" poster="/thoughts/2026-W40/media/ai-account-story-poster.jpg" aria-label="一个工具罢了，丢了就丢了… 为何我却如此心痛">
-  <source src="/thoughts/2026-W40/media/ai-account-story.mp4" type="video/mp4">
-  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/ai-account-story.mp4">打开视频</a>观看。
+  <source src="/thoughts/2026-W40/media/ai-account-story.mp4?v=89e5988cab51" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/ai-account-story.mp4?v=89e5988cab51">打开视频</a>观看。
 </video>
 
 ---
@@ -358,22 +358,22 @@ OK 上面就是无害化处理之后的内容 我希望别人看到这些内容 
 ---
 
 <video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/dialect-classmates-poster.jpg" aria-label="零零后的同学不会说方言~">
-  <source src="/thoughts/2026-W40/media/dialect-classmates.mp4" type="video/mp4">
-  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/dialect-classmates.mp4">打开视频</a>观看。
+  <source src="/thoughts/2026-W40/media/dialect-classmates.mp4?v=be9977599b46" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/dialect-classmates.mp4?v=be9977599b46">打开视频</a>观看。
 </video>
 
 ---
 
 <video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/youth-music-memories-poster.jpg" aria-label="“卧槽！音乐一响，多少人的青春回来了！”">
-  <source src="/thoughts/2026-W40/media/youth-music-memories.mp4" type="video/mp4">
-  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/youth-music-memories.mp4">打开视频</a>观看。
+  <source src="/thoughts/2026-W40/media/youth-music-memories.mp4?v=0eff3d252ac1" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/youth-music-memories.mp4?v=0eff3d252ac1">打开视频</a>观看。
 </video>
 
 ---
 
 <video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/shape-of-you-poster.jpg" aria-label="最有名的小黄歌没有之一!‖《Shape ofYou》">
-  <source src="/thoughts/2026-W40/media/shape-of-you.mp4" type="video/mp4">
-  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/shape-of-you.mp4">打开视频</a>观看。
+  <source src="/thoughts/2026-W40/media/shape-of-you.mp4?v=91c0a62f7c5d" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/shape-of-you.mp4?v=91c0a62f7c5d">打开视频</a>观看。
 </video>
 
 ---
@@ -502,6 +502,6 @@ A股"上市多、退市少"的根本原因是一个**制度性、结构性的系
 ---
 
 <video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W40/media/week40-video-9928c636-poster.jpg" aria-label="周记视频">
-  <source src="/thoughts/2026-W40/media/week40-video-9928c636.mp4" type="video/mp4">
-  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/week40-video-9928c636.mp4">打开视频</a>观看。
+  <source src="/thoughts/2026-W40/media/week40-video-9928c636.mp4?v=4406aa448185" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W40/media/week40-video-9928c636.mp4?v=4406aa448185">打开视频</a>观看。
 </video>

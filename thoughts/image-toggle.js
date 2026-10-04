@@ -1,5 +1,5 @@
 export function mountImageToggle(content, button, headingBar) {
-  const images = Array.from(content.querySelectorAll('img'));
+  const images = Array.from(content.querySelectorAll('img:not(.journal-video-cover)'));
   if (!images.length) return;
   // Remove empty image paragraphs too, so collapsed photo galleries leave no gaps.
   for (const block of content.querySelectorAll('p, figure, a, picture')) {

@@ -10,7 +10,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
   <title>周记 | 各种想法与认识</title>
   <link rel="stylesheet" href="reading-headings.css?v=20261003-1">
-  <link rel="stylesheet" href="image-toggle.css?v=20261003-1">
+  <link rel="stylesheet" href="image-toggle.css?v=20261005-1">
+  <link rel="stylesheet" href="journal-video.css?v=20261005-1">
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #111; color: #ddd; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
@@ -49,7 +50,8 @@
   <script type="module">
     import { getWeek, getWeekMarkdown } from "./api.js";
     import { mountReadingHeadings } from "./reading-headings.js?v=20261003-1";
-    import { mountImageToggle } from "./image-toggle.js?v=20261003-1";
+    import { mountImageToggle } from "./image-toggle.js?v=20261005-1";
+    import { renderJournalContent } from './journal-video.js?v=20261005-1';
     const content = document.getElementById('content');
     const week = new URLSearchParams(location.search).get('week');
     getWeek(week)
@@ -59,8 +61,7 @@
         return getWeekMarkdown(entry);
       })
       .then(markdown => {
-        content.innerHTML = marked.parse(markdown);
-        content.querySelectorAll('img').forEach(image => { image.loading = 'lazy'; image.decoding = 'async'; });
+        renderJournalContent(content, marked.parse(markdown));
         mountReadingHeadings(content, document.getElementById('reading-headings'));
         mountImageToggle(content, document.getElementById('journal-image-toggle'), document.getElementById('reading-headings'));
       })

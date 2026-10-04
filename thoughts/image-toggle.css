@@ -1,4 +1,4 @@
-#content.journal-images-collapsed img,
+#content.journal-images-collapsed img:not(.journal-video-cover),
 #content.journal-images-collapsed .journal-image-only { display: none !important; }
 .journal-image-toggle {
   position: fixed;
