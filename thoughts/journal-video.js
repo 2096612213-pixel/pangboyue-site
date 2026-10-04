@@ -72,7 +72,6 @@ export function renderJournalContent(content, html) {
       video.controls = true;
       video.playsInline = true;
       video.preload = 'auto';
-      video.autoplay = true; // Signal intent to Safari
       if (poster) video.poster = poster;
       if (width > 0) video.width = width;
       if (height > 0) video.height = height;
@@ -85,6 +84,7 @@ export function renderJournalContent(content, html) {
       // Safari's media pipeline may fail to load metadata, causing a 00:00 stall.
       box.insertBefore(video, message);
       video.src = url;
+      video.load(); // Required for iOS Safari to initialize the network pipeline
 
       video.addEventListener('loadedmetadata', () => {
         if (state.video === video && state.position > 0 && Number.isFinite(video.duration)) {
