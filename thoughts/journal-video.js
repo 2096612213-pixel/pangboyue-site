@@ -80,6 +80,13 @@ export function renderJournalContent(content, html) {
       active = state;
       button.hidden = true;
       box.insertBefore(video, message);
+      
+      // Safari workaround: explicitly call load() on the newly created video 
+      // before calling play(). Without this, Safari's media pipeline may fail to 
+      // initialize synchronously, resulting in a black screen that requires 
+      // the user to pause and play again via native controls.
+      video.load();
+
       video.addEventListener('loadedmetadata', () => {
         if (state.video === video && state.position > 0 && Number.isFinite(video.duration)) {
           video.currentTime = Math.min(state.position, Math.max(0, video.duration - 0.1));
