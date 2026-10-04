@@ -15,7 +15,6 @@ export function renderJournalContent(content, html) {
     state.video = null;
     video.pause();
     video.removeAttribute('src');
-    video.querySelectorAll('source').forEach(source => source.removeAttribute('src'));
     video.load(); // Abort the previous download, rather than only pausing playback.
     video.remove();
     state.button.hidden = false;
@@ -66,14 +65,17 @@ export function renderJournalContent(content, html) {
       if (state.video) return;
       if (active) release(active);
       message.hidden = true;
-      const video = original.cloneNode(true);
-      video.removeAttribute('autoplay');
+      // Safari's cloneNode(true) does not register <source> children in the
+      // media engine, so the cloned video silently fails to load on first play.
+      // Build a fresh <video> and set src directly to bypass source selection.
+      const video = document.createElement('video');
       video.controls = true;
       video.playsInline = true;
-      // Safari needs preload=auto (not "none") so it begins fetching from
-      // <source> children immediately; otherwise the first play() inside the
-      // user-gesture window silently fails and the user must tap a second time.
       video.preload = 'auto';
+      if (poster) video.poster = poster;
+      if (width > 0) video.width = width;
+      if (height > 0) video.height = height;
+      video.src = url;
       state.video = video;
       active = state;
       button.hidden = true;
@@ -91,14 +93,6 @@ export function renderJournalContent(content, html) {
         message.hidden = false;
       };
       video.addEventListener('error', showError);
-      const sources = Array.from(video.querySelectorAll('source'));
-      let failedSources = 0;
-      sources.forEach(source => source.addEventListener('error', () => {
-        if (++failedSources === sources.length) showError();
-      }, {once: true}));
-      // Kick Safari's media-load pipeline so <source> elements are discovered
-      // before play() consumes the user-gesture token.
-      video.load();
       video.focus({preventScroll: true});
       // Keep play() in the user gesture for Safari and mobile autoplay policy.
       video.play().catch(error => {
