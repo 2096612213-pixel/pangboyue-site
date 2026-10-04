@@ -72,20 +72,19 @@ export function renderJournalContent(content, html) {
       video.controls = true;
       video.playsInline = true;
       video.preload = 'auto';
+      video.autoplay = true; // Signal intent to Safari
       if (poster) video.poster = poster;
       if (width > 0) video.width = width;
       if (height > 0) video.height = height;
-      video.src = url;
+      
       state.video = video;
       active = state;
       button.hidden = true;
-      box.insertBefore(video, message);
       
-      // Safari workaround: explicitly call load() on the newly created video 
-      // before calling play(). Without this, Safari's media pipeline may fail to 
-      // initialize synchronously, resulting in a black screen that requires 
-      // the user to pause and play again via native controls.
-      video.load();
+      // Safari workaround: MUST append to DOM before setting src, otherwise 
+      // Safari's media pipeline may fail to load metadata, causing a 00:00 stall.
+      box.insertBefore(video, message);
+      video.src = url;
 
       video.addEventListener('loadedmetadata', () => {
         if (state.video === video && state.position > 0 && Number.isFinite(video.duration)) {

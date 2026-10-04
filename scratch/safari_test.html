@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Safari Video Test</title>
+<style>
+  .journal-video { width: 640px; height: 360px; background: #222; position: relative; }
+  .journal-video-play { width: 100%; height: 100%; position: absolute; top: 0; left: 0; background: #444; color: white; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+  <h1>Safari Video Test</h1>
+  <div id="container"></div>
+
+  <script>
+    const container = document.getElementById('container');
+    const box = document.createElement('div');
+    box.className = 'journal-video';
+    const button = document.createElement('button');
+    button.className = 'journal-video-play';
+    button.textContent = '▶ 点击播放';
+    box.appendChild(button);
+    container.appendChild(box);
+
+    const url = 'https://www.w3schools.com/html/mov_bbb.mp4';
+
+    button.addEventListener('click', () => {
+      button.hidden = true;
+      const video = document.createElement('video');
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.width = 640;
+      video.height = 360;
+      video.src = url;
+      
+      box.appendChild(video);
+      
+      // Try load()
+      video.load();
+
+      video.focus({preventScroll: true});
+      video.play().catch(console.error);
+    });
+  </script>
+</body>
+</html>
