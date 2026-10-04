@@ -70,7 +70,10 @@ export function renderJournalContent(content, html) {
       video.removeAttribute('autoplay');
       video.controls = true;
       video.playsInline = true;
-      video.preload = 'none';
+      // Safari needs preload=auto (not "none") so it begins fetching from
+      // <source> children immediately; otherwise the first play() inside the
+      // user-gesture window silently fails and the user must tap a second time.
+      video.preload = 'auto';
       state.video = video;
       active = state;
       button.hidden = true;
@@ -93,6 +96,9 @@ export function renderJournalContent(content, html) {
       sources.forEach(source => source.addEventListener('error', () => {
         if (++failedSources === sources.length) showError();
       }, {once: true}));
+      // Kick Safari's media-load pipeline so <source> elements are discovered
+      // before play() consumes the user-gesture token.
+      video.load();
       video.focus({preventScroll: true});
       // Keep play() in the user gesture for Safari and mobile autoplay policy.
       video.play().catch(error => {
