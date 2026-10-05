@@ -97,3 +97,7 @@ A：对，这个观点里有一部分我很认同，但我会帮你把它修得�
   <source src="/thoughts/2026-W41/media/xiao-ao-jiang-hu-qin-xiao.mp4" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W41/media/xiao-ao-jiang-hu-qin-xiao.mp4">打开视频</a>观看。
 </video>
+
+---
+
+嗯 总图跟数院那个小自习室还是不一样 总图像是好莱坞顶级大片 数院那个小自习室只能是国内小作坊小制作
