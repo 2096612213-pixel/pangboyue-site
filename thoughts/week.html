@@ -54,13 +54,25 @@
     import { renderJournalContent } from './journal-video.js?v=20261005-2';
     const content = document.getElementById('content');
     const week = new URLSearchParams(location.search).get('week');
-    getWeek(week)
+    const isDaily = new URLSearchParams(location.search).get('page') === 'daily';
+    const markdownRequest = isDaily
+      ? (async () => {
+          document.title = '我现在每天正在做的事 | 庞博约';
+          const back = document.querySelector('.back');
+          back.href = '../index.html';
+          back.textContent = '← 返回主页';
+          document.getElementById('week-label').hidden = true;
+          const response = await fetch('../daily/daily.md');
+          if (!response.ok) throw new Error('日常记录暂时无法读取');
+          return response.text();
+        })()
+      : getWeek(week)
       .then(async entry => {
         document.title = `${entry.title} | 各种想法与认识`;
         document.getElementById('week-label').textContent = `${entry.title} · ${entry.dateRange}`;
         return getWeekMarkdown(entry);
-      })
-      .then(markdown => {
+      });
+    markdownRequest.then(markdown => {
         renderJournalContent(content, marked.parse(markdown));
         mountReadingHeadings(content, document.getElementById('reading-headings'));
         mountImageToggle(content, document.getElementById('journal-image-toggle'), document.getElementById('reading-headings'));
