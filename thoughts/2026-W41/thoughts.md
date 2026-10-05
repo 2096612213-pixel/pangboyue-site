@@ -90,3 +90,10 @@ A：对，这个观点里有一部分我很认同，但我会帮你把它修得�
 这比一句“上班都是牛马”要准确得多。
 ---
 我现在感觉一个大问题在于 不知道怎么把数学书和数学论文里面前人研究好的厉害的公式写成现实里面好用的算法 或者其他做法 就是转化到工程应用中 从理论到应用确实好难 不过我相信在世界上的某处肯定有人找到了正确的方法 正在源源不断的把理论变成应用 距离全部的理论转化成应用只是时间问题 我还要看更多的艺术作品学习更厉害的审美
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W41/media/xiao-ao-jiang-hu-qin-xiao-poster.jpg" aria-label="笑傲江湖琴箫合奏">
+  <source src="/thoughts/2026-W41/media/xiao-ao-jiang-hu-qin-xiao.mp4" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W41/media/xiao-ao-jiang-hu-qin-xiao.mp4">打开视频</a>观看。
+</video>
