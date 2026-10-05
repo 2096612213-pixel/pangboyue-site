@@ -10,16 +10,8 @@
     if (!event.ctrlKey) preventTopOverscroll(event, event.deltaY < 0);
   }, { passive: false });
 
-  let touchStartY = 0;
-  window.addEventListener('touchstart', event => {
-    if (event.touches.length === 1) touchStartY = event.touches[0].clientY;
-  }, { passive: true });
-  window.addEventListener('touchmove', event => {
-    if (event.touches.length === 1) {
-      preventTopOverscroll(event, event.touches[0].clientY > touchStartY);
-    }
-  }, { passive: false });
-
+  // Touch scrolling stays native. CSS overscroll-behavior handles the edge;
+  // cancelling window touchmove can trap Safari gestures over an embedded scene.
   function alignDropdowns() {
     const header = document.querySelector('.top-nav');
     const headerLeft = header.getBoundingClientRect().left;

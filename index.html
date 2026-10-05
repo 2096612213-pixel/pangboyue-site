@@ -22,7 +22,7 @@
   <script>try { document.documentElement.dataset.homeScene = localStorage.getItem('home-scene') === 'dark' ? 'dark' : 'bright'; } catch { document.documentElement.dataset.homeScene = 'bright'; }</script>
   <link rel="stylesheet" href="assets/home.css?v=063e3cb9f81a">
   <link rel="stylesheet" href="assets/fluid-tank.css?v=165800c1782b">
-  <link rel="stylesheet" href="assets/home-scenes.css?v=e38de222c9e8">
+  <link rel="stylesheet" href="assets/home-scenes.css?v=b18d2f99ef09">
   <script defer src="assets/astronomy.browser.min.js?v=1"></script>
   <script defer src="assets/storm-sound.js?v=20260924-rumble-3"></script>
   <script defer src="assets/fluid-tank.js?v=971436782d80"></script>
@@ -77,6 +77,7 @@
     <section class="fluid-tank" id="fluid-tank" aria-label="缓缓向右流动的雷雨云层">
       <div class="mountain-home-layer" aria-hidden="true"><iframe id="mountain-home" data-src="/有趣的小玩具展示/mountain-home/?embed=1" title="群山场景" tabindex="-1" allow="autoplay"></iframe></div>
       <canvas class="tank-fluid" aria-hidden="true"></canvas>
+      <div class="hero-scroll-surface" aria-hidden="true"></div>
       <div class="tank-copy">
         <h1 class="welcome-text"><span>  欢迎访问</span><span>我的个人空间</span></h1>
         <div class="beijing-time"><span id="beijing-time"></span>&nbsp;&nbsp;<button class="storm-sound-toggle" id="storm-sound-toggle" type="button" aria-label="开启雷声" aria-pressed="false" title="开启雷声">
@@ -161,7 +162,7 @@
       class="footer-image"
     >
   </footer>
-<script defer src="assets/home.js?v=46c6b1f24732"></script>
+<script defer src="assets/home.js?v=fe66efe966f0"></script>
 </body>
 
 </html>

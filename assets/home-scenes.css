@@ -58,3 +58,11 @@ html[data-home-scene="bright"] .home-scene-switch::before { transform: translate
 }
 @media(max-width:380px) { .nav-menu { gap: 6px; } .nav-menu > a, .nav-link { font-size: 11px; } .top-nav { padding-inline: 8px; gap: 6px; } }
 @media(prefers-reduced-motion:reduce) { .mountain-home-layer, .tank-fluid, .fluid-tank::after, .home-scene-switch::before { transition: none; } }
+
+/* A parent-document hit surface keeps mobile gestures out of the WebGL iframe. */
+.fluid-tank { touch-action: pan-y pinch-zoom; }
+.hero-scroll-surface {
+  position: absolute; inset: 0 0 -200px; z-index: 1;
+  background: transparent; pointer-events: auto; touch-action: pan-y pinch-zoom;
+}
+@media(max-width:600px) { .hero-scroll-surface { bottom: -160px; } }
