@@ -27,6 +27,8 @@ PY
 
 `assets/home.css` 管首页样式，`assets/fluid-tank.*` 管云层动画，`assets/storm-sound.js` 管雷声。周记的数据请求集中在 `thoughts/api.js`；目前没有远程业务 API，不需要另造接口层。
 
-电子书的源码在 `sample-src/`，发布文件在 `sample/`。`node_modules/` 与 `dist/` 是本地生成物，已从版本控制中移除；需要重建电子书时，在 `sample-src/` 中运行 `npm ci` 和 `npm run build`，再把 `sample-src/dist/` 的内容复制到 `sample/`，提交 `sample/` 更新。Cloudflare Pages 如直接发布仓库根目录，根目录的 `_headers` 会对静态资源设置浏览器缓存。新页面应加入 `sitemap.xml`；周记按周生成的查询链接仍由目录页提供。
+电子书的源码在 `sample-src/`，发布文件在 `sample/`。`node_modules/` 与 `dist/` 是本地生成物，已从版本控制中移除；需要重建电子书时，在 `sample-src/` 中运行 `cd /Users/pby/Desktop/pangboyue-site/sample-src &&
+npm run build &&
+cp -R dist/. ../sample/`，再把 `sample-src/dist/` 的内容复制到 `sample/`，提交 `sample/` 更新。Cloudflare Pages 如直接发布仓库根目录，根目录的 `_headers` 会对静态资源设置浏览器缓存。新页面应加入 `sitemap.xml`；周记按周生成的查询链接仍由目录页提供。
 
 当前周记列表只有少量项目，虚拟列表会增加代码和可访问性成本，暂不使用。浏览器缓存策略已按可更新的 HTML/数据、普通资源、哈希资源分别处理；不要给不带哈希且经常替换的文件设置 `immutable`。
