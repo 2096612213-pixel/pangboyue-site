@@ -129,6 +129,7 @@
     musicButton.title = playing ? '暂停群山音乐' : '播放群山音乐';
   }
   function select(next, gesture = false) {
+    const changed = next !== mode;
     mode = next;
     root.dataset.homeScene = next;
     tank.setAttribute('aria-label', next === 'bright' ? '音乐与群山共振' : '缓缓向右流动的雷雨云层');
@@ -138,7 +139,7 @@
     window.dispatchEvent(new Event('home-scene-change'));
     sync();
     // Same-origin call stays within the click gesture. First visit remains silent.
-    if (gesture && next === 'bright' && api() && !api().isPlaying()) api().toggleMusic();
+    if (gesture && changed && next === 'bright' && api() && !api().isPlaying()) api().toggleMusic();
   }
   buttons.forEach(button => button.addEventListener('click', () => select(button.dataset.homeScene, true)));
   musicButton.addEventListener('click', () => { api()?.toggleMusic(); });

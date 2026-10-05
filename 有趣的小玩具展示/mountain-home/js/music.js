@@ -55,20 +55,35 @@ export class MusicBeatSync {
     this.onReset();
   }
 
+  pause() {
+    this.playRequest = (this.playRequest || 0) + 1;
+    this.wantsPlay = false;
+    this.starting = false;
+    this.audio.pause();
+    this.align(this.audio.currentTime);
+    this.onState('paused');
+  }
+
   async toggle() {
-    if (this.starting) return;
-    if (!this.audio.paused) {
-      this.audio.pause();
+    // A stop must work even while play() is waiting for network data.
+    if (this.starting || !this.audio.paused) {
+      this.pause();
       return;
     }
+    const request = this.playRequest = (this.playRequest || 0) + 1;
+    this.wantsPlay = true;
     this.starting = true;
     this.onState('loading');
     try {
       await this.audio.play();
+      if (request !== this.playRequest && !this.wantsPlay) this.audio.pause();
     } catch (error) {
-      this.onState(error.name === 'NotAllowedError' ? 'idle' : 'error');
+      if (request === this.playRequest) {
+        this.wantsPlay = false;
+        this.onState(error.name === 'NotAllowedError' ? 'idle' : 'error');
+      }
     } finally {
-      this.starting = false;
+      if (request === this.playRequest) this.starting = false;
     }
   }
 

@@ -119,7 +119,7 @@ export class MountainScene {
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           this.isPaused = true;
-          this.audio.pause();
+          this.music.pause();
         } else {
           this.isPaused = false;
           this.lastTime = performance.now();
@@ -219,9 +219,9 @@ if (typeof window !== 'undefined') {
         setActive(active) {
           window.app.externallyActive = active;
           window.app.lastTime = performance.now();
-          if (!active) window.app.audio.pause();
+          if (!active && (!window.app.audio.paused || window.app.music.starting)) window.app.music.pause();
         },
-        toggleMusic() { if (window.app.externallyActive) return window.app.music.toggle(); },
+        toggleMusic() { if (window.app.externallyActive || !window.app.audio.paused || window.app.music.starting) return window.app.music.toggle(); },
         isPlaying() { return !window.app.audio.paused; }
       };
     }

@@ -18,34 +18,42 @@ html[data-home-scene="bright"] #storm-sound-toggle,
 html[data-home-scene="dark"] #mountain-music-toggle { display: none; }
 #mountain-music-toggle { opacity: .9; }
 .home-scene-switch {
-  position: relative; display: inline-flex; flex: 0 0 auto; align-items: center;
-  gap: 0; width: 78px; height: 36px; padding: 3px; border-radius: 30px;
-  border: 1px solid #ffffff40; background: linear-gradient(130deg,#ffffff30,#ffffff09);
-  box-shadow: inset 0 1px 1px #ffffff70, inset 0 -1px 3px #ffffff15, 0 3px 12px #0003;
-  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 0 0 auto; box-sizing: border-box; width: 84px; height: 40px; padding: 4px;
+  border-radius: 999px; border: 1px solid #ffffff38;
+  background: linear-gradient(155deg, #ffffff29, #ffffff08 55%, #00000024);
+  box-shadow: inset 0 1px 1px #ffffff60, inset 0 -1px 3px #0005, 0 4px 14px #0003;
+  backdrop-filter: blur(22px) saturate(170%); -webkit-backdrop-filter: blur(22px) saturate(170%);
 }
 .home-scene-switch::before {
-  content: ''; position: absolute; top: 3px; left: 3px; width: 34px; height: 28px;
-  border-radius: 22px; border: 1px solid #ffffff80; box-sizing: border-box;
-  background: linear-gradient(145deg,#ffffff80,#ffffff22);
-  box-shadow: 0 2px 7px #0004, inset 0 1px 2px #fff9;
-  transition: transform .34s cubic-bezier(.2,.8,.25,1); pointer-events: none;
+  content: ''; position: absolute; left: 4px; top: 50%;
+  width: calc((100% - 8px) / 2); height: calc(100% - 8px); box-sizing: border-box;
+  border-radius: 999px; border: 1px solid #ffffff90;
+  background: linear-gradient(150deg, #ffffffa3, #ffffff45 48%, #ffffff1c);
+  box-shadow: inset 0 1px 2px #ffffffdd, inset 0 -1px 2px #ffffff38, 0 3px 8px #0004;
+  transform: translate(0, -50%); pointer-events: none;
+  transition: transform .32s cubic-bezier(.2,.85,.25,1), box-shadow .2s;
 }
-html[data-home-scene="bright"] .home-scene-switch::before { transform: translateX(36px); }
-.home-scene-switch button { position: relative; display: grid; place-items: center; width: 36px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 20px; }
-.home-scene-switch button::after { content: ''; width: 17px; height: 17px; border-radius: 50%; box-shadow: 0 1px 3px #0005, inset 0 1px 1px #ffffff30; }
-.home-scene-switch button[data-home-scene="dark"]::after { background: #101317; border: 1px solid #53565b; }
+html[data-home-scene="bright"] .home-scene-switch::before { transform: translate(100%, -50%); }
+.home-scene-switch button {
+  position: relative; min-width: 0; width: 100%; height: 100%; padding: 0;
+  border: 0; border-radius: 999px; background: none; cursor: pointer; appearance: none; -webkit-appearance: none;
+}
+.home-scene-switch button::after {
+  content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  box-sizing: border-box; width: 17px; height: 17px; border-radius: 50%;
+  box-shadow: 0 1px 3px #0005, inset 0 1px 1px #ffffff40;
+}
+.home-scene-switch button[data-home-scene="dark"]::after { background: #101317; border: 1px solid #636970; }
 .home-scene-switch button[data-home-scene="bright"]::after { background: #fafafa; border: 1px solid #fff; }
-.home-scene-switch button:focus-visible { outline: 2px solid #a2d8ff; outline-offset: 5px; }
+.home-scene-switch button:focus-visible { outline: 2px solid #a2d8ff; outline-offset: 3px; }
+#mountain-music-toggle { width: 36px; height: 36px; padding: 8px; touch-action: manipulation; }
 @media(max-width:600px) {
   .fluid-tank { margin-bottom: 200px; }
   .mountain-home-layer { bottom: -160px; }
   .top-nav { padding-inline: 10px; gap: 9px; }
   .nav-menu { gap: 8px; }
-  .home-scene-switch { width: 66px; height: 34px; padding: 3px; }
-  .home-scene-switch button { width: 30px; height: 26px; }
-  .home-scene-switch::before { width: 28px; height: 26px; }
-  html[data-home-scene="bright"] .home-scene-switch::before { transform: translateX(30px); }
+  .home-scene-switch { width: 70px; height: 36px; }
   .brand { font-size: 15px; }
 }
 @media(max-width:380px) { .nav-menu { gap: 6px; } .nav-menu > a, .nav-link { font-size: 11px; } .top-nav { padding-inline: 8px; gap: 6px; } }
