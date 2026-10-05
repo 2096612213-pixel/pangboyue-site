@@ -2079,7 +2079,7 @@ class MountainScene {
       this.musicButton.textContent = playing ? 'Ⅱ 暂停音乐' : state === 'loading' ? '音乐加载中…' : state === 'paused' ? '▶ 继续播放' : '♫ 开启音乐';
       this.musicButton.setAttribute('aria-pressed', String(playing));
       this.musicButton.setAttribute('aria-label', playing ? '暂停背景音乐' : '播放背景音乐');
-      this.musicHint.textContent = state === 'error' ? '音乐加载失败，点击重试' : playing ? '老人与海 · 伴奏 / 循环播放' : state === 'paused' ? '音乐已暂停' : '点击画面或按空格开启音乐';
+      this.musicHint.textContent = state === 'error' ? '音乐加载失败，点击重试' : playing ? '' : state === 'paused' ? '音乐已暂停' : '点击画面或按空格开启音乐';
     });
     this.musicButton.addEventListener('click', () => this.music.toggle());
   }
