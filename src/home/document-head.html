@@ -19,11 +19,13 @@
 
    <title>庞博约 | Boyue Pang</title>
 
+  <script>try { document.documentElement.dataset.homeScene = localStorage.getItem('home-scene') === 'dark' ? 'dark' : 'bright'; } catch { document.documentElement.dataset.homeScene = 'bright'; }</script>
   <link rel="stylesheet" href="assets/home.css?v=__HOME_CSS_HASH__">
   <link rel="stylesheet" href="assets/fluid-tank.css?v=__FLUID_CSS_HASH__">
+  <link rel="stylesheet" href="assets/home-scenes.css?v=__SCENE_CSS_HASH__">
   <script defer src="assets/astronomy.browser.min.js?v=1"></script>
   <script defer src="assets/storm-sound.js?v=20260924-rumble-3"></script>
-  <script defer src="assets/fluid-tank.js?v=20260924-rumble-1"></script>
+  <script defer src="assets/fluid-tank.js?v=__FLUID_JS_HASH__"></script>
 </head>
 
 

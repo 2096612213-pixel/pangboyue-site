@@ -231,7 +231,7 @@
     gl.drawArrays(gl.TRIANGLES,0,3);
     stats.frames=++frames;
   }
-  function running(){return !paused&&!failed&&visible&&!document.hidden;}
+  function running(){return document.documentElement.dataset.homeScene!=="bright"&&!paused&&!failed&&visible&&!document.hidden;}
   function schedule(){if(!raf&&running())raf=requestAnimationFrame(frame);}
   function frame(now){
     raf=0;if(!running())return;
@@ -254,6 +254,7 @@
   new ResizeObserver(resize).observe(tank);
   new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;sync();},{threshold:0}).observe(tank);
   document.addEventListener('visibilitychange',sync);
+  window.addEventListener('home-scene-change',sync);
   setInterval(()=>{if(visible&&!document.hidden&&!failed){updateMoon();if(paused)draw();}},60000);
   canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();fallback('Graphics context lost');});
   resize();sync();

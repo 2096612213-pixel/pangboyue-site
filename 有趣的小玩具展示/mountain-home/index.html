@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>网站第二首页 · 群山共振</title>
+  <link rel="stylesheet" href="css/style.css?v=6d82df469c7e">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23ff371a'/></svg>">
+</head>
+<body>
+<script>if(new URLSearchParams(location.search).has("embed"))document.documentElement.classList.add("embedded");</script>
+<style>.embedded .ui-layer { display:none; }</style>
+  <!-- WebGL Fullscreen Canvas -->
+  <canvas id="scene-canvas"></canvas>
+
+  <audio id="bg-music" src="audio/old-man-and-sea.mp3" preload="none" loop></audio>
+
+  <!-- Poetic Minimalist Layer -->
+  <div class="ui-layer">
+    <div class="header-mark">
+      <div class="brand-coords">46°33′ N · 7°50′ E</div>
+    </div>
+
+    <div class="footer-bar">
+      <div class="music-control">
+        <button id="music-toggle" class="music-toggle" type="button" aria-label="播放背景音乐" aria-pressed="false">♫ 开启音乐</button>
+        <span id="music-hint" class="music-hint" role="status">点击画面或按空格开启音乐</span>
+      </div>
+      <div class="resonance-status" id="resonance-hint">
+        <span class="status-dot"></span>
+        <span class="status-label">重拍共振</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js (Bundled locally, works 100% offline with CDN fallback) -->
+  <script src="three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- Application Engine -->
+  <script src="bundle.js?v=5b44e102e706"></script>
+</body>
+</html>

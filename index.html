@@ -19,11 +19,13 @@
 
    <title>庞博约 | Boyue Pang</title>
 
+  <script>try { document.documentElement.dataset.homeScene = localStorage.getItem('home-scene') === 'dark' ? 'dark' : 'bright'; } catch { document.documentElement.dataset.homeScene = 'bright'; }</script>
   <link rel="stylesheet" href="assets/home.css?v=063e3cb9f81a">
   <link rel="stylesheet" href="assets/fluid-tank.css?v=165800c1782b">
+  <link rel="stylesheet" href="assets/home-scenes.css?v=73c71f70f241">
   <script defer src="assets/astronomy.browser.min.js?v=1"></script>
   <script defer src="assets/storm-sound.js?v=20260924-rumble-3"></script>
-  <script defer src="assets/fluid-tank.js?v=20260924-rumble-1"></script>
+  <script defer src="assets/fluid-tank.js?v=971436782d80"></script>
 </head>
 
 
@@ -64,11 +66,16 @@
         </div>
       </div>
     </div>
+    <div class="home-scene-switch" role="group" aria-label="首页场景">
+      <button type="button" data-home-scene="dark" aria-label="黑云与月亮" aria-pressed="false" title="黑云与月亮"></button>
+      <button type="button" data-home-scene="bright" aria-label="音乐与群山" aria-pressed="true" title="音乐与群山"></button>
+    </div>
   </nav>
 </header>
 
   <main>
     <section class="fluid-tank" id="fluid-tank" aria-label="缓缓向右流动的雷雨云层">
+      <div class="mountain-home-layer" aria-hidden="true"><iframe id="mountain-home" data-src="/有趣的小玩具展示/mountain-home/?embed=1" title="群山场景" tabindex="-1" allow="autoplay"></iframe></div>
       <canvas class="tank-fluid" aria-hidden="true"></canvas>
       <div class="tank-copy">
         <h1 class="welcome-text"><span>  欢迎访问</span><span>我的个人空间</span></h1>
@@ -78,6 +85,8 @@
             <path class="sound-icon-waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>
             <path class="sound-icon-slash" d="m16 9 4 6m0-6-4 6"/>
           </svg>
+        </button><button class="storm-sound-toggle" id="mountain-music-toggle" type="button" aria-label="播放群山音乐" aria-pressed="false" title="播放群山音乐">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l4 3V6L8 9H4Z"/><path class="sound-icon-waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="sound-icon-slash" d="m16 9 4 6m0-6-4 6"/></svg>
         </button></div>
       </div>
     </section>
@@ -152,7 +161,7 @@
       class="footer-image"
     >
   </footer>
-<script defer src="assets/home.js?v=c8c9558008f7"></script>
+<script defer src="assets/home.js?v=68a5de79a01a"></script>
 </body>
 
 </html>

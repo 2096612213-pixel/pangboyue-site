@@ -19,11 +19,14 @@ const scripts = [
   'lazy-images.js',
   'route-prefetch.js',
   'clock.js',
+  'home-scenes.js',
 ];
 const javascript = (await Promise.all(scripts.map(name =>
   readFile(join(root, 'src', 'home', 'scripts', name), 'utf8')))).join('');
 const fingerprint = content => createHash('sha256').update(content).digest('hex').slice(0, 12);
 const versions = {
+  __SCENE_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'home-scenes.css'))),
+  __FLUID_JS_HASH__: fingerprint(await readFile(join(root, 'assets', 'fluid-tank.js'))),
   __HOME_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'home.css'))),
   __FLUID_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'fluid-tank.css'))),
   __LANDSCAPE_SVG_HASH__: fingerprint(await readFile(join(root, 'images', 'changsha-xiangjiang-editable.svg'))),
