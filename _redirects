@@ -1,2 +1,4 @@
 
 /daily/daily.html /thoughts/week.html?page=daily 301
+/有趣的小玩具展示 /visibleproductsshow/ 301
+/有趣的小玩具展示/* /visibleproductsshow/:splat 301

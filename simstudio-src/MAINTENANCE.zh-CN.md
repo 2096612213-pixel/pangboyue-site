@@ -4,10 +4,10 @@
 
 ## 网站入口与构建
 
-- 卡片：`../有趣的小玩具展示/index.html`，放在第一个，宽屏占两列、两行，小屏单列。
-- 封面：`../有趣的小玩具展示/assets/lego-studio-cover.png`，使用用户提供的原图。
-- 页面：`/有趣的小玩具展示/lego/`。
-- 源码：本目录。部署产物：`../有趣的小玩具展示/lego/`，不要直接编辑产物。
+- 卡片：`../visibleproductsshow/index.html`，放在第一个，宽屏占两列、两行，小屏单列。
+- 封面：`../visibleproductsshow/assets/lego-studio-cover.png`，使用用户提供的原图。
+- 页面：`/visibleproductsshow/lego/`。
+- 源码：本目录。部署产物：`../visibleproductsshow/lego/`，不要直接编辑产物。
 - 构建配置：`vite.pages.config.ts`，使用相对路径，支持中文子目录。
 
 首次准备依赖时，在本目录运行 `npm ci`。当前机器为避免重复安装，`node_modules` 暂时复用桌面原项目的依赖；更换机器或移走原项目后重新安装即可。

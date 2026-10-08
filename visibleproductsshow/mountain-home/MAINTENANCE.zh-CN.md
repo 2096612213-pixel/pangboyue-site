@@ -12,9 +12,9 @@
 在网站根目录运行：
 
 ```sh
-node 有趣的小玩具展示/mountain-home/build.mjs
+node visibleproductsshow/mountain-home/build.mjs
 node scripts/build-home.mjs
-node 有趣的小玩具展示/mountain-home/build.mjs --check
+node visibleproductsshow/mountain-home/build.mjs --check
 node scripts/build-home.mjs --check
 ```
 

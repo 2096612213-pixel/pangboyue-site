@@ -26,7 +26,7 @@ for (const rel of files(publicRoot)) {
 }
 execFileSync(process.execPath, [path.join(source, 'node_modules/vite/bin/vite.js'), 'build', '--config', 'vite.pages.config.ts'], { cwd: source, stdio: 'inherit' });
 const output = path.join(source, 'pages-dist');
-const destination = path.join(root, '有趣的小玩具展示/lego');
+const destination = path.join(root, 'visibleproductsshow/lego');
 if (process.argv.includes('--check')) {
   const expected = files(output), actual = files(destination);
   if (JSON.stringify(expected) !== JSON.stringify(actual) || expected.some(rel => !readFileSync(path.join(output, rel)).equals(readFileSync(path.join(destination, rel)))))
