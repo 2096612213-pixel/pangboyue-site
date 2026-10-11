@@ -29,7 +29,7 @@ const versions = {
   __FLUID_JS_HASH__: fingerprint(await readFile(join(root, 'assets', 'fluid-tank.js'))),
   __HOME_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'home.css'))),
   __FLUID_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'fluid-tank.css'))),
-  __LANDSCAPE_SVG_HASH__: fingerprint(await readFile(join(root, 'images', 'changsha-xiangjiang-editable.svg'))),
+  __LANDSCAPE_SVG_HASH__: fingerprint(await readFile(join(root, 'images', 'changsha-xiangjiang-reflections-corrected-v2.svg'))),
   __HOME_JS_HASH__: fingerprint(javascript),
 };
 const html = Object.entries(versions).reduce(

@@ -427,4 +427,5 @@ export const songs = [
   {"title": "雨爱 — 杨丞琳", "file": "qingming-81-866d64cf7f63.mp3", "addedAt": "2026-10-11"},
   {"title": "雨过后的风景 — 蔡诗芸", "file": "qingming-82-d918ba005764.mp3", "addedAt": "2026-10-11"},
   {"title": "领悟 (Live) — 林忆莲", "file": "qingming-83-ce7e705c27a4.mp3", "addedAt": "2026-10-11"},
+  {"title": "来自天堂的魔鬼 (Live) — 邓紫棋", "file": "lai-zi-tian-tang-de-mo-gui-live-deng-zi-qi.mp3", "addedAt": "2026-10-11"},
 ];
