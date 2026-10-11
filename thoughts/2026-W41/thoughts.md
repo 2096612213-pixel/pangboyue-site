@@ -153,3 +153,5 @@ A：对，这个观点里有一部分我很认同，但我会帮你把它修得�
   <source src="/thoughts/2026-W41/media/xjtu-penguin-dance.mp4" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W41/media/xjtu-penguin-dance.mp4">打开视频</a>观看。
 </video>
+
+今天真的累 干了一下午 终于把歌单板块的歌差不多做的很完整了
