@@ -1,9 +1,11 @@
 export function mountImageToggle(content, button, headingBar) {
-  const images = Array.from(content.querySelectorAll('img:not(.journal-video-cover)'));
+  // PDF pages retain their fixed document layout when handwritten photos are collapsed.
+  const imageSelector = 'img:not(.journal-video-cover):not(.journal-pdf-page)';
+  const images = Array.from(content.querySelectorAll(imageSelector));
   if (!images.length) return;
   // Remove empty image paragraphs too, so collapsed photo galleries leave no gaps.
   for (const block of content.querySelectorAll('p, figure, a, picture')) {
-    if (block.querySelector('img') && !block.textContent.trim() &&
+    if (block.querySelector(imageSelector) && !block.textContent.trim() &&
         !block.querySelector('video, audio, iframe, button, input')) {
       block.classList.add('journal-image-only');
     }
