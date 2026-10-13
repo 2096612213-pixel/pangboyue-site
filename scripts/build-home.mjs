@@ -8,6 +8,7 @@ const parts = [
   'document-head.html',
   'header.html',
   'hero.html',
+  'agent-chat.html',
   'archive-cards.html',
   'footer.html',
 ];
@@ -25,6 +26,9 @@ const javascript = (await Promise.all(scripts.map(name =>
   readFile(join(root, 'src', 'home', 'scripts', name), 'utf8')))).join('');
 const fingerprint = content => createHash('sha256').update(content).digest('hex').slice(0, 12);
 const versions = {
+  __AGENT_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'agent-chat', 'chat.css'))),
+  __AGENT_JS_HASH__: fingerprint(await readFile(join(root, 'assets', 'agent-chat', 'chat.js'))),
+  __AGENT_ICON_HASH__: fingerprint(await readFile(join(root, 'assets', 'agent-chat', 'psi.svg'))),
   __SCENE_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'home-scenes.css'))),
   __FLUID_JS_HASH__: fingerprint(await readFile(join(root, 'assets', 'fluid-tank.js'))),
   __HOME_CSS_HASH__: fingerprint(await readFile(join(root, 'assets', 'home.css'))),

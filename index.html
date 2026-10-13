@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="assets/home.css?v=063e3cb9f81a">
   <link rel="stylesheet" href="assets/fluid-tank.css?v=165800c1782b">
   <link rel="stylesheet" href="assets/home-scenes.css?v=b18d2f99ef09">
+  <link rel="stylesheet" href="assets/agent-chat/chat.css?v=6edbbd9f8ae5">
   <script defer src="assets/astronomy.browser.min.js?v=1"></script>
   <script defer src="assets/storm-sound.js?v=20260924-rumble-3"></script>
   <script defer src="assets/fluid-tank.js?v=971436782d80"></script>
@@ -31,7 +32,12 @@
 
 <body>
 <header class="top-nav">
-  <a href="/" class="brand">庞博约</a>
+  <div class="agent-brand-group">
+    <a href="/" class="brand">庞博约</a>
+    <a class="agent-entry" href="#digital-agent" aria-label="与庞博约的数字助手对话" title="与我对话">
+      <img src="assets/agent-chat/psi.svg?v=997cf9582400" alt="" width="30" height="30">
+    </a>
+  </div>
 
   <nav class="nav-menu">
     <a href="/">首页</a>
@@ -73,6 +79,7 @@
   </nav>
 </header>
 
+
   <main>
     <section class="fluid-tank" id="fluid-tank" aria-label="缓缓向右流动的雷雨云层">
       <div class="mountain-home-layer" aria-hidden="true"><iframe id="mountain-home" data-src="/visibleproductsshow/mountain-home/?embed=1" title="群山场景" tabindex="-1" allow="autoplay"></iframe></div>
@@ -91,6 +98,33 @@
         </button></div>
       </div>
     </section>
+    <section class="agent-section" id="digital-agent" aria-label="与庞博约的数字分身对话">
+      <div class="agent-panel">
+        <div class="agent-empty" id="agent-empty">
+          <div class="agent-symbol" tabindex="0" role="img" aria-label="Psi">
+            <img class="agent-empty-mark" src="assets/agent-chat/psi.svg?v=997cf9582400" width="58" height="58" alt="">
+          </div>
+        </div>
+
+        <div class="agent-messages" id="agent-messages" role="log" aria-live="polite" aria-label="对话记录" hidden></div>
+
+        <form class="agent-composer" id="agent-form">
+          <label class="agent-sr-only" for="agent-input">给数字分身发消息，每次最多100字</label>
+          <textarea id="agent-input" rows="2" placeholder="有什么想和我聊的？" aria-describedby="agent-input-status agent-count" aria-invalid="false" required></textarea>
+          <div class="agent-composer-bottom">
+            <p class="agent-sr-only" id="agent-input-status" role="status" aria-live="polite"></p>
+            <div class="agent-send-group">
+              <span class="agent-sr-only" id="agent-count" aria-label="输入字数">0 / 100</span>
+              <button class="agent-send" id="agent-send" type="submit" aria-label="发送消息" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <noscript><p class="agent-noscript">开启 JavaScript 后即可使用对话。</p></noscript>
+    </section>
+
 
    <a href="thoughts/week.html?page=daily"
    class="archive-card"
@@ -163,6 +197,7 @@
     >
   </footer>
 <script defer src="assets/home.js?v=fe66efe966f0"></script>
+<script defer src="assets/agent-chat/chat.js?v=e1ca5f0752ae"></script>
 </body>
 
 </html>
