@@ -49,7 +49,8 @@ export async function onRequest({ request, env }) {
     const upstreamRequest = new Request(UPSTREAM, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
-      redirect: 'error', signal: controller.signal
+      // Cloudflare只接受follow/manual；manual同样阻止自动跳转。
+      redirect: 'manual', signal: controller.signal
     });
     // 使用内部服务调用，避免线上Pages再经公网访问同账户Worker。
     // 调用时保留绑定对象的this；本地预览没有env，仍可直接访问已部署的Worker。
@@ -57,6 +58,7 @@ export async function onRequest({ request, env }) {
     const response = service && typeof service.fetch === 'function'
       ? await service.fetch(upstreamRequest)
       : await fetch(upstreamRequest);
+    if (response.status >= 300 && response.status < 400) return json({ error: '对话服务地址暂不可用，请稍后再试。' }, 502);
     if (!response.headers.get('Content-Type')?.includes('application/json')) return json({ error: '暂时无法连接数字分身，请稍后再试。' }, 502);
     const result = await response.json();
     if (!response.ok) {

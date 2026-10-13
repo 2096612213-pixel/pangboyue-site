@@ -64,3 +64,11 @@
 Cloudflare官方说明：https://developers.cloudflare.com/pages/functions/bindings/#service-bindings
 
 此修复不改变前端聊天布局和100字限制，不把个人资料或提示词放入前端，也不需要访客直接请求Worker或新增跨域权限。本地文件修改不等于已修复线上，线上验证须在绑定配置及新部署完成后进行。
+
+## Cloudflare请求参数兼容性修复
+
+再次核对确认：生产部署与GitHub提交一致，服务绑定名称正确，但请求仍失败。根因是转发请求使用了`redirect: 'error'`；本地Node接受该参数，Cloudflare workerd会在创建Request时抛出异常，尚未进入服务绑定调用，因此绑定本身无法修复它。
+
+改为`redirect: 'manual'`并显式拒绝3xx响应，继续阻止自动跟随跳转。服务绑定、身份最小回答、100字限制与本地预览回退均保留。用Cloudflare官方Miniflare/workerd实际执行旧、新代码（本地工具最高支持兼容日期2026-08-06）：旧代码502、新代码200、重定向拒绝及超长输入校验通过。网站生产兼容日期未修改。
+
+官方运行时实现：https://github.com/cloudflare/workerd/blob/main/src/workerd/api/http.c%2B%2B
