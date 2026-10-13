@@ -4,14 +4,14 @@
 
 - `src/home/agent-chat.html`：首页聊天区结构，位于首屏与内容卡片之间。
 - `src/home/header.html`：名字右侧的 Ψ 入口，点击滚动到聊天区。
-- `assets/agent-chat/psi.svg`：与桌面图标一致的矢量图，图标使用CSS放大动效。
-- `assets/agent-chat/chat.css`：所有图标与聊天区样式，统一使用 `agent-` 前缀。
-- `assets/agent-chat/chat.js`：输入限制、请求、上下文、图标滚动入口和安全文本展示。
-- `assets/agent-chat/backdrop.js`：底层Ψ点阵、鼠标附近的`<`形变、流动与动画性能控制。
+- `assets/home/agent-chat/psi.svg`：与桌面图标一致的矢量图，图标使用CSS放大动效。
+- `src/home/styles/chat.css`：所有图标与聊天区样式，统一使用 `agent-` 前缀。
+- `assets/home/agent-chat/chat.js`：输入限制、请求、上下文、图标滚动入口和安全文本展示。
+- `assets/home/agent-chat/backdrop.js`：底层Ψ点阵、鼠标附近的`<`形变、流动与动画性能控制。
 - `functions/api/chat.js`：Pages后台路由 `/api/chat`，转发到独立 Worker。
 - `_routes.json`：仅让 `/api/*` 进入Pages Functions，静态页面仍走静态服务。
 - `scripts/build-home.mjs`：拼装首页、更新图标和功能样式/脚本的内容指纹。
-- `index.html`、`assets/home.js`：构建输出，不能作为首页修改的唯一来源。
+- `index.html`、`assets/home/main.js`、`assets/home/main.css`：构建输出，不能作为首页修改的唯一来源。
 
 ## 可调参数
 
@@ -72,3 +72,7 @@ Cloudflare官方说明：https://developers.cloudflare.com/pages/functions/bindi
 改为`redirect: 'manual'`并显式拒绝3xx响应，继续阻止自动跟随跳转。服务绑定、身份最小回答、100字限制与本地预览回退均保留。用Cloudflare官方Miniflare/workerd实际执行旧、新代码（本地工具最高支持兼容日期2026-08-06）：旧代码502、新代码200、重定向拒绝及超长输入校验通过。网站生产兼容日期未修改。
 
 官方运行时实现：https://github.com/cloudflare/workerd/blob/main/src/workerd/api/http.c%2B%2B
+
+## 按需启动
+
+聊天脚本保留首屏入口绑定，点阵脚本在聊天区接近视口时才加载。样式源码集中在 `src/home/styles/chat.css`，由首页构建统一输出到 `assets/home/main.css`；不会单独请求源码样式。

@@ -1,13 +1,18 @@
 {
-    "files.exclude": {
-        "**/.git": true,
-        "**/.svn": true,
-        "**/.hg": true,
-        "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "**/thoughts.aux": true,
-        "**/thoughts.log": true,
-        "**/thoughts.gz": true,
-        "**/thoughts.out": true
-    }
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/thoughts.aux": true,
+    "**/thoughts.log": true,
+    "**/thoughts.gz": true,
+    "**/thoughts.out": true,
+    "**/node_modules": true,
+    "src/book/dist": true,
+    "src/simstudio/pages-dist": true,
+    "src/simstudio/.next": true,
+    "src/simstudio/.vinext": true
+  }
 }

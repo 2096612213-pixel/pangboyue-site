@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <link rel="icon" type="image/x-icon" href="../../site-icon-v2.ico">
-  <link rel="icon" type="image/png" sizes="16x16" href="../../site-icon-v2-16.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="../../site-icon-v2-32.png">
+  <link rel="icon" type="image/x-icon" href="../../favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="../../assets/icons/site-icon-v2-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icons/site-icon-v2-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="../../apple-touch-icon.png">
 
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1250,7 +1250,7 @@ THE SOFTWARE.
         }
         b = index % maxB; // permutation
         a = index / maxB | 0; // combination
-        
+
         // Invalidate all edges
         perm = this[permName];
         for (i = o = 0, ref1 = maxAll; (0 <= ref1 ? o <= ref1 : o >= ref1); i = 0 <= ref1 ? ++o : --o) {
@@ -1481,7 +1481,7 @@ THE SOFTWARE.
 
   N_URFtoDLF = 20160; // 8!/(8-6)! permutations of URF..DLF corners
 
-  
+
   // The URtoDF move table is only computed for phase 2 because the full
   // table would have >650000 entries
   N_URtoDF = 20160; // 8!/(8-6)! permutation of UR..DF edges in phase 2
@@ -1490,7 +1490,7 @@ THE SOFTWARE.
 
   N_UBtoDF = 1320; // 12!/(12-3)! permutations of UB..DF edges
 
-  
+
   // The move table for parity is so small that it's included here
   Cube.moveTables = {
     parity: [[1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1], [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]],

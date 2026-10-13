@@ -1,0 +1,13 @@
+{
+  "name": "pangboyue-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:home": "node scripts/build-home.mjs",
+    "check:home": "node scripts/build-home.mjs --check",
+    "build:book": "node scripts/build-book.mjs",
+    "check:book": "node scripts/build-book.mjs --check",
+    "build:lego": "node scripts/build-simstudio.mjs",
+    "check:lego": "node scripts/build-simstudio.mjs --check"
+  }
+}

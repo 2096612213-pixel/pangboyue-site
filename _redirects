@@ -2,3 +2,36 @@
 /daily/daily.html /thoughts/week.html?page=daily 301
 /有趣的小玩具展示 /visibleproductsshow/ 301
 /有趣的小玩具展示/* /visibleproductsshow/:splat 301
+
+# Previous asset URLs remain compatible after file reorganization.
+/assets/home.js /assets/home/main.js 301
+/assets/home.css /assets/home/main.css 301
+/assets/home.bundle.css /assets/home/main.css 301
+/assets/home-scenes.css /assets/home/main.css 301
+/assets/fluid-tank.css /assets/home/main.css 301
+/assets/agent-chat/chat.css /assets/home/main.css 301
+/assets/agent-chat/* /assets/home/agent-chat/:splat 301
+/assets/fluid-tank.js /assets/home/scenes/fluid-tank.js 301
+/assets/storm-sound.js /assets/home/scenes/storm-sound.js 301
+/assets/astronomy.browser.min.js /assets/home/scenes/astronomy.browser.min.js 301
+/assets/moon-surface.svg /assets/home/scenes/moon-surface.svg 301
+/assets/thunder/* /assets/home/scenes/thunder/:splat 301
+/site-icon-v2.ico /favicon.ico 301
+/site-icon-v2-16.png /assets/icons/site-icon-v2-16.png 301
+/site-icon-v2-32.png /assets/icons/site-icon-v2-32.png 301
+/favicon-16x16.png /assets/icons/favicon-16x16.png 301
+/favicon-32x32.png /assets/icons/favicon-32x32.png 301
+/favicon.jpg /assets/icons/favicon.jpg 301
+/images/book_main.avif /images/home/book_main.avif 301
+/images/book_main.png /images/home/book_main.png 301
+/images/daily_main.jpg /images/home/daily_main.jpg 301
+/images/daily_main.avif /images/home/daily_main.avif 301
+/images/thoughts_main.avif /images/home/thoughts_main.avif 301
+/images/thoughts_main.png /images/home/thoughts_main.png 301
+/images/toys_main.avif /images/home/toys_main.avif 301
+/images/toys_main.jpg /images/home/toys_main.jpg 301
+/images/music_main.avif /images/home/music_main.avif 301
+/images/music_main.png /images/home/music_main.png 301
+/images/footer.avif /images/home/footer.avif 301
+/images/footer.png /images/home/footer.png 301
+/images/changsha-xiangjiang-reflections-corrected-v2.svg /images/home/xiangjiang.svg 301

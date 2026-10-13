@@ -10,17 +10,6 @@
   if (!tank) return;
   const canvas = tank.querySelector('.tank-fluid');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  // Only the first archive entrance receives the reveal behavior.
-  const first = document.querySelector('a.archive-card');
-  if (first && !reduced.matches && 'IntersectionObserver' in window) {
-    const reveal = new IntersectionObserver(entries => {
-      if (entries.some(e => e.isIntersecting)) {
-        first.classList.add('is-visible'); reveal.disconnect();
-      }
-    }, { threshold: .08 });
-    first.classList.add('archive-reveal'); reveal.observe(first);
-    first.addEventListener('focus', () => first.classList.add('is-visible'));
-  }
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, powerPreference: 'low-power' });
   let paused = reduced.matches, visible = true, failed = false, raf = 0, previous = 0, time = 0;
   let nextFlash = 5 + Math.random() * 5, frames = 0;

@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 
 <head>
-  <link rel="icon" type="image/x-icon" href="site-icon-v2.ico">
-  <link rel="icon" type="image/png" sizes="16x16" href="site-icon-v2-16.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="site-icon-v2-32.png">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/site-icon-v2-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/site-icon-v2-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
   <meta charset="UTF-8">
@@ -15,18 +15,25 @@
   <meta property="og:title" content="庞博约 | Boyue Pang">
   <meta property="og:description" content="记录日常、想法与认识，展示可视化项目、电子书和短片。">
   <meta property="og:url" content="https://pangboyue.com/">
-  <meta property="og:image" content="https://pangboyue.com/images/toys_main.jpg">
+  <meta property="og:image" content="https://pangboyue.com/images/home/toys_main.jpg">
 
    <title>庞博约 | Boyue Pang</title>
 
-  <script>try { document.documentElement.dataset.homeScene = localStorage.getItem('home-scene') === 'dark' ? 'dark' : 'bright'; } catch { document.documentElement.dataset.homeScene = 'bright'; }</script>
-  <link rel="stylesheet" href="assets/home.css?v=063e3cb9f81a">
-  <link rel="stylesheet" href="assets/fluid-tank.css?v=165800c1782b">
-  <link rel="stylesheet" href="assets/home-scenes.css?v=b18d2f99ef09">
-  <link rel="stylesheet" href="assets/agent-chat/chat.css?v=d86386908473">
-  <script defer src="assets/astronomy.browser.min.js?v=1"></script>
-  <script defer src="assets/storm-sound.js?v=20260924-rumble-3"></script>
-  <script defer src="assets/fluid-tank.js?v=971436782d80"></script>
+  <script>
+  (() => {
+    let scene = 'bright';
+    try { if (localStorage.getItem('home-scene') === 'dark') scene = 'dark'; } catch {}
+    document.documentElement.dataset.homeScene = scene;
+    if (scene === 'bright') {
+      for (const href of ['/visibleproductsshow/mountain-home/three.min.js', '/visibleproductsshow/mountain-home/bundle.js?v=535fb88d0d4d']) {
+        const hint = document.createElement('link');
+        hint.rel = 'preload'; hint.as = 'script'; hint.fetchPriority = 'low'; hint.href = href;
+        document.head.append(hint);
+      }
+    }
+  })();
+  </script>
+  <link rel="stylesheet" href="assets/home/main.css?v=d207d45d7c99">
 </head>
 
 
@@ -35,7 +42,7 @@
   <div class="agent-brand-group">
     <a href="/" class="brand">庞博约</a>
     <a class="agent-entry" href="#digital-agent" aria-label="与庞博约的数字助手对话" title="与我对话">
-      <img src="assets/agent-chat/psi.svg?v=997cf9582400" alt="" width="30" height="30">
+      <img src="assets/home/agent-chat/psi.svg?v=997cf9582400" alt="" width="30" height="30">
     </a>
   </div>
 
@@ -81,7 +88,7 @@
 
 
   <main>
-    <section class="fluid-tank" id="fluid-tank" aria-label="缓缓向右流动的雷雨云层">
+    <section class="fluid-tank" id="fluid-tank" data-astronomy-src="assets/home/scenes/astronomy.browser.min.js?v=d1b3ab4b86aa" data-sound-src="assets/home/scenes/storm-sound.js?v=21d751cf1e9b" data-cloud-src="assets/home/scenes/fluid-tank.js?v=e63229e77238" aria-label="缓缓向右流动的雷雨云层">
       <div class="mountain-home-layer" aria-hidden="true"><iframe id="mountain-home" data-src="/visibleproductsshow/mountain-home/?embed=1" title="群山场景" tabindex="-1" allow="autoplay"></iframe></div>
       <canvas class="tank-fluid" aria-hidden="true"></canvas>
       <div class="hero-scroll-surface" aria-hidden="true"></div>
@@ -99,11 +106,11 @@
       </div>
     </section>
     <section class="agent-section" id="digital-agent" aria-label="与庞博约的数字分身对话">
-      <canvas class="agent-backdrop" id="agent-backdrop" aria-hidden="true"></canvas>
+      <canvas class="agent-backdrop" id="agent-backdrop" data-script="assets/home/agent-chat/backdrop.js?v=16f689a4dd25" aria-hidden="true"></canvas>
       <div class="agent-panel">
         <div class="agent-empty" id="agent-empty">
           <div class="agent-symbol" tabindex="0" role="img" aria-label="Psi">
-            <img class="agent-empty-mark" src="assets/agent-chat/psi.svg?v=997cf9582400" width="58" height="58" alt="">
+            <img class="agent-empty-mark" src="assets/home/agent-chat/psi.svg?v=997cf9582400" width="58" height="58" alt="">
           </div>
         </div>
 
@@ -131,7 +138,7 @@
    class="archive-card"
    target="_blank">
 
-  <picture><source type="image/avif" data-srcset="images/daily_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/daily_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我现在每天正在做的事"></picture>
+  <picture><source type="image/avif" data-srcset="images/home/daily_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/home/daily_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我现在每天正在做的事"></picture>
 
   <div class="archive-title">
     我现在每天正在做的事
@@ -141,7 +148,7 @@
 
     <br>
     <a href="thoughts/index.html" class="archive-card" target="_blank">
-  <picture><source type="image/avif" data-srcset="images/thoughts_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/thoughts_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="各种想法和认识"></picture>
+  <picture><source type="image/avif" data-srcset="images/home/thoughts_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/home/thoughts_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="各种想法和认识"></picture>
 
   <div class="archive-title">
     各种想法与认识
@@ -153,7 +160,7 @@
     target="_blank"
     class="archive-card">
 
-    <picture><source type="image/avif" data-srcset="images/book_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/book_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我的电子书"></picture>
+    <picture><source type="image/avif" data-srcset="images/home/book_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/home/book_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="我的电子书"></picture>
 <div class="archive-title">
     我的电子书
   </div>
@@ -165,7 +172,7 @@
    class="archive-card"
    target="_blank">
 
-  <picture><source type="image/avif" data-srcset="images/toys_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/toys_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="可视化项目"></picture>
+  <picture><source type="image/avif" data-srcset="images/home/toys_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/home/toys_main.jpg" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="可视化项目"></picture>
 
   <div class="archive-title">
     可视化项目
@@ -179,7 +186,7 @@
    class="archive-card"
    target="_blank">
 
-  <picture><source type="image/avif" data-srcset="images/music_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/music_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="最爱的歌曲"></picture>
+  <picture><source type="image/avif" data-srcset="images/home/music_main.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" data-src="images/home/music_main.png" width="1844" height="853" loading="lazy" decoding="async" fetchpriority="low" alt="最爱的歌曲"></picture>
 
   <div class="archive-title">
     最爱的歌曲 <span class="music-star">★</span>
@@ -190,16 +197,20 @@
   </main>
 
   <footer class="site-landscape" aria-label="长沙湘江景观">
-    <img
-      src="images/changsha-xiangjiang-reflections-corrected-v2.svg?v=7ed6cac9b8bf"
-      width="2159" height="728" loading="lazy" decoding="async" fetchpriority="low"
-      alt="从岳麓山远望长沙：湘江环绕橘子洲，城市高楼与湖南大学校园映在蓝灰天空下"
-      class="footer-image"
-    >
+    <picture>
+      <source type="image/avif" sizes="100vw" data-srcset="images/home/xiangjiang-2159.avif?v=64b0047a068c 2159w, images/home/xiangjiang-4318.avif?v=2099eb557045 4318w">
+      <img
+        src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+        data-src="images/home/xiangjiang-2159.webp?v=40b643c6e266"
+        data-srcset="images/home/xiangjiang-2159.webp?v=40b643c6e266 2159w, images/home/xiangjiang-4318.webp?v=f074512b48a7 4318w" sizes="100vw"
+        width="2159" height="728" loading="lazy" decoding="async" fetchpriority="low"
+        alt="从岳麓山远望长沙：湘江环绕橘子洲，城市高楼与湖南大学校园映在蓝灰天空下"
+        class="footer-image"
+      >
+    </picture>
   </footer>
-<script defer src="assets/home.js?v=fe66efe966f0"></script>
-<script defer src="assets/agent-chat/chat.js?v=dd926c3b6cac"></script>
-<script defer src="assets/agent-chat/backdrop.js?v=16f689a4dd25"></script>
+<script defer src="assets/home/main.js?v=5283b0fe7425"></script>
+<script defer src="assets/home/agent-chat/chat.js?v=dd926c3b6cac"></script>
 </body>
 
 </html>

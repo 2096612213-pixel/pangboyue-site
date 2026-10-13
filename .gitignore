@@ -1,9 +1,9 @@
 .DS_Store
-sample-src/node_modules/
-sample-src/dist/
+src/book/node_modules/
+src/book/dist/
 
-simstudio-src/node_modules/
-simstudio-src/pages-dist/
-simstudio-src/.next/
-simstudio-src/.vinext/
-simstudio-src/*.tsbuildinfo
+src/simstudio/node_modules/
+src/simstudio/pages-dist/
+src/simstudio/.next/
+src/simstudio/.vinext/
+src/simstudio/*.tsbuildinfo

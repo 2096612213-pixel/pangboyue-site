@@ -4,7 +4,7 @@ import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const source = path.join(root, 'simstudio-src');
+const source = path.join(root, 'src/simstudio');
 const publicRoot = path.join(source, 'public');
 // 目录再生成后仍保持这个大底板的无损压缩格式。
 const baseplate = path.join(publicRoot, 'catalog/geometry/39369-71.json');

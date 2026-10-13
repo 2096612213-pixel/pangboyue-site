@@ -7,7 +7,7 @@
 - `js/` 是场景源码，`bundle.js` 是生成文件。音乐、节拍数据和 Three.js 都是本地资源。
 - `window.HomeMountains` 提供首页所需的启停与音乐控制。未选中、离屏或页面隐藏时停止绘制并暂停音乐。首次访问不自动发声。
 - 首页场景选择默认 bright，并保存到 localStorage 的 `home-scene`；黑色切回原黑云/月亮，白色进入群山。
-- 首页控制位于 `../../src/home/scripts/home-scenes.js`，布局位于 `../../assets/home-scenes.css`。240px（手机200px）外边距及底部遮罩控制山脚延伸与图片间距。
+- 首页控制位于 `../../src/home/scripts/home-scenes.js`，布局位于 `../../src/home/styles/scenes.css`。240px（手机200px）外边距及底部遮罩控制山脚延伸与图片间距。
 
 在网站根目录运行：
 

@@ -25,12 +25,26 @@
     });
   }
 
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  // Only the first archive entrance receives the reveal behavior.
+  const first = document.querySelector('a.archive-card');
+  if (first && !reduced.matches && 'IntersectionObserver' in window) {
+    const reveal = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        first.classList.add('is-visible'); reveal.disconnect();
+      }
+    }, { threshold: .08 });
+    first.classList.add('archive-reveal'); reveal.observe(first);
+    first.addEventListener('focus', () => first.classList.add('is-visible'));
+  }
+
   // Reveal pictures only as they approach the viewport. Keep their size reserved.
   const deferredImages = document.querySelectorAll('picture img[data-src]');
   function revealPicture(picture) {
     const source = picture.querySelector('source[data-srcset]');
     const image = picture.querySelector('img[data-src]');
     if (source) { source.srcset = source.dataset.srcset; delete source.dataset.srcset; }
+    if (image.dataset.srcset) { image.srcset = image.dataset.srcset; delete image.dataset.srcset; }
     image.src = image.dataset.src;
     delete image.dataset.src;
   }
@@ -109,6 +123,23 @@
   const frame = document.getElementById('mountain-home');
   const buttons = [...document.querySelectorAll('[data-home-scene]')];
   const musicButton = document.getElementById('mountain-music-toggle');
+  const cloudButton = document.getElementById('storm-sound-toggle');
+  let clouds;
+  function ensureClouds() {
+    if (clouds) return clouds;
+    cloudButton.disabled = true;
+    clouds = Promise.all([tank.dataset.astronomySrc, tank.dataset.soundSrc, tank.dataset.cloudSrc].map(src => new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.async = false; script.src = src;
+      script.onload = resolve;
+      script.onerror = () => { script.remove(); reject(new Error('Scene asset unavailable')); };
+      document.head.append(script);
+    }))).then(() => {
+      tank.dataset.cloudReady = 'true';
+      window.dispatchEvent(new Event('home-scene-change'));
+    }).catch(error => { console.warn('Cloud scene:', error); }).finally(() => { cloudButton.disabled = false; });
+    return clouds;
+  }
   let visible = true;
   let mode = root.dataset.homeScene || 'bright';
   const api = () => frame.contentWindow?.HomeMountains;
@@ -127,7 +158,13 @@
     tank.setAttribute('aria-label', next === 'bright' ? '音乐与群山共振' : '缓缓向右流动的雷雨云层');
     for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.homeScene === next));
     try { localStorage.setItem('home-scene', next); } catch {}
-    if (next === 'bright' && !frame.hasAttribute('src')) frame.src = frame.dataset.src;
+    const loadCurrentScene = () => {
+      if (mode === 'bright' && !frame.hasAttribute('src')) frame.src = frame.dataset.src;
+      if (mode === 'dark') ensureClouds();
+    };
+    // Show the navigation and welcome copy before compiling the selected scene.
+    if (gesture) loadCurrentScene();
+    else requestAnimationFrame(() => requestAnimationFrame(loadCurrentScene));
     window.dispatchEvent(new Event('home-scene-change'));
     sync();
     // Same-origin call stays within the click gesture. First visit remains silent.
@@ -143,3 +180,25 @@
   window.addEventListener('pageshow', sync);
   select(mode);
 })();
+  // Start the point-field only when the visitor approaches the chat section.
+  (() => {
+    const section = document.getElementById('digital-agent');
+    const canvas = document.getElementById('agent-backdrop');
+    if (!section || !canvas) return;
+    let requested = false;
+    function loadBackdrop() {
+      if (requested) return;
+      requested = true;
+      const script = document.createElement('script');
+      script.src = canvas.dataset.script;
+      script.onerror = () => { requested = false; script.remove(); canvas.hidden = true; };
+      document.head.append(script);
+    }
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        observer.disconnect(); loadBackdrop();
+      }, { rootMargin: '160px 0px' });
+      observer.observe(section);
+    } else loadBackdrop();
+  })();
