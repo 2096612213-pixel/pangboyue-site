@@ -7,7 +7,7 @@
   if (!ctx) return;
 
   // 点阵只在原始Psi矢量轮廓内绘制；统一在此调整密度、亮度和流速。
-  const CONFIG = Object.freeze({ fps: 30, maxDpr: 1.5, gap: 17, mobileGap: 11, size: .80, flow: 2.8, speed: .65, opacity: .30, hoverOpacity: .60, spotlightPeriod: 8, spotlightLength: .32, spotlightWidth: 1.20, spotlightGain: 1.65 });
+  const CONFIG = Object.freeze({ fps: 30, maxDpr: 1.5, gap: 17, mobileGap: 11, size: .80, flow: 2.8, speed: .65, opacity: .30, hoverOpacity: .60, spotlightPeriod: 8, spotlightLength: .32, spotlightWidth: 1.20, spotlightGain: 3.30 });
   const mask = document.createElement('canvas');
   const maskCtx = mask.getContext('2d', { alpha: true });
   if (!maskCtx) return;
@@ -15,7 +15,7 @@
   const pointer = { x: 0, y: 0, targetX: 0, targetY: 0, strength: 0, active: false };
   let paths = [], points = [], width = 0, height = 0, dpr = 1, scale = 1, originX = 0, originY = 0;
   let frame = 0, lastFrame = 0, elapsed = 0, visible = false;
-  let textZone = null, lensZone = null;
+  let lensZone = null;
 
   function resize() {
     if (!paths.length) return;
@@ -46,20 +46,17 @@
     }
     canvas.dataset.ready = 'true';
     canvas.dataset.points = String(points.length);
-    updateTextZone();
+    updateLensZone();
     draw();
     updatePlayback();
   }
 
-  function updateTextZone() {
+  function updateLensZone() {
     const bounds = canvas.getBoundingClientRect();
     const composer = document.getElementById('agent-form');
     const lens = composer.getBoundingClientRect();
     lensZone = { left: lens.left - bounds.left, top: lens.top - bounds.top, width: lens.width, height: lens.height, radius: parseFloat(getComputedStyle(composer).borderRadius) || 26 };
-    const log = document.getElementById('agent-messages');
-    if (!log || log.hidden) { textZone = null; return; }
-    const area = log.getBoundingClientRect();
-    textZone = { left: area.left - bounds.left, right: area.right - bounds.left, top: area.top - bounds.top, bottom: area.bottom - bounds.top };
+
   }
 
   function draw() {
@@ -112,10 +109,8 @@
       // 光束范围外完全透明；鼠标仍可独立唤醒原来的变亮和形变。
       const illumination = Math.max(beam * CONFIG.spotlightGain, Math.min(1, influence * 8));
       if (!illumination && !influence) continue;
-      // 回复正文下方降低亮度，避免背景与文字争抢注意力。
-      const safeFactor = textZone && x > textZone.left && x < textZone.right && y > textZone.top && y < textZone.bottom ? .40 : 1;
-      // 鼠标交互亮度独立于正文下的背景降亮，玻璃后的点阵同样可见。
-      const alpha = Math.min(.88, ambientAlpha * safeFactor * illumination + influence * CONFIG.hoverOpacity);
+      // 聊天前后使用相同的背景亮度，保留鼠标原有的交互亮度。
+      const alpha = Math.min(.88, ambientAlpha * illumination + influence * CONFIG.hoverOpacity);
       const rise = half * .95 * influence;
       ctx.beginPath();
       ctx.moveTo(x + half, y - rise);
@@ -133,7 +128,7 @@
       ctx.strokeStyle = `rgba(159,191,230,${(alpha * (.58 - scattering * .12)).toFixed(3)})`;
       ctx.stroke();
       ctx.lineWidth = width < 600 ? .8 : 1.05;
-      ctx.strokeStyle = `rgba(245,250,255,${((alpha * .9 + glint * .23 * safeFactor * illumination) * (1 - scattering * .16)).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(245,250,255,${((alpha * .9 + glint * .23 * illumination) * (1 - scattering * .16)).toFixed(3)})`;
       ctx.stroke();
     }
     ctx.restore();
@@ -183,8 +178,8 @@
   }, { passive: true });
   new IntersectionObserver(entries => { visible = entries[0].isIntersecting; updatePlayback(); }).observe(section);
   new ResizeObserver(resize).observe(canvas);
-  new ResizeObserver(updateTextZone).observe(section.querySelector('.agent-panel'));
-  section.addEventListener('agent:layout', updateTextZone);
+  new ResizeObserver(updateLensZone).observe(section.querySelector('.agent-panel'));
+  section.addEventListener('agent:layout', updateLensZone);
   document.addEventListener('visibilitychange', updatePlayback);
   reducedMotion.addEventListener('change', updatePlayback);
 
