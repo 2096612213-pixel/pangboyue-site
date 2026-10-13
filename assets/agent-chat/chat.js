@@ -38,6 +38,7 @@
     send.setAttribute('aria-label', busy ? '正在回复' : '发送消息');
     input.style.height = 'auto';
     input.style.height = `${Math.min(168, Math.max(70, input.scrollHeight))}px`;
+    section.dispatchEvent(new Event('agent:layout'));
   }
 
   function setBusy(value) {
@@ -113,6 +114,7 @@
     messageFrame.className = 'agent-message-row';
     messageFrame.append(row);
     log.append(messageFrame);
+    section.dispatchEvent(new Event('agent:layout'));
     log.scrollTop = log.scrollHeight;
     return { row, body, content };
   }

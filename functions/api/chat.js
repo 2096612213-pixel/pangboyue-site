@@ -1,4 +1,5 @@
-// Pages后台转发到独立Worker。前端不保存个人资料、系统提示或模型密钥。
+// Pages优先通过BOYUE_AGENT服务绑定调用独立Worker；无绑定时保留本地HTTP预览。
+// 前端不保存个人资料、系统提示或模型密钥。
 const UPSTREAM = 'https://boyue-agent.2096612213.workers.dev/chat';
 const MAX_BYTES = 32000;
 
@@ -10,7 +11,7 @@ function identityReply(text) {
     ? '我是 Ψ（Psi），庞博约的数字助手。' : null;
 }
 
-export async function onRequest({ request }) {
+export async function onRequest({ request, env }) {
   const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
   const json = (value, status = 200) => Response.json(value, { status, headers });
   if (request.method !== 'POST') return json({ error: '请发送对话消息。' }, 405);
@@ -45,11 +46,17 @@ export async function onRequest({ request }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 85000);
   try {
-    const response = await fetch(UPSTREAM, {
+    const upstreamRequest = new Request(UPSTREAM, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
       redirect: 'error', signal: controller.signal
     });
+    // 使用内部服务调用，避免线上Pages再经公网访问同账户Worker。
+    // 调用时保留绑定对象的this；本地预览没有env，仍可直接访问已部署的Worker。
+    const service = env?.BOYUE_AGENT;
+    const response = service && typeof service.fetch === 'function'
+      ? await service.fetch(upstreamRequest)
+      : await fetch(upstreamRequest);
     if (!response.headers.get('Content-Type')?.includes('application/json')) return json({ error: '暂时无法连接数字分身，请稍后再试。' }, 502);
     const result = await response.json();
     if (!response.ok) {
