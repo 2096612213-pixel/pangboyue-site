@@ -1,0 +1,52 @@
+/* 首字母索引：桌面位于搜索与歌单的空隙，手机贴左侧。 */
+.song-alphabet {
+  position: fixed; z-index: 22;
+  left: calc(305px + max(0px, (100vw - 1450px) / 2)); top: 50%;
+  transform: translate(-50%, -50%); width: 28px;
+  height: min(675px, calc(100svh - 32px));
+  display: grid; grid-template-rows: repeat(27, minmax(0, 1fr));
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.song-alphabet button {
+  display: grid; place-items: center; min-height: 0; min-width: 0;
+  padding: 0; border: 0; background: none; color: #787878; cursor: pointer;
+  font: 500 clamp(11px, 2svh, 18px)/1 -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.song-alphabet button span {
+  display: grid; place-items: center; width: min(24px, 2.8svh); height: min(24px, 2.8svh);
+  border-radius: 50%; transition: background .12s, color .12s;
+}
+.song-alphabet button:hover:not(:disabled) { color: #ddd; }
+.song-alphabet button[aria-pressed="true"] span { color: #fff; background: #07c160; }
+.song-alphabet button:disabled { color: #414141; cursor: default; }
+.song-alphabet button:focus-visible { outline: 1px solid #07c160; outline-offset: 1px; border-radius: 50%; }
+.alphabet-preview {
+  position: absolute; right: calc(100% + 20px); top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 76px; height: 76px;
+  border-radius: 50%; background: #bdbdbd; color: #fff; pointer-events: none;
+  font: 500 40px/1 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.alphabet-preview::after {
+  content: ''; position: absolute; right: -15px; top: calc(50% - 19px);
+  width: 22px; height: 38px; background: #bdbdbd;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.alphabet-preview[hidden] { display: none; }
+@media (max-width: 1000px) {
+  .song-alphabet {
+    left: 0; top: calc(176px + (100svh - 176px) / 2); transform: translateY(-50%);
+    width: 22px; height: min(486px, calc(100svh - 192px));
+  }
+  .song-alphabet button { font-size: clamp(8px, (100svh - 192px) / 34, 11px); }
+  .song-alphabet button span {
+    width: min(18px, (100svh - 192px) / 27); height: min(18px, (100svh - 192px) / 27);
+  }
+  .page { width: calc(100% - 52px); margin-left: 34px; margin-right: 18px; }
+  .alphabet-preview { left: calc(100% + 18px); right: auto; width: 52px; height: 52px; font-size: 30px; }
+  .alphabet-preview::after {
+    left: -14px; right: auto; top: calc(50% - 14px); width: 20px; height: 28px;
+    clip-path: polygon(100% 0, 0 50%, 100% 100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) { .song-alphabet button span { transition: none; } }

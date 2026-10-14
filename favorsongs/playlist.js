@@ -5,6 +5,44 @@ let songs = [...addedSongs];
 const additionOrder = new Map(addedSongs.map((song, index) => [song.file, index]));
 const pinyinCollator = new Intl.Collator('zh-Hans-CN-u-co-pinyin', { numeric: true, sensitivity: 'base' });
 
+// 复用浏览器的拼音排序规则；中文以音节边界分类，英文直接取首字母。
+const alphabet = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '#'];
+const pinyinBoundaries = [
+  ['A','阿'], ['B','八'], ['C','擦'], ['D','搭'], ['E','蛾'], ['F','发'],
+  ['G','噶'], ['H','哈'], ['J','击'], ['K','喀'], ['L','垃'], ['M','妈'],
+  ['N','拿'], ['O','哦'], ['P','啪'], ['Q','七'], ['R','然'], ['S','撒'],
+  ['T','塌'], ['W','挖'], ['X','昔'], ['Y','压'], ['Z','匝'],
+];
+const songName = song => song.title.split('—')[0].trim();
+function initialFor(song) {
+  const title = songName(song).normalize('NFKC').replace(/^[\p{P}\p{S}\p{Z}]+/u, '');
+  const first = [...title][0] || '';
+  const latin = first.normalize('NFD').replace(/\p{M}/gu, '');
+  if (/^[a-z]$/i.test(latin)) return latin.toUpperCase();
+  if (/\p{Script=Han}/u.test(first)) {
+    for (let index = pinyinBoundaries.length - 1; index >= 0; index--) {
+      if (pinyinCollator.compare(first, pinyinBoundaries[index][1]) >= 0) return pinyinBoundaries[index][0];
+    }
+  }
+  return '#';
+}
+const initials = new Map(addedSongs.map(song => [song.file, initialFor(song)]));
+const groupOrder = song => alphabet.indexOf(initials.get(song.file));
+let sortMode = 'added';
+let alphabetNav = null;
+const alphabetButtons = new Map();
+function markLetter(letter) {
+  for (const [key, button] of alphabetButtons) button.setAttribute('aria-pressed', String(key === letter));
+}
+function syncAlphabet(listTop, stride) {
+  if (!alphabetNav) return;
+  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
+  const atBottom = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+  const first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
+  markLetter(sortMode === 'pinyin' ? initials.get(songs[first]?.file) : '');
+}
+
+
 const list = document.querySelector('#songs');
 const cards = new Map();
 let activeIndex = -1;
@@ -115,6 +153,7 @@ function render() {
     card.style.top = `${index * stride}px`;
     card.classList.toggle("search-match", index === searchIndex);
   }
+  syncAlphabet(listTop, stride);
 }
 
 function scheduleRender() {
@@ -178,13 +217,14 @@ searchForm.addEventListener('submit', event => {
 });
 
 
-function sortPlaylist(mode) {
+function sortPlaylist(mode, resetScroll = true) {
+  sortMode = mode;
   const activeFile = songs[activeIndex]?.file;
   const matchedFile = songs[searchIndex]?.file;
   const retained = new Map([...cards.values()].map(card => [card.dataset.file, card]));
   songs = [...addedSongs];
   if (mode === 'pinyin') {
-    songs.sort((a, b) => pinyinCollator.compare(a.title.split('—')[0].trim(), b.title.split('—')[0].trim())
+    songs.sort((a, b) => groupOrder(a) - groupOrder(b) || pinyinCollator.compare(songName(a), songName(b))
       || pinyinCollator.compare(a.title, b.title)
       || additionOrder.get(a.file) - additionOrder.get(b.file));
   }
@@ -201,7 +241,82 @@ function sortPlaylist(mode) {
   document.querySelector('#sort-added').setAttribute('aria-pressed', String(mode === 'added'));
   searchStatus.textContent = mode === 'pinyin' ? '已按歌名拼音 A–Z 排序。' : '已按添加时间排序（最早 → 最新）。';
   render();
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  if (resetScroll) window.scrollTo({ top: 0, behavior: 'instant' });
 }
 document.querySelector('#sort-pinyin').addEventListener('click', () => sortPlaylist('pinyin'));
 document.querySelector('#sort-added').addEventListener('click', () => sortPlaylist('added'));
+
+
+// 微信式索引：点选、连续拖动与键盘定位都不触发音频加载。
+alphabetNav = document.querySelector('#song-alphabet');
+const preview = alphabetNav.querySelector('.alphabet-preview');
+let previewTimer = 0;
+let draggingPointer = null;
+let draggedLetter = '';
+for (const letter of alphabet) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.dataset.letter = letter;
+  button.setAttribute('aria-label', letter === '#' ? '定位数字或其他字符开头的歌曲' : `定位到 ${letter} 开头的歌曲`);
+  button.setAttribute('aria-pressed', 'false');
+  button.disabled = !addedSongs.some(song => initials.get(song.file) === letter);
+  const label = document.createElement('span'); label.textContent = letter;
+  button.append(label); alphabetNav.insertBefore(button, preview);
+  alphabetButtons.set(letter, button);
+}
+function showPreview(letter) {
+  clearTimeout(previewTimer);
+  const rect = alphabetButtons.get(letter).getBoundingClientRect();
+  const margin = matchMedia('(max-width: 1000px)').matches ? 30 : 44;
+  const center = Math.max(margin, Math.min(innerHeight - margin, rect.top + rect.height / 2));
+  preview.style.top = `${center - alphabetNav.getBoundingClientRect().top}px`;
+  preview.textContent = letter; preview.hidden = false;
+}
+function hidePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => { preview.hidden = true; }, 450);
+}
+function jumpToLetter(letter) {
+  if (alphabetButtons.get(letter)?.disabled) return;
+  if (sortMode !== 'pinyin') sortPlaylist('pinyin', false);
+  const index = songs.findIndex(song => initials.get(song.file) === letter);
+  if (index < 0) return;
+  searchIndex = index; previousQuery = ''; matchCursor = -1;
+  searchStatus.textContent = `已定位 ${letter}：${songs[index].title}`;
+  render();
+  const top = cards.get(index).getBoundingClientRect().top + scrollY;
+  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
+  window.scrollTo({ top: Math.max(0, top - edge), behavior: 'instant' });
+  markLetter(letter); scheduleRender(); showPreview(letter);
+}
+function letterAtPointer(event) {
+  const rect = alphabetNav.getBoundingClientRect();
+  const index = Math.max(0, Math.min(alphabet.length - 1, Math.floor((event.clientY - rect.top) / (rect.height / alphabet.length))));
+  return alphabet[index];
+}
+function dragToLetter(event) {
+  const letter = letterAtPointer(event);
+  if (letter === draggedLetter || alphabetButtons.get(letter).disabled) return;
+  draggedLetter = letter; jumpToLetter(letter);
+}
+alphabetNav.addEventListener('pointerdown', event => {
+  if (event.button !== 0) return;
+  event.preventDefault(); draggingPointer = event.pointerId; draggedLetter = '';
+  alphabetNav.setPointerCapture(event.pointerId); dragToLetter(event);
+});
+alphabetNav.addEventListener('pointermove', event => {
+  if (event.pointerId === draggingPointer) dragToLetter(event);
+});
+function finishDrag() {
+  if (draggingPointer === null) return;
+  const pointer = draggingPointer; draggingPointer = null; draggedLetter = '';
+  if (alphabetNav.hasPointerCapture(pointer)) alphabetNav.releasePointerCapture(pointer);
+  hidePreview();
+}
+for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) alphabetNav.addEventListener(event, finishDrag);
+alphabetNav.addEventListener('click', event => {
+  // 鼠标和触摸已由 pointerdown 处理；detail=0 是键盘触发。
+  if (event.detail !== 0) return;
+  const button = event.target.closest('button[data-letter]');
+  if (button && !button.disabled) { jumpToLetter(button.dataset.letter); hidePreview(); }
+});
+render();
