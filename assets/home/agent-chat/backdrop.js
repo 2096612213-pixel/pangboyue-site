@@ -111,7 +111,9 @@
       if (!illumination && !influence) continue;
       // 聊天前后使用相同的背景亮度，保留鼠标原有的交互亮度。
       const alpha = Math.min(.88, ambientAlpha * illumination + influence * CONFIG.hoverOpacity);
-      const rise = half * .95 * influence;
+      // 开口跟随扫光强度：亮处张开，暗处收拢，鼠标仍可独立张开。
+      const opening = Math.max(beam, influence);
+      const rise = half * .95 * opening;
       ctx.beginPath();
       ctx.moveTo(x + half, y - rise);
       ctx.lineTo(x - half, y);
