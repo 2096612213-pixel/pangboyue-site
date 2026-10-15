@@ -37,6 +37,7 @@
     a.toy-card:hover { border-color: #8bd7eb; transform: translateY(-5px); box-shadow: 0 18px 38px #080e1455; }
     a.toy-card:focus-visible, .home-link:focus-visible, .brand:focus-visible { outline: 2px solid #91d8e8; outline-offset: 4px; }
     .card-title { height: 76px; margin: 0; padding: 21px 22px 10px; font-size: clamp(20px, 1.7vw, 26px); font-weight: 660; color: #79d0e6; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+    .abstract-wave-card .card-title { height: auto; line-height: 1.45; }
     .card-empty-copy { flex: 1; min-height: 58px; }
     /* Bound images to the cover box, independent of their HTML width/height. */
     .card-art { position: relative; flex-shrink: 0; aspect-ratio: 1.8; margin: 0 10px 10px; overflow: hidden; background: #252f38; }
@@ -99,6 +100,12 @@
         <h2 class="card-title">网站第二首页</h2>
         <div class="card-empty-copy" aria-hidden="true"></div>
         <div class="card-art"><picture><img src="assets/mountain-home-cover.png" width="3274" height="2048" alt="雪山、红日与音乐共振的群山场景" loading="lazy" decoding="async"></picture></div>
+        <div class="card-bottom">sample</div>
+      </a>
+      <a class="toy-card abstract-wave-card" href="abstract-wave/" aria-label="进入Gemini 4 argon用代码还原抽象动画实例">
+        <h2 class="card-title">Gemini 4 argon用代码还原抽象动画实例</h2>
+        <div class="card-empty-copy" aria-hidden="true"></div>
+        <div class="card-art"><picture><img src="assets/abstract-wave-cover.png" width="660" height="660" alt="彩色波纹与环形晶格的抽象动画还原" loading="lazy" decoding="async"></picture></div>
         <div class="card-bottom">sample</div>
       </a>
     </div>

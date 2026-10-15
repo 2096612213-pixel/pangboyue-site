@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08090b">
+  <meta name="description" content="Gemini 4 argon 用代码还原抽象动画实例：交互式彩色波纹、谐波与晶格。">
+  <link rel="canonical" href="https://pangboyue.com/visibleproductsshow/abstract-wave/">
+  <link rel="icon" href="/favicon.ico">
+  <title>Gemini 4 argon用代码还原抽象动画实例 | 庞博约</title>
+  <link rel="stylesheet" href="styles.css?v=ce88cea2123e">
+  <script defer src="scene.js?v=b68b2b5b380c"></script>
+  <script defer src="interface.js?v=909192aa121b"></script>
+</head>
+<body>
+  <header class="top-nav">
+    <a class="brand" href="/">庞博约</a>
+    <span class="page-name">抽象波纹 <span class="credit">/ Gemini 4 argon</span></span>
+    <nav aria-label="项目导航">
+      <a href="../">项目集</a>
+      <button id="referenceBtn" type="button">原视频</button>
+      <button id="settingsBtn" class="glass-button" type="button" aria-expanded="false" aria-controls="inspector">参数</button>
+    </nav>
+  </header>
+  <main class="workspace">
+    <section class="stage" id="stageContainer" aria-label="彩色抽象波纹动画">
+      <div class="canvas-frame" id="canvasFrame">
+        <canvas id="artCanvas" width="660" height="660" aria-label="彩色谐波与晶格合成的动态波纹"></canvas>
+        <div class="canvas-overlay-badge" id="canvasBadge" hidden></div>
+      </div>
+      <div class="transport-bar" aria-label="动画控制">
+        <button class="btn primary" id="playPauseBtn" type="button">⏸ 暂停</button>
+        <span class="separator" aria-hidden="true"></span>
+        <button class="btn" id="resetBtn" type="button">重置</button>
+        <button class="btn" id="exportBtn" type="button">保存图片</button>
+      </div>
+    </section>
+    <button class="drawer-backdrop" id="drawerBackdrop" aria-label="关闭参数面板" hidden></button>
+    <aside class="inspector" id="inspector" aria-label="动画参数" hidden>
+      <div class="inspector-heading"><h1>动画参数</h1><button class="icon-button" id="closeSettings" type="button" aria-label="关闭参数面板">×</button></div>
+      <div class="header-metrics">
+        <span>视野 <b id="metricFov">1.00×</b></span>
+        <span>网格 <b id="metricGrid">100%</b></span>
+        <span>相位 ωt <b id="metricPhase">0.0°</b></span>
+      </div>
+      <div class="panel-section">
+        <div class="section-title">逐帧与视野</div>
+        <div class="frame-controls">
+          <button class="btn" id="stepPrevBtn" title="后退一帧（−48°）">上一帧</button>
+          <button class="btn" id="stepNextBtn" title="前进一帧（+48°）">下一帧</button>
+          <button class="btn" id="f0Btn">第 0 帧</button>
+          <button class="btn" id="f4Btn">第 4 帧</button>
+          <button class="btn" id="centerPanBtn" title="将视野移回中心">居中视野</button>
+        </div>
+      </div>
+
+      <div class="panel-section fov-highlight">
+        <div class="section-title">
+          <span>视野范围</span>
+          <span class="badge-emerald">平滑延展</span>
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span><strong>视野大小</strong></span>
+            <span class="control-val" id="fovVal" style="color:var(--accent-emerald);font-weight:700;">1.00× (原画范围)</span>
+          </div>
+          <input type="range" class="emerald-slider" id="fovSlider" min="1.00" max="2.50" step="0.02" value="1.00" />
+        </div>
+
+        <div class="preset-grid">
+          <button class="preset-btn active" data-fov="1.00">1.0× 原画</button>
+          <button class="preset-btn" data-fov="1.35">1.35× 扩宽</button>
+          <button class="preset-btn" data-fov="1.75">1.75× 群球</button>
+          <button class="preset-btn" data-fov="2.30">2.30× 全景</button>
+        </div>
+
+        <label class="checkbox-row">
+          <span>保持中心球体尺寸</span>
+          <input type="checkbox" id="lockDomeSizeToggle" checked />
+        </label>
+
+        <label class="checkbox-row">
+          <span>显示原画边界</span>
+          <input type="checkbox" id="showOrigBoxToggle" />
+        </label>
+      </div>
+      <div class="panel-section scifi-highlight">
+        <div class="section-title">
+          <span>网格与平滑度</span>
+          <span class="badge-new">抗锯齿</span>
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span><strong>黑白网格强度</strong></span>
+            <span class="control-val" id="gridStrVal" style="color:var(--accent-amber);font-weight:700;">100% (1.00×)</span>
+          </div>
+          <input type="range" class="amber-slider" id="gridStrSlider" min="0.00" max="2.50" step="0.05" value="1.00" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>黑白骨架混合</span>
+            <span class="control-val" id="bwMixVal">0%（原色）</span>
+          </div>
+          <input type="range" id="bwMixSlider" min="0.00" max="1.00" step="0.02" value="0.00" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>网格颗粒大小</span>
+            <span class="control-val" id="gridScaleVal">1.0×（精细）</span>
+          </div>
+          <input type="range" id="gridScaleSlider" min="1.0" max="4.0" step="0.25" value="1.0" />
+        </div>
+      </div>
+      <div class="panel-section">
+        <span class="section-title">合成引擎</span>
+        <div class="engine-switch">
+          <button class="mode-btn active" data-engine="harmonic">视频谐波与布拉维晶格</button>
+          <button class="mode-btn" data-engine="procedural">纯解析公式引擎（v12）</button>
+        </div>
+      </div>
+      <div class="panel-section">
+        <span class="section-title">图层与谐波</span>
+        <div class="mode-grid">
+          <button class="mode-btn active" data-mode="full">完整合成与网格</button>
+          <button class="mode-btn" data-mode="scifi_bw">仅黑白网格</button>
+          <button class="mode-btn" data-mode="fund">仅一阶谐波（m=0,2）</button>
+          <button class="mode-btn" data-mode="demod">解调环形场 ψ</button>
+        </div>
+        <label class="checkbox-row">
+          <span>叠加偏心青海波穹顶晶格</span>
+          <input type="checkbox" id="overlayToggle" />
+        </label>
+      </div>
+      <div class="panel-section">
+        <span class="section-title">时间与谐波参数</span>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>角速度 ω₀（原视频 = 24.64 弧度/秒）</span>
+            <span class="control-val" id="speedVal">24.64 弧度/秒</span>
+          </div>
+          <input type="range" id="speedSlider" min="-40.0" max="40.0" step="0.32" value="24.64" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>水平载波周期（原画宽度内的 kx）</span>
+            <span class="control-val" id="kxVal">17.30 周期</span>
+          </div>
+          <input type="range" id="kxSlider" min="8.0" max="28.0" step="0.10" value="17.30" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>抛物线环弯曲程度（Im₁ 增益）</span>
+            <span class="control-val" id="bendVal">1.00×</span>
+          </div>
+          <input type="range" id="bendSlider" min="0.0" max="2.5" step="0.05" value="1.00" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>一阶谐波增益 A₁（120° 三相波）</span>
+            <span class="control-val" id="g1Val">1.00×</span>
+          </div>
+          <input type="range" id="g1Slider" min="0.0" max="1.6" step="0.05" value="1.00" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>二阶谐波增益 A₂（收窄波谷）</span>
+            <span class="control-val" id="g2Val">1.00×</span>
+          </div>
+          <input type="range" id="g2Slider" min="0.0" max="2.0" step="0.05" value="1.00" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>三阶谐波增益 A₃（黑色月牙）</span>
+            <span class="control-val" id="g3Val">1.00×</span>
+          </div>
+          <input type="range" id="g3Slider" min="0.0" max="2.0" step="0.05" value="1.00" />
+        </div>
+
+        <div class="control-row" id="procRowRadius" style="display:none;">
+          <div class="control-label">
+            <span>解析穹顶半径 R₀</span>
+            <span class="control-val" id="radVal">132 像素</span>
+          </div>
+          <input type="range" id="radSlider" min="95" max="165" step="1" value="132" />
+        </div>
+
+        <div class="control-row" id="procRowGamma" style="display:none;">
+          <div class="control-label">
+            <span>解析偏心偏移 γ</span>
+            <span class="control-val" id="gamVal">0.52</span>
+          </div>
+          <input type="range" id="gamSlider" min="0.00" max="0.75" step="0.01" value="0.52" />
+        </div>
+      </div>
+      <div class="panel-section">
+        <span class="section-title">延展方程</span>
+        <div class="formula-box">
+          <div><span class="hl-emerald">// 亚像素双线性插值与平滑相位：</span></div>
+          <div>F(wx, wy) = Bilinear(w_A₀..w_Re₃, wx, wy) [无阶梯边缘]</div>
+          <div>Φ(wx,wy,t) = atan2(Im₁, Re₁) − 2π·17.30·wx/W₀ + ω₀·t</div>
+          <div style="margin-top:3px;"><span class="hl-amber">// 屏幕锁定的抗锯齿余弦网格：</span></div>
+          <div><span class="hl-cyan">G(px,py) = 0.5·[cos(π·px/s) + cos(π·py/s)] + 0.18·cos·cos</span></div>
+        </div>
+      </div>
+    
+    </aside>
+  </main>
+  <dialog id="referenceDialog" aria-labelledby="referenceTitle">
+    <div class="reference-heading"><h2 id="referenceTitle">原视频</h2><button class="icon-button" id="closeReference" type="button" aria-label="关闭原视频">×</button></div>
+    <video id="referenceVideo" controls playsinline loop preload="none" data-src="media/reference.mp4" aria-label="抽象动画原视频"></video>
+  </dialog>
+</body>
+</html>
