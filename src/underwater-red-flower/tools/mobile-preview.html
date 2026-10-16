@@ -1,0 +1,6 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>390×844 布局预览</title>
+<style>body{margin:0;background:#151515;color:#aaa;font:11px -apple-system,sans-serif}header{height:42px;display:flex;align-items:center;gap:16px;padding:0 12px}iframe{display:block;width:390px;height:844px;border:0}pre{white-space:pre-wrap;padding:12px;margin:0}</style>
+<header>390 × 844 · 手机布局预览<span>浏览器中的窄屏布局，非真机性能测试</span></header>
+<iframe id="scene" width="390" height="844" src="../?qa=1" title="手机场景"></iframe><pre id="profile"></pre>
+<script>const frame=document.getElementById('scene');frame.onload=async()=>{for(let i=0;i<100;i++){if(frame.contentWindow.UnderwaterStudio)break;await new Promise(resolve=>setTimeout(resolve,50));}const app=frame.contentWindow.UnderwaterStudio;document.getElementById('profile').textContent=JSON.stringify({viewport:[frame.contentWindow.innerWidth,frame.contentWindow.innerHeight],quality:app.getState().quality,grid:app.getState().gridResolution,panelInitiallyClosed:frame.contentDocument.body.classList.contains('panel-hidden'),...app.diagnostics()},null,2);};</script>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080808">
+  <meta name="description" content="一朵红花浸在黑白水境中。固定水下视角、持续水波与实时焦散的交互艺术场景。">
+  <title>黑白水境中的红花</title>
+  <style>/*__CSS__*/</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="brand-mark" aria-hidden="true">≈</span><div><h1>黑白水境中的红花</h1><p>SUBMERGED · A STUDY IN STILLNESS</p></div></div>
+    <div class="header-right"><span class="locked">固定水下视角</span><button id="immersiveBtn" title="沉浸画面 · H">沉浸画面 <span>↗</span></button><button id="panelToggle" aria-expanded="true" aria-controls="inspector">参数 <span>☷</span></button></div>
+  </header>
+  <main class="workspace">
+    <section class="stage" aria-label="实时水下红花场景">
+      <div class="canvas-frame"><canvas id="glCanvas" aria-label="水下红花，花瓣缓慢舒展，黑白水面持续流动"></canvas></div>
+      <div id="loading" role="status">正在进入水下<span>实时水波与花瓣</span></div>
+      <div class="scene-note" aria-hidden="true"><span>01 / UNDER THE SURFACE</span><p>水面不息，花朵静观。</p></div>
+      <div class="transport-bar">
+        <button class="btn primary" id="playPauseBtn" title="暂停或继续全部动画 · 空格">Ⅱ 暂停</button>
+        <button class="btn" id="dropWaveBtn">滴落水滴</button>
+        <details class="more-actions"><summary>更多 ···</summary><div>
+          <button class="btn" id="stepPrevBtn">上一帧</button><button class="btn" id="stepNextBtn">下一帧</button>
+          <button class="btn" id="resetBtn">恢复默认</button><button class="btn" id="exportBtn">保存 1600px 图片</button>
+          <button class="btn" id="iconExportBtn">提取透明图标</button>
+        </div></details>
+      </div>
+      <div class="canvas-overlay-badge" id="canvasBadge">摄像机已锁定</div>
+      <button id="exitImmersive" aria-label="退出沉浸画面">↙</button>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </section>
+    <aside class="inspector" id="inspector" aria-label="场景参数">
+      <div class="inspector-title"><div><span>STUDIO</span><h2>场景控制</h2></div><button id="closePanel" aria-label="收起参数面板">×</button></div>
+      <div class="preset-tools"><button id="savePreset">保存预设</button><button id="loadPreset">恢复预设</button><button id="exportPreset" title="导出全部设置">↓ JSON</button><button id="importPreset" title="导入设置">↑</button><input type="file" id="presetFile" accept="application/json,.json" hidden></div>
+      <details class="main-module" open><summary><span><small>A / FLOWER SETTINGS</small>花朵</span><span class="chevron">−</span></summary><div class="module-body">
+        <div class="panel-section"><div class="control-row"><label class="control-label" for="objectScale"><span>Flower Scale · 花朵大小</span><output class="control-val" id="objectScaleVal">1.00×</output></label><input type="range" id="objectScale" min="0.25" max="3" step="0.01" value="1" data-setting="objectScale"></div><p class="color-note">整体等比缩放，花冠始终浸没。原有大小控制也保留在下方。</p></div>
+        <!--__FLOWER_CONTROLS__-->
+      </div></details>
+      <details class="main-module" open><summary><span><small>B / WATER SETTINGS</small>水面</span><span class="chevron">−</span></summary><div class="module-body">
+        <div class="panel-section">
+          <div class="control-row"><label class="control-label" for="waterSpeed"><span>Water Motion Speed · 速度</span><output id="waterSpeedVal" class="control-val">1.00×</output></label><input id="waterSpeed" type="range" min=".05" max="3" step=".01" value="1" data-setting="waterSpeed"></div>
+          <div class="control-row"><label class="control-label" for="gridResolution"><span>Water Grid Resolution · 网格</span></label><select id="gridResolution" data-setting="gridResolution"><option value="64">64 × 64</option><option value="128" selected>128 × 128</option><option value="256">256 × 256</option><option value="512">512 × 512</option></select></div>
+          <div class="control-row"><label class="control-label" for="rippleScale"><span>Water Ripple Scale · 空间尺度</span><output id="rippleScaleVal" class="control-val">1.00×</output></label><input id="rippleScale" type="range" min=".35" max="2.5" step=".01" value="1" data-setting="rippleScale"><div class="range-hints"><span>细密</span><span>宽阔</span></div></div>
+          <div class="control-row"><label class="control-label" for="waterAmplitude"><span>Water Amplitude · 振幅</span><output id="waterAmplitudeVal" class="control-val">1.00×</output></label><input id="waterAmplitude" type="range" min="0" max="2.5" step=".01" value="1" data-setting="waterAmplitude"></div>
+          <div class="control-row"><label class="control-label" for="disturbanceStrength"><span>随机扰动强度</span><output id="disturbanceStrengthVal" class="control-val">1.00×</output></label><input id="disturbanceStrength" type="range" min="0" max="3" step=".01" value="1" data-setting="disturbanceStrength"></div>
+          <div class="control-row"><label class="control-label" for="disturbanceFrequency"><span>随机扰动频率</span><output id="disturbanceFrequencyVal" class="control-val">0.65 / s</output></label><input id="disturbanceFrequency" type="range" min="0" max="3" step=".05" value=".65" data-setting="disturbanceFrequency"></div>
+          <div class="control-row"><label class="control-label" for="waterTransparency"><span>水面透明程度</span><output id="waterTransparencyVal" class="control-val">92%</output></label><input id="waterTransparency" type="range" min="0" max="1" step=".01" value=".92" data-setting="waterTransparency"></div>
+          <p class="color-note">速度只改变模拟时间；网格改变精度；空间尺度改变波纹疏密。三者独立。</p>
+        </div>
+      </div></details>
+      <details class="main-module" open><summary><span><small>C / LIGHTING & CAUSTICS</small>光照与焦散</span><span class="chevron">−</span></summary><div class="module-body"><div class="panel-section">
+        <div class="control-row"><label class="control-label" for="causticsIntensity"><span>黑白焦散亮度</span><output id="causticsIntensityVal" class="control-val">1.30×</output></label><input id="causticsIntensity" type="range" min="0" max="4" step=".01" value="1.3" data-setting="causticsIntensity"></div>
+        <div class="control-row"><label class="control-label" for="causticsContrast"><span>焦散对比度</span><output id="causticsContrastVal" class="control-val">1.25×</output></label><input id="causticsContrast" type="range" min=".5" max="3" step=".01" value="1.25" data-setting="causticsContrast"></div>
+        <div class="control-row"><label class="control-label" for="shadowStrength"><span>动态花瓣阴影</span><output id="shadowStrengthVal" class="control-val">85%</output></label><input id="shadowStrength" type="range" min="0" max="1" step=".01" value=".85" data-setting="shadowStrength"></div>
+        <div class="control-row"><label class="control-label" for="reflectionStrength"><span>水面反射强度</span><output id="reflectionStrengthVal" class="control-val">1.00×</output></label><input id="reflectionStrength" type="range" min="0" max="1.5" step=".01" value="1" data-setting="reflectionStrength"></div>
+        <div class="control-row"><label class="control-label" for="refractionStrength"><span>水面折射强度</span><output id="refractionStrengthVal" class="control-val">1.00×</output></label><input id="refractionStrength" type="range" min="0" max="2" step=".01" value="1" data-setting="refractionStrength"></div>
+        <div class="control-row"><label class="control-label" for="surfaceLight"><span>水面微散射光纹</span><output id="surfaceLightVal" class="control-val">1.00×</output></label><input id="surfaceLight" type="range" min="0" max="2" step=".01" value="1" data-setting="surfaceLight"></div>
+        <div class="control-row"><label class="control-label" for="exposure"><span>整体曝光</span><output id="exposureVal" class="control-val">1.00×</output></label><input id="exposure" type="range" min=".4" max="1.7" step=".01" value="1" data-setting="exposure"></div>
+        <div class="control-row"><label class="control-label" for="quality"><span>渲染质量</span></label><select id="quality" data-setting="quality"><option value="low">轻量 · 移动设备</option><option value="balanced" selected>平衡 · 日常观看</option><option value="high">精细 · 桌面设备</option></select></div>
+        <p class="color-note">黑白光照贯穿水面、花瓣和花茎。水面映像取自实时花朵；暗色接收面承接花瓣轮廓阴影。</p>
+      </div></div></details>
+      <footer class="inspector-footer"><p>水面以上的光，水面以下的红。</p><div><span id="metricRes"></span><span id="metricPhase"></span><span id="metricRipple" hidden></span><span id="fpsMetric"></span></div><a href="README.md" target="_blank" rel="noopener">运行与算法说明 ↗</a></footer>
+    </aside>
+  </main>
+  <script>/*__BUNDLE__*/</script>
+</body>
+</html>

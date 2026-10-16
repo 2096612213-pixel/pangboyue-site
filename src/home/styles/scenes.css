@@ -66,15 +66,15 @@ html[data-home-scene="bright"] .home-scene-switch::before { transform: translate
 }
 @media(max-width:600px) { .hero-scroll-surface { bottom: -160px; } }
 
-/* C面：红花居中，黑白波纹占满首屏。 */
-.blossom-home-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .38s ease; background: #262626; -webkit-mask-image: linear-gradient(#000 0%, #000 calc(100% - 140px), transparent 100%); mask-image: linear-gradient(#000 0%, #000 calc(100% - 140px), transparent 100%); }
+/* 首页三：默认水中花，整个水境在画面中间偏右，向下融入纯黑。 */
+.blossom-home-layer { position: absolute; inset: 0 0 -200px; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .38s ease; background: #000; -webkit-mask-image: linear-gradient(#000 0%, #000 62%, transparent 100%); mask-image: linear-gradient(#000 0%, #000 62%, transparent 100%); }
 .blossom-home-layer iframe { display: block; border: 0; width: 100%; height: 100%; pointer-events: none; }
 html[data-home-scene="flower"] .blossom-home-layer { opacity: 1; }
 html[data-home-scene="flower"] .tank-fluid { opacity: 0; }
-html[data-home-scene="flower"] .fluid-tank::after { opacity: 1; background: linear-gradient(90deg, #0006, transparent 65%), linear-gradient(0deg, #000 0%, transparent 20%); }
+html[data-home-scene="flower"] .fluid-tank::after { opacity: 0; }
 html[data-home-scene="flower"] .tank-copy { text-shadow: 0 2px 16px #000b; }
 html[data-home-scene="flower"] .beijing-time { color: #f1f2f4; }
-html[data-home-scene="flower"] #mountain-music-toggle, html[data-home-scene="flower"] #storm-sound-toggle { display: none; }
+html[data-home-scene="flower"] #storm-sound-toggle { display: none; }
 html[data-home-scene="flower"] .home-scene-switch::before { transform: translate(200%, -50%); }
 .home-scene-switch button[data-home-scene="flower"]::after { background: #800020; border: 1px solid #a54a60; }
 @media(max-width:600px) { html[data-home-scene="flower"] .tank-copy { top: 16%; } html[data-home-scene="flower"] .welcome-text { line-height: 1.65; } html[data-home-scene="flower"] .beijing-time { margin-top: 16px; } }
@@ -84,3 +84,7 @@ html[data-home-scene="flower"] .home-scene-switch::before { transform: translate
   html[data-home-scene="flower"] .welcome-text { line-height: 1.65; }
   html[data-home-scene="flower"] .beijing-time { margin-top: 16px; }
 }
+
+@media(max-width:600px) { .blossom-home-layer { bottom: -160px; } }
+
+@media(max-width:600px) { html[data-home-scene="flower"] .beijing-time { display:flex; align-items:center; max-width:none; } html[data-home-scene="flower"] #mountain-music-toggle { flex:0 0 30px; width:30px; padding:5px; } }

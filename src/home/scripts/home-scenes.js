@@ -22,6 +22,29 @@
     }).catch(error => { console.warn('Cloud scene:', error); }).finally(() => { cloudButton.disabled = false; });
     return clouds;
   }
+  // 音频仅在用户点击后创建并赋予地址，不随首页或场景加载预取。
+  let flowerAudio, flowerStarting = false, flowerWantsPlay = false, flowerRequest = 0;
+  function stopFlowerMusic() {
+    flowerRequest++; flowerStarting = false; flowerWantsPlay = false;
+    flowerAudio?.pause();
+  }
+  async function toggleFlowerMusic() {
+    if (flowerStarting || (flowerAudio && !flowerAudio.paused)) {
+      stopFlowerMusic(); sync(); return;
+    }
+    if (!flowerAudio) {
+      flowerAudio = new Audio();
+      flowerAudio.preload = 'none'; flowerAudio.loop = true;
+      flowerAudio.src = '/favorsongs/river-flows-in-you-martin-ermen.mp3';
+      for (const event of ['play', 'pause', 'error']) flowerAudio.addEventListener(event, sync);
+    }
+    const request = ++flowerRequest; flowerStarting = true; flowerWantsPlay = true;
+    try {
+      await flowerAudio.play();
+      if (request !== flowerRequest && !flowerWantsPlay) flowerAudio.pause();
+    } catch (error) { if (error.name !== 'AbortError') console.warn('水中花音乐播放失败：', error); }
+    finally { if (request === flowerRequest) flowerStarting = false; sync(); }
+  }
   let visible = true;
   let mode = root.dataset.homeScene || 'bright';
   const api = () => frame.contentWindow?.HomeMountains;
@@ -29,15 +52,18 @@
     const active = mode === 'bright' && visible && !document.hidden;
     api()?.setActive(active);
     blossomFrame.contentWindow?.HomeBlossom?.setActive(mode === 'flower' && visible && !document.hidden);
-    const playing = active && api()?.isPlaying();
+    const flowerActive = mode === 'flower' && visible && !document.hidden;
+    if (!flowerActive && (flowerStarting || (flowerAudio && !flowerAudio.paused))) stopFlowerMusic();
+    const playing = mode === 'flower' ? flowerActive && flowerAudio && !flowerAudio.paused : active && api()?.isPlaying();
+    const musicName = mode === 'flower' ? '水中花音乐' : '群山音乐';
     musicButton.setAttribute('aria-pressed', String(Boolean(playing)));
-    musicButton.setAttribute('aria-label', playing ? '暂停群山音乐' : '播放群山音乐');
-    musicButton.title = playing ? '暂停群山音乐' : '播放群山音乐';
+    musicButton.setAttribute('aria-label', `${playing ? '暂停' : '播放'}${musicName}`);
+    musicButton.title = `${playing ? '暂停' : '播放'}${musicName}`;
   }
   function select(next, gesture = false) {
     mode = next;
     root.dataset.homeScene = next;
-    tank.setAttribute('aria-label', next === 'flower' ? '红花与黑白流光' : next === 'bright' ? '音乐与群山共振' : '缓缓向右流动的雷雨云层');
+    tank.setAttribute('aria-label', next === 'flower' ? '水中花' : next === 'bright' ? '音乐与群山共振' : '缓缓向右流动的雷雨云层');
     for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.homeScene === next));
     try { localStorage.setItem('home-scene', next); } catch {}
     const loadCurrentScene = () => {
@@ -52,13 +78,13 @@
     sync();
   }
   buttons.forEach(button => button.addEventListener('click', () => select(button.dataset.homeScene, true)));
-  musicButton.addEventListener('click', () => { api()?.toggleMusic(); });
+  musicButton.addEventListener('click', () => { if (mode === 'flower') toggleFlowerMusic(); else api()?.toggleMusic(); });
   frame.addEventListener('load', sync);
   blossomFrame.addEventListener('load', sync);
   window.addEventListener('mountain-music-change', sync);
   document.addEventListener('visibilitychange', sync);
   new IntersectionObserver(entries => { visible = entries[0].isIntersecting; sync(); }).observe(tank);
-  window.addEventListener('pagehide', () => { api()?.setActive(false); blossomFrame.contentWindow?.HomeBlossom?.setActive(false); });
+  window.addEventListener('pagehide', () => { stopFlowerMusic(); api()?.setActive(false); blossomFrame.contentWindow?.HomeBlossom?.setActive(false); });
   window.addEventListener('pageshow', sync);
   select(mode);
 })();

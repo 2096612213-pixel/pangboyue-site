@@ -1,0 +1,9 @@
+{
+  "name":"submerged-red-flower",
+  "version":"1.0.0",
+  "private":true,
+  "type":"module",
+  "description":"Preserved native WebGL2 flower integrated with Martin Renou-derived water simulation and achromatic caustics.",
+  "scripts":{"build":"node tools/build.mjs","start":"node tools/serve.mjs","check":"node tools/check.mjs"},
+  "engines":{"node":">=18"}
+}
