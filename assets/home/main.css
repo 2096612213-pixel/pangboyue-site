@@ -650,15 +650,15 @@ html[data-home-scene="bright"] #storm-sound-toggle,
 html[data-home-scene="dark"] #mountain-music-toggle { display: none; }
 #mountain-music-toggle { opacity: .9; }
 .home-scene-switch {
-  position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  flex: 0 0 auto; box-sizing: border-box; width: 84px; height: 40px; padding: 4px;
+  position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 0 0 auto; box-sizing: border-box; width: 126px; height: 40px; padding: 4px;
   border-radius: 999px; border: 1px solid transparent;
   background: none; box-shadow: none;
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 .home-scene-switch::before {
   content: ''; position: absolute; left: 4px; top: 50%;
-  width: calc((100% - 8px) / 2); height: calc(100% - 8px); box-sizing: border-box;
+  width: calc((100% - 8px) / 3); height: calc(100% - 8px); box-sizing: border-box;
   border-radius: 999px; border: 1px solid #ffffff90;
   background: linear-gradient(150deg, #ffffffa3, #ffffff45 48%, #ffffff1c);
   box-shadow: inset 0 1px 2px #ffffffdd, inset 0 -1px 2px #ffffff38, 0 3px 8px #0004;
@@ -684,7 +684,7 @@ html[data-home-scene="bright"] .home-scene-switch::before { transform: translate
   .mountain-home-layer { bottom: -160px; }
   .top-nav { padding-inline: 10px; gap: 9px; }
   .nav-menu { gap: 8px; }
-  .home-scene-switch { width: 70px; height: 36px; }
+  .home-scene-switch { width: 102px; height: 36px; }
   .brand { font-size: 15px; }
 }
 @media(max-width:380px) { .nav-menu { gap: 6px; } .nav-menu > a, .nav-link { font-size: 11px; } .top-nav { padding-inline: 8px; gap: 6px; } }
@@ -697,6 +697,25 @@ html[data-home-scene="bright"] .home-scene-switch::before { transform: translate
   background: transparent; pointer-events: auto; touch-action: pan-y pinch-zoom;
 }
 @media(max-width:600px) { .hero-scroll-surface { bottom: -160px; } }
+
+/* C面：红花居中，黑白波纹占满首屏。 */
+.blossom-home-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .38s ease; background: #262626; -webkit-mask-image: linear-gradient(#000 0%, #000 calc(100% - 140px), transparent 100%); mask-image: linear-gradient(#000 0%, #000 calc(100% - 140px), transparent 100%); }
+.blossom-home-layer iframe { display: block; border: 0; width: 100%; height: 100%; pointer-events: none; }
+html[data-home-scene="flower"] .blossom-home-layer { opacity: 1; }
+html[data-home-scene="flower"] .tank-fluid { opacity: 0; }
+html[data-home-scene="flower"] .fluid-tank::after { opacity: 1; background: linear-gradient(90deg, #0006, transparent 65%), linear-gradient(0deg, #000 0%, transparent 20%); }
+html[data-home-scene="flower"] .tank-copy { text-shadow: 0 2px 16px #000b; }
+html[data-home-scene="flower"] .beijing-time { color: #f1f2f4; }
+html[data-home-scene="flower"] #mountain-music-toggle, html[data-home-scene="flower"] #storm-sound-toggle { display: none; }
+html[data-home-scene="flower"] .home-scene-switch::before { transform: translate(200%, -50%); }
+.home-scene-switch button[data-home-scene="flower"]::after { background: #800020; border: 1px solid #a54a60; }
+@media(max-width:600px) { html[data-home-scene="flower"] .tank-copy { top: 16%; } html[data-home-scene="flower"] .welcome-text { line-height: 1.65; } html[data-home-scene="flower"] .beijing-time { margin-top: 16px; } }
+@media(prefers-reduced-motion:reduce) { .blossom-home-layer { transition: none; } }
+@media(max-width:1200px) {
+  html[data-home-scene="flower"] .tank-copy { top: 14%; }
+  html[data-home-scene="flower"] .welcome-text { line-height: 1.65; }
+  html[data-home-scene="flower"] .beijing-time { margin-top: 16px; }
+}
 
 /* Ψ 与对话区的全部样式。数值控制集中在这里，避免影响原有内容卡片。 */
 :root { --agent-width: 1040px; --agent-space-height: 960px; --agent-top-gap: 180px; --agent-icon-scale: 1.24; --agent-motion: 440ms; }
@@ -762,6 +781,8 @@ main > .fluid-tank { margin-bottom: 0; }
 @media(min-width:1600px) { :root { --agent-width: 1120px; --agent-space-height: 1080px; }.agent-section { padding-top: 128px; padding-bottom: 150px; }.agent-panel { padding: 30px 36px; }.agent-empty { min-height: 310px; } }
 @media(max-width:768px) { .agent-section { width: min(640px,100%); padding-top: 90px; padding-bottom: 90px; }.agent-panel { padding: 21px 20px; border-radius: 25px; }.agent-empty { min-height: 270px; } }
 @media(max-width:600px) { :root { --agent-space-height: 880px; }.agent-section { padding-top: 90px; padding-bottom: 78px; }.agent-panel { padding: 18px 15px; border-radius: 22px; margin-inline: -10px; }.agent-empty { min-height: 278px; padding-bottom: 30px; }.agent-composer { padding: 16px 15px 10px; border-radius: 26px; }.agent-composer textarea { min-height: 68px; font-size: 16px; }.agent-composer-bottom { gap: 8px; }.agent-send-group { gap: 9px; }.agent-composer-bottom p, #agent-count { font-size: 10px; }.agent-messages { padding-top: 23px; min-height: 260px; max-height: 380px; }.agent-message { max-width: 96%; }.agent-message.is-user { max-width: 90%; padding: 11px 14px; }.agent-message-body { font-size: 14px; }.agent-brand-group { gap: 4px; }.agent-entry { width: 30px; height: 36px; }.agent-entry img { width: 25px; height: 25px; } }
-@media(max-width:480px) { .top-nav { gap: 6px; padding-inline: 10px; }.nav-menu { gap: 6px; }.nav-menu > a, .nav-link { font-size: 11px; }.home-scene-switch { width: 58px; height: 34px; }.home-scene-switch button::after { width: 15px; height: 15px; }.brand { font-size: 14px; }.agent-entry { width: 27px; }.agent-entry img { width: 23px; height: 23px; } }
+@media(max-width:480px) { .top-nav { gap: 6px; padding-inline: 10px; }.nav-menu { gap: 6px; }.nav-menu > a, .nav-link { font-size: 11px; }.home-scene-switch { width: 88px; height: 34px; }.home-scene-switch button::after { width: 15px; height: 15px; }.brand { font-size: 14px; }.agent-entry { width: 27px; }.agent-entry img { width: 23px; height: 23px; } }
 @media(max-width:350px) { .top-nav { padding-inline: 8px; }.nav-menu { gap: 5px; }.agent-panel { margin-inline: -13px; padding-inline: 13px; } }
 @media(prefers-reduced-motion:reduce) { .agent-entry img, .agent-section *, .agent-section *::before, .agent-section *::after { animation: none!important; transition: none!important; scroll-behavior: auto!important; }.agent-entry:hover img, .agent-entry:focus-visible img, .agent-symbol:hover .agent-empty-mark, .agent-symbol:focus-visible .agent-empty-mark, .agent-avatar-icon:hover { transform: none; } }
+
+@media(max-width:360px) { .top-nav { gap: 4px; padding-inline: 8px; } .nav-menu { gap: 4px; } .nav-menu > a, .nav-link { font-size: 10px; } .agent-brand-group { gap: 5px; } .home-scene-switch { width: 82px; } }

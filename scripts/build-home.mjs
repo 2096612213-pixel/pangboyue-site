@@ -33,6 +33,7 @@ const versions = {
   __HOME_STYLE_HASH__: fingerprint(stylesheet),
   __ASTRONOMY_JS_HASH__: fingerprint(await readFile(join(root, 'assets/home/scenes/astronomy.browser.min.js'))),
   __STORM_JS_HASH__: fingerprint(await readFile(join(root, 'assets/home/scenes/storm-sound.js'))),
+  __BLOSSOM_HTML_HASH__: fingerprint(await readFile(join(root, 'visibleproductsshow/silver-blossom/index.html'))),
   __MOUNTAIN_JS_HASH__: fingerprint(await readFile(join(root, 'visibleproductsshow/mountain-home/bundle.js'))),
   __LANDSCAPE_AVIF_2X_HASH__: fingerprint(await readFile(join(root, 'images/home/xiangjiang-4318.avif'))),
   __LANDSCAPE_WEBP_2X_HASH__: fingerprint(await readFile(join(root, 'images/home/xiangjiang-4318.webp'))),

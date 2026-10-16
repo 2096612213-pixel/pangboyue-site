@@ -220,7 +220,7 @@
     gl.drawArrays(gl.TRIANGLES,0,3);
     stats.frames=++frames;
   }
-  function running(){return document.documentElement.dataset.homeScene!=="bright"&&!paused&&!failed&&visible&&!document.hidden;}
+  function running(){return document.documentElement.dataset.homeScene==="dark"&&!paused&&!failed&&visible&&!document.hidden;}
   function schedule(){if(!raf&&running())raf=requestAnimationFrame(frame);}
   function frame(now){
     raf=0;if(!running())return;

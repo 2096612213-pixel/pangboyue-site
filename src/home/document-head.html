@@ -22,7 +22,7 @@
   <script>
   (() => {
     let scene = 'bright';
-    try { if (localStorage.getItem('home-scene') === 'dark') scene = 'dark'; } catch {}
+    try { const saved = localStorage.getItem('home-scene'); if (['dark', 'bright', 'flower'].includes(saved)) scene = saved; } catch {}
     document.documentElement.dataset.homeScene = scene;
     if (scene === 'bright') {
       for (const href of ['/visibleproductsshow/mountain-home/three.min.js', '/visibleproductsshow/mountain-home/bundle.js?v=__MOUNTAIN_JS_HASH__']) {

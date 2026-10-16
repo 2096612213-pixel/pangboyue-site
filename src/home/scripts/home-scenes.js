@@ -2,6 +2,7 @@
   const root = document.documentElement;
   const tank = document.getElementById('fluid-tank');
   const frame = document.getElementById('mountain-home');
+  const blossomFrame = document.getElementById('blossom-home');
   const buttons = [...document.querySelectorAll('[data-home-scene]')];
   const musicButton = document.getElementById('mountain-music-toggle');
   const cloudButton = document.getElementById('storm-sound-toggle');
@@ -27,6 +28,7 @@
   function sync() {
     const active = mode === 'bright' && visible && !document.hidden;
     api()?.setActive(active);
+    blossomFrame.contentWindow?.HomeBlossom?.setActive(mode === 'flower' && visible && !document.hidden);
     const playing = active && api()?.isPlaying();
     musicButton.setAttribute('aria-pressed', String(Boolean(playing)));
     musicButton.setAttribute('aria-label', playing ? '暂停群山音乐' : '播放群山音乐');
@@ -35,12 +37,13 @@
   function select(next, gesture = false) {
     mode = next;
     root.dataset.homeScene = next;
-    tank.setAttribute('aria-label', next === 'bright' ? '音乐与群山共振' : '缓缓向右流动的雷雨云层');
+    tank.setAttribute('aria-label', next === 'flower' ? '红花与黑白流光' : next === 'bright' ? '音乐与群山共振' : '缓缓向右流动的雷雨云层');
     for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.homeScene === next));
     try { localStorage.setItem('home-scene', next); } catch {}
     const loadCurrentScene = () => {
       if (mode === 'bright' && !frame.hasAttribute('src')) frame.src = frame.dataset.src;
       if (mode === 'dark') ensureClouds();
+      if (mode === 'flower' && !blossomFrame.hasAttribute('src')) blossomFrame.src = blossomFrame.dataset.src;
     };
     // Show the navigation and welcome copy before compiling the selected scene.
     if (gesture) loadCurrentScene();
@@ -50,11 +53,12 @@
   }
   buttons.forEach(button => button.addEventListener('click', () => select(button.dataset.homeScene, true)));
   musicButton.addEventListener('click', () => { api()?.toggleMusic(); });
-  frame.addEventListener('load', () => { sync(); });
+  frame.addEventListener('load', sync);
+  blossomFrame.addEventListener('load', sync);
   window.addEventListener('mountain-music-change', sync);
   document.addEventListener('visibilitychange', sync);
   new IntersectionObserver(entries => { visible = entries[0].isIntersecting; sync(); }).observe(tank);
-  window.addEventListener('pagehide', () => api()?.setActive(false));
+  window.addEventListener('pagehide', () => { api()?.setActive(false); blossomFrame.contentWindow?.HomeBlossom?.setActive(false); });
   window.addEventListener('pageshow', sync);
   select(mode);
 })();

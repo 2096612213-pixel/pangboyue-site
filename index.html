@@ -22,7 +22,7 @@
   <script>
   (() => {
     let scene = 'bright';
-    try { if (localStorage.getItem('home-scene') === 'dark') scene = 'dark'; } catch {}
+    try { const saved = localStorage.getItem('home-scene'); if (['dark', 'bright', 'flower'].includes(saved)) scene = saved; } catch {}
     document.documentElement.dataset.homeScene = scene;
     if (scene === 'bright') {
       for (const href of ['/visibleproductsshow/mountain-home/three.min.js', '/visibleproductsshow/mountain-home/bundle.js?v=535fb88d0d4d']) {
@@ -33,7 +33,7 @@
     }
   })();
   </script>
-  <link rel="stylesheet" href="assets/home/main.css?v=9c6f7aee7d34">
+  <link rel="stylesheet" href="assets/home/main.css?v=c1a6868eac0c">
 </head>
 
 
@@ -82,14 +82,16 @@
     <div class="home-scene-switch" role="group" aria-label="首页场景">
       <button type="button" data-home-scene="dark" aria-label="A面" aria-pressed="false" title="A面"></button>
       <button type="button" data-home-scene="bright" aria-label="B面" aria-pressed="true" title="B面"></button>
+      <button type="button" data-home-scene="flower" aria-label="C面：红花与黑白流光" aria-pressed="false" title="C面"></button>
     </div>
   </nav>
 </header>
 
 
   <main>
-    <section class="fluid-tank" id="fluid-tank" data-astronomy-src="assets/home/scenes/astronomy.browser.min.js?v=d1b3ab4b86aa" data-sound-src="assets/home/scenes/storm-sound.js?v=21d751cf1e9b" data-cloud-src="assets/home/scenes/fluid-tank.js?v=e63229e77238" aria-label="缓缓向右流动的雷雨云层">
+    <section class="fluid-tank" id="fluid-tank" data-astronomy-src="assets/home/scenes/astronomy.browser.min.js?v=d1b3ab4b86aa" data-sound-src="assets/home/scenes/storm-sound.js?v=21d751cf1e9b" data-cloud-src="assets/home/scenes/fluid-tank.js?v=81d5cc52335d" aria-label="缓缓向右流动的雷雨云层">
       <div class="mountain-home-layer" aria-hidden="true"><iframe id="mountain-home" data-src="/visibleproductsshow/mountain-home/?embed=1" title="群山场景" tabindex="-1" allow="autoplay"></iframe></div>
+      <div class="blossom-home-layer" aria-hidden="true"><iframe id="blossom-home" data-src="/visibleproductsshow/silver-blossom/?embed=1&amp;v=2ed7b1d73d70" title="红花与黑白流光场景" tabindex="-1"></iframe></div>
       <canvas class="tank-fluid" aria-hidden="true"></canvas>
       <div class="hero-scroll-surface" aria-hidden="true"></div>
       <div class="tank-copy">
@@ -209,7 +211,7 @@
       >
     </picture>
   </footer>
-<script defer src="assets/home/main.js?v=f34f91e70c56"></script>
+<script defer src="assets/home/main.js?v=ef577ad4f24c"></script>
 <script defer src="assets/home/agent-chat/chat.js?v=dd926c3b6cac"></script>
 </body>
 

@@ -1,0 +1,18 @@
+{
+  "playing": false,
+  "phase": 1.1588986233242349,
+  "timeSec": 0,
+  "speed": 0.55,
+  "rippleStr": 0,
+  "causticStr": 0,
+  "pondStr": 0,
+  "floatStr": 1.25,
+  "stamenStr": 0,
+  "veinStr": 2.2,
+  "warmth": 1.45,
+  "res": 1600,
+  "flowerColor": "#a63055",
+  "colorMix": 0.95,
+  "exportFlower": false,
+  "phaseDegrees": 66.4
+}

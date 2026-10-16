@@ -8,6 +8,7 @@
 pangboyue-site/
 ├── src/                        可维护源码
 │   ├── home/                   首页 HTML、scripts/ 交互、styles/ 样式
+│   ├── silver-blossom/         银花光影、调色与透明图标导出源码
 │   ├── abstract-wave/          抽象波纹项目的页面、样式、动画与谐波数据
 │   ├── book/                   React / MDX 电子书源码
 │   └── simstudio/              乐高项目源码及自身依赖、测试和许可
@@ -41,11 +42,14 @@ pangboyue-site/
 | 任务 | 生成发布文件 | 检查一致性 |
 | --- | --- | --- |
 | 首页 | `node scripts/build-home.mjs` | `node scripts/build-home.mjs --check` |
+| 银花工作室 | `node scripts/build-silver-blossom.mjs` | `node scripts/build-silver-blossom.mjs --check` |
 | 抽象动画 | `node scripts/build-abstract-wave.mjs` | `node scripts/build-abstract-wave.mjs --check` |
 | 电子书 | `node scripts/build-book.mjs` | `node scripts/build-book.mjs --check` |
 | 乐高 | `node scripts/build-simstudio.mjs` | `node scripts/build-simstudio.mjs --check` |
 
 电子书和乐高首次准备时，分别在 `src/book/`、`src/simstudio/` 运行 `npm ci`。各项目的依赖版本继续独立锁定。首页无需安装依赖。
+
+修改红花场景后先运行 `node scripts/build-silver-blossom.mjs`，再运行 `node scripts/build-home.mjs`，以同步首页嵌入地址。
 
 修改首页应编辑 `src/home/`，再生成 `index.html` 和 `assets/home/main.*`。电子书发布到 `/sample/`，乐高发布到 `/visibleproductsshow/lego/`，源码归类不改变网址。
 
