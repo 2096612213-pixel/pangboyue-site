@@ -7,14 +7,21 @@ import vm from 'node:vm';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const read=path=>readFile(resolve(root,path),'utf8');
 const original=await read('reference/original-flower.frag.glsl');
-const integrated=(await read('shaders/flower.frag.glsl'))
+const stem=original.slice(original.indexOf('    // Exact centerline X'),original.indexOf('    void main()'));
+const flowerSource=await read('shaders/flower.frag.glsl');
+assert.equal(flowerSource.split('/*__BOTANICAL_STEM__*/').length,2,'Missing or duplicated botanical-stem hook.');
+const integrated=flowerSource
+  .replace('/*__BOTANICAL_STEM__*/\n',stem)
   .replace('\n    uniform vec2 u_captureOffset;','')
   .replace(' + u_captureOffset;',';')
   .replace('outColor = vec4(finalColor, max(petalMask, stemAlpha));','outColor = vec4(finalColor, 1.0);');
-assert.equal(integrated,original,'Native flower shader changed outside its three integration hooks.');
-const stem=original.slice(original.indexOf('    // Exact centerline X'),original.indexOf('    void main()'));
-assert.equal(await read('shaders/stem.glsl'),stem,'Original procedural stem was changed.');
+assert.equal(integrated,original,'Petal shader changed outside capture, coverage and botanical-stem integration hooks.');
+const botanicalStem=await read('shaders/stem.glsl');
+for(const name of ['evalStemCenterX','evalHarmonizedStem'])assert.equal(botanicalStem.split(`float ${name}(`).length+botanicalStem.split(`vec4 ${name}(`).length,3,`Missing or duplicated stem interface: ${name}`);
 const html=await read('index.html'),source=await read('reference/original-flower.html');
+const bundled=JSON.parse(html.match(/^const SHADERS=(.+);$/m)[1]);
+assert.equal(bundled.flowerFragment,flowerSource.replace('/*__BOTANICAL_STEM__*/\n',botanicalStem),'Flower capture uses a stale stem.');
+assert.equal(bundled.sceneFragment,(await read('shaders/scene.frag.glsl')).replace('/*__NATIVE_STEM__*/',botanicalStem),'Extended stalk uses a different stem.');
 for(const match of source.matchAll(/<(?:input|button)[^>]*\bid="([^"]+)"/g))assert(html.includes(`id="${match[1]}"`),`Lost native control ${match[1]}`);
 for(const match of source.matchAll(/data-preset="([^"]+)"/g))assert(html.includes(`data-preset="${match[1]}"`));
 for(const match of source.matchAll(/data-flower-color="([^"]+)"/g))assert(html.includes(`data-flower-color="${match[1]}"`));
@@ -30,4 +37,4 @@ for(const name of ['gpu','water','flower','scene','ui','app'])new vm.Script(awai
 const script=html.slice(html.indexOf('<script>')+8,html.lastIndexOf('</script>'));
 new vm.Script(script,{filename:'index.html inline bundle'});
 assert((await read('licenses/threejs-caustics-BSD-3-Clause.txt')).includes('Copyright (c) 2020 Martin Renou'));
-console.log('PASS: native shader integration hooks, exact stem, both atlas hashes, all native controls/presets/colors, unique IDs, offline bundle, JavaScript syntax and license.');
+console.log('PASS: unchanged petal shader, shared botanical stem in both render paths, both atlas hashes, all native controls/presets/colors, unique IDs, offline bundle, JavaScript syntax and license.');

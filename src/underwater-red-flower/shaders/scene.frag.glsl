@@ -12,6 +12,7 @@ uniform float u_reflection, u_refraction, u_transparency, u_surfaceLight, u_expo
 uniform float u_wt, u_resolution, u_stemStr, u_floatStr, u_rippleStr, u_veinStr, u_warmth, u_colorMix, u_backgroundStrength;
 uniform vec3 u_flowerColor;
 const float WATER_Y=2.5;
+const float FLOOR_Y=-5.;
 const float DOMAIN=24.;
 const vec2 CENTER=vec2(287.76/600.,269.68/600.);
 
@@ -67,11 +68,25 @@ float receiverCaustic(vec3 p,vec3 normal) {
   return focusedLight(softFlux(u_caustic2,uv),uv);
 }
 
+float lowerStemVisibility(vec3 p) {
+  // Only the homepage embed fades the stem. Preserve the crown and upper stalk,
+  // then reach zero in world space before the floor can occlude it at FLOOR_Y.
+  if(u_homeOffset<=0.) return 1.;
+  float rootY=u_objectY-1.6*u_objectScale;
+  float endY=max(FLOOR_Y+.7,u_objectY-4.6*u_objectScale);
+  if(rootY<=endY) return 1.; // At extreme scales the floor already hides this lower stalk.
+  float t=clamp((rootY-p.y)/(rootY-endY),0.,1.);
+  return 1.-t*t*t*(t*(t*6.-15.)+10.);
+}
+
 vec4 flowerAt(vec3 p) {
   vec2 local=(p.xy-vec2(0.,u_objectY))/u_objectScale;
   vec2 uv=vec2(.5+local.x/4.4,.25-local.y/8.8);
   if(uv.x<0. || uv.x>1. || uv.y<0. || p.y>WATER_Y-.045) return vec4(0.);
-  if(uv.y<=1.) return texture(u_flower,vec2(uv.x,1.-uv.y));
+  float visibility=lowerStemVisibility(p);
+  // The source texture is premultiplied: fade RGB and alpha together so both the
+  // existing front-to-back composite and flowerShadow use identical stem coverage.
+  if(uv.y<=1.) return texture(u_flower,vec2(uv.x,1.-uv.y))*visibility;
   // The original stem is mathematically unbounded. Continue its identical function below
   // the finite atlas capture, including at the smallest object scale.
   vec2 flowerUV=CENTER+vec2(local.x,-local.y)/4.4;
@@ -83,7 +98,7 @@ vec4 flowerAt(vec3 p) {
   float flow=.52+.28*sin(bg.x*9.+bg.y*7.-u_wt)+.20*cos(bg.x*13.-bg.y*10.+u_wt);
   vec3 tint=u_flowerColor/max(dot(u_flowerColor,vec3(.2126,.7152,.0722)),.08);
   vec4 stem=evalHarmonizedStem(stemUV,u_wt,0.,flow,0.,tint);
-  return vec4(stem.rgb*stem.a,stem.a);
+  return vec4(stem.rgb*stem.a,stem.a)*visibility;
 }
 
 vec3 underwaterLight(vec3 p) {
@@ -129,7 +144,7 @@ vec3 receiver(vec3 p,vec3 normal) {
 
 vec3 traceUnderwater(vec3 origin,vec3 direction) {
   float wallT=direction.z<-.001?(-1.15-origin.z)/direction.z:1.e4;
-  float floorT=direction.y<-.001?(-5.0-origin.y)/direction.y:1.e4;
+  float floorT=direction.y<-.001?(FLOOR_Y-origin.y)/direction.y:1.e4;
   float distanceToSurface=min(wallT,floorT);
   if(distanceToSurface<0.) distanceToSurface=1.e4;
   vec3 p=origin+direction*min(distanceToSurface,100.);
