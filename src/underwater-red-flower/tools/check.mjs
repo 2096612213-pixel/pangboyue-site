@@ -22,9 +22,14 @@ const html=await read('index.html'),source=await read('reference/original-flower
 const bundled=JSON.parse(html.match(/^const SHADERS=(.+);$/m)[1]);
 assert.equal(bundled.flowerFragment,flowerSource.replace('/*__BOTANICAL_STEM__*/\n',botanicalStem),'Flower capture uses a stale stem.');
 assert.equal(bundled.sceneFragment,(await read('shaders/scene.frag.glsl')).replace('/*__NATIVE_STEM__*/',botanicalStem),'Extended stalk uses a different stem.');
-for(const match of source.matchAll(/<(?:input|button)[^>]*\bid="([^"]+)"/g))assert(html.includes(`id="${match[1]}"`),`Lost native control ${match[1]}`);
-for(const match of source.matchAll(/data-preset="([^"]+)"/g))assert(html.includes(`data-preset="${match[1]}"`));
-for(const match of source.matchAll(/data-flower-color="([^"]+)"/g))assert(html.includes(`data-flower-color="${match[1]}"`));
+const studioPage=(await read('src/page.html')).replace('<!--__FLOWER_CONTROLS__-->',await read('src/flower-controls.html'));
+assert(html.includes('const STUDIO_MODE=false;'),'Production enables the studio.');
+assert(!html.includes('class StudioUI'),'Production includes debug GUI code.');
+assert(!/<(?:aside|header|button|input|select|details)\b/i.test(html.slice(0,html.indexOf('<script>'))),'Production mounts studio markup.');
+assert(html.includes('background:#000')&&html.includes('html[data-scene-ready] #glCanvas'),'Missing black-until-ready scene.');
+for(const match of source.matchAll(/<(?:input|button)[^>]*\bid="([^"]+)"/g))assert(studioPage.includes(`id="${match[1]}"`),`Lost native control ${match[1]}`);
+for(const match of source.matchAll(/data-preset="([^"]+)"/g))assert(studioPage.includes(`data-preset="${match[1]}"`));
+for(const match of source.matchAll(/data-flower-color="([^"]+)"/g))assert(studioPage.includes(`data-flower-color="${match[1]}"`));
 const hash=data=>createHash('sha256').update(data).digest('hex');
 for(const [file,key] of [['flower-atlas.webp','ATLAS_B64'],['flower-detail.webp','CAUSTIC_ATLAS_B64']]){
   const data=source.match(new RegExp(`const ${key} = "data:image/webp;base64,([^"]+)"`))[1];
@@ -37,4 +42,4 @@ for(const name of ['gpu','water','flower','scene','ui','app'])new vm.Script(awai
 const script=html.slice(html.indexOf('<script>')+8,html.lastIndexOf('</script>'));
 new vm.Script(script,{filename:'index.html inline bundle'});
 assert((await read('licenses/threejs-caustics-BSD-3-Clause.txt')).includes('Copyright (c) 2020 Martin Renou'));
-console.log('PASS: unchanged petal shader, shared botanical stem in both render paths, both atlas hashes, all native controls/presets/colors, unique IDs, offline bundle, JavaScript syntax and license.');
+console.log('PASS: unchanged petal shader, shared botanical stem in both render paths, both atlas hashes, local studio controls/presets/colors, scene-only production, unique IDs, offline bundle, JavaScript syntax and license.');

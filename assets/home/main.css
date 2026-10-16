@@ -700,7 +700,9 @@ html[data-home-scene="bright"] .home-scene-switch::before { transform: translate
 
 /* 首页三：默认水中花，整个水境在画面中间偏右，向下融入纯黑。 */
 .blossom-home-layer { position: absolute; inset: 0 0 -200px; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .38s ease; background: #000; -webkit-mask-image: linear-gradient(#000 0%, #000 62%, transparent 100%); mask-image: linear-gradient(#000 0%, #000 62%, transparent 100%); }
-.blossom-home-layer iframe { display: block; border: 0; width: 100%; height: 100%; pointer-events: none; }
+.blossom-home-layer iframe { display: block; border: 0; width: 100%; height: 100%; pointer-events: none; background: #000; visibility: hidden; }
+.blossom-home-layer[data-ready="true"] iframe { visibility: visible; }
+html[data-home-scene="flower"]:not([data-blossom-ready="true"]) .fluid-tank { background: #000; }
 html[data-home-scene="flower"] .blossom-home-layer { opacity: 1; }
 html[data-home-scene="flower"] .tank-fluid { opacity: 0; }
 html[data-home-scene="flower"] .fluid-tank::after { opacity: 0; }

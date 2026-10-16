@@ -80,7 +80,18 @@
   buttons.forEach(button => button.addEventListener('click', () => select(button.dataset.homeScene, true)));
   musicButton.addEventListener('click', () => { if (mode === 'flower') toggleFlowerMusic(); else api()?.toggleMusic(); });
   frame.addEventListener('load', sync);
-  blossomFrame.addEventListener('load', sync);
+  function syncBlossomReady() {
+    const ready=blossomFrame.contentWindow?.HomeBlossom?.ready===true;
+    blossomFrame.parentElement.dataset.ready=String(ready);
+    root.dataset.blossomReady=String(ready);
+    sync();
+  }
+  // The document load event alone does not mean the textures and first frame are ready.
+  blossomFrame.addEventListener('load', syncBlossomReady);
+  window.addEventListener('message',event=>{
+    if(event.source===blossomFrame.contentWindow&&event.origin===location.origin&&
+       ['home-blossom-ready','home-blossom-error'].includes(event.data?.type))syncBlossomReady();
+  });
   window.addEventListener('mountain-music-change', sync);
   document.addEventListener('visibilitychange', sync);
   new IntersectionObserver(entries => { visible = entries[0].isIntersecting; sync(); }).observe(tank);

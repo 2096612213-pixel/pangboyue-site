@@ -7,3 +7,6 @@ src/simstudio/pages-dist/
 src/simstudio/.next/
 src/simstudio/.vinext/
 src/simstudio/*.tsbuildinfo
+
+# Explicit local flower debugging build; never publish the studio page.
+src/underwater-red-flower/studio.html

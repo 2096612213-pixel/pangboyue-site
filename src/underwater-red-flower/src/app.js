@@ -21,9 +21,9 @@ class Studio {
   }
   async init() {
     await this.flower.load(); this.flower.resize(this.state);
-    this.ui=new StudioUI(this);
+    if(STUDIO_MODE)this.ui=new StudioUI(this);
     this.ready=true; this.resize(); this.render();
-    document.getElementById('loading').hidden=true;
+    if(STUDIO_MODE)document.getElementById('loading').hidden=true;
     this.resizeObserver=new ResizeObserver(()=>this.resize()); this.resizeObserver.observe(this.canvas.parentElement);
     document.addEventListener('visibilitychange',()=>{this.lastTime=performance.now();});
     this.canvas.addEventListener('webglcontextlost',event=>{
@@ -48,18 +48,19 @@ class Studio {
     this.canvas.addEventListener('pointerdown',disturb);
     this.canvas.addEventListener('pointermove',event=>{if(event.buttons===1 && performance.now()-dragTime>100){dragTime=performance.now();disturb(event);}});
     this.tick=this.tick.bind(this); this.raf=requestAnimationFrame(this.tick);
-    window.HomeBlossom={setActive:active=>{this.active=Boolean(active);this.lastTime=performance.now();if(this.active)this.render();},isActive:()=>this.active};
+    window.HomeBlossom={ready:true,setActive:active=>{this.active=Boolean(active);this.lastTime=performance.now();if(this.active)this.render();},isActive:()=>this.active};
     window.UnderwaterStudio={
       getState:()=>({...this.state,waterTime:this.water.time}),
       set:(key,value)=>this.set(key,value),
       pause:()=>this.play(false),play:()=>this.play(true),
       advance:(seconds,{flower=true,water=true}={})=>{
         for(let t=0;t<seconds-1.e-7;t+=1/60)this.advance(Math.min(1/60,seconds-t),flower,water);
-        this.render();this.ui.sync();
+        this.render();this.ui?.sync();
       },
       reset:()=>this.reset(),diagnostics:()=>this.diagnostics(),debugWater:()=>this.debugWater(),
       exportSettings:()=>this.settings(),capture:()=>this.capture(),extractFlowerIcon:()=>this.extractIcon()
     };
+    setSceneReady(true);
   }
   settings() { return Object.fromEntries(Object.keys(SETTINGS_DEFAULTS).map(key=>[key,this.state[key]])); }
   set(key,value,draw=true) {
@@ -75,16 +76,16 @@ class Studio {
   }
   apply(settings) {
     const clean={};
-    for(const key of Object.keys(SETTINGS_DEFAULTS))if(key in settings){this.ui.validate(key,settings[key]);clean[key]=settings[key];}
+    for(const key of Object.keys(SETTINGS_DEFAULTS))if(key in settings){this.ui?.validate(key,settings[key]);clean[key]=settings[key];}
     // Validate the entire import before mutating any live settings.
     const oldGrid=this.state.gridResolution,oldQuality=this.state.quality;
     Object.assign(this.state,clean);
     if(oldGrid!==this.state.gridResolution)this.water.resize(this.state.gridResolution);
     if(oldGrid!==this.state.gridResolution||oldQuality!==this.state.quality)this.caustics.rebuild(this.state.gridResolution,this.state.quality);
     this.flower.resize(this.state);this.flowerDirty=true;this.causticsDirty=true;
-    this.resize();this.ui.sync();this.render();
+    this.resize();this.ui?.sync();this.render();
   }
-  play(playing) {this.state.playing=playing;this.lastTime=performance.now();this.ui.sync();}
+  play(playing) {this.state.playing=playing;this.lastTime=performance.now();this.ui?.sync();}
   step(direction) {this.play(false);this.state.phase=(this.state.phase+direction*2*Math.PI/50+2*Math.PI)%(2*Math.PI);this.flowerDirty=true;this.render();}
   reset() {
     Object.assign(this.state,SETTINGS_DEFAULTS,{phase:INITIAL_PHASE,timeSec:0,playing:true});
@@ -92,7 +93,7 @@ class Studio {
     this.water.reset();this.flower.resetDrops();this.flower.resize(this.state);
     this.caustics.rebuild(this.state.gridResolution,this.state.quality);
     this.flowerDirty=true;this.causticsDirty=true;this.lastTime=performance.now();
-    this.resize();this.ui.sync();this.render();this.ui.toast('已恢复默认水境');
+    this.resize();this.ui?.sync();this.render();this.ui?.toast('已恢复默认水境');
   }
   advance(dt,flower=true,water=true) {
     if(flower){this.state.timeSec+=dt;this.state.phase=(this.state.phase+BASE_OMEGA*this.state.speed*dt)%(2*Math.PI);this.flowerDirty=true;}
@@ -102,7 +103,7 @@ class Studio {
     const dt=Math.max(0,Math.min(.05,(now-this.lastTime)/1000)); this.lastTime=now;
     if(this.state.playing&&this.active&&!document.hidden){this.advance(dt);this.render();}
     this.frameCount++;
-    if(now-this.fpsStart>750){this.fps=this.frameCount*1000/(now-this.fpsStart);this.frameCount=0;this.fpsStart=now;this.ui.metrics(this.fps);}
+    if(now-this.fpsStart>750){this.fps=this.frameCount*1000/(now-this.fpsStart);this.frameCount=0;this.fpsStart=now;this.ui?.metrics(this.fps);}
     this.raf=requestAnimationFrame(this.tick);
   }
   resize() {
@@ -175,8 +176,15 @@ class Studio {
     this.render();return {min,max,energy:energy/(n*n),finite};
   }
 }
+function setSceneReady(ready) {
+  document.documentElement.toggleAttribute('data-scene-ready',ready);
+  if(window.HomeBlossom)window.HomeBlossom.ready=ready;
+  if(!STUDIO_MODE&&parent!==window)parent.postMessage({type:ready?'home-blossom-ready':'home-blossom-error'},location.origin);
+}
 function showFailure(error) {
-  console.error(error);const loading=document.getElementById('loading');loading.hidden=false;loading.classList.add('error');
+  console.error(error);setSceneReady(false);
+  if(!STUDIO_MODE)return;
+  const loading=document.getElementById('loading');loading.hidden=false;loading.classList.add('error');
   loading.textContent=error.message;const button=document.createElement('button');button.textContent='重新载入';button.onclick=()=>location.reload();loading.appendChild(button);
 }
 let studio;

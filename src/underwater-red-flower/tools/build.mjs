@@ -11,11 +11,12 @@ shaders.flowerFragment=shaders.flowerFragment.replace('/*__BOTANICAL_STEM__*/\n'
 shaders.sceneFragment=shaders.sceneFragment.replace('/*__NATIVE_STEM__*/',botanicalStem);
 const assets={};
 for(const [name,file] of [['flowerAtlas','flower-atlas.webp'],['flowerDetail','flower-detail.webp']])assets[name]=`data:image/webp;base64,${(await readFile(resolve(root,'assets',file))).toString('base64')}`;
-let bundle=`'use strict';\nconst ASSETS=${JSON.stringify(assets)};\nconst SHADERS=${JSON.stringify(shaders)};\n`;
-for(const name of ['gpu','water','flower','scene','ui','app'])bundle+=`\n// src/${name}.js\n${await read(`src/${name}.js`)}\n`;
+const studioMode=process.argv.includes('--studio');
+let bundle=`'use strict';\nconst STUDIO_MODE=${studioMode};\nconst ASSETS=${JSON.stringify(assets)};\nconst SHADERS=${JSON.stringify(shaders)};\n`;
+for(const name of ['gpu','water','flower','scene',...(studioMode?['ui']:[]),'app'])bundle+=`\n// src/${name}.js\n${await read(`src/${name}.js`)}\n`;
 let flowerControls=await read('src/flower-controls.html');
 flowerControls=flowerControls.replace('style="display:none;"','');
 flowerControls=flowerControls.replace('<div class="color-swatches" aria-label="花色预设">','<div class="color-swatches" aria-label="花色预设"><button type="button" class="color-swatch" data-flower-color="#c8102e" style="--swatch:#c8102e" aria-label="原始红花" title="原始红花" aria-pressed="true"></button>');
-const page=(await read('src/page.html')).replace('/*__CSS__*/',await read('src/style.css')).replace('<!--__FLOWER_CONTROLS__-->',flowerControls).replace('/*__BUNDLE__*/',()=>bundle.replace(/<\/script/gi,'<\\/script'));
-await writeFile(resolve(root,'index.html'),page.replace(/[ \t]+$/gm,''));
-console.log('Built index.html — self-contained, offline, no runtime dependencies.');
+const page=(await read(studioMode?'src/page.html':'src/scene.html')).replace('/*__CSS__*/',await read('src/style.css')).replace('<!--__FLOWER_CONTROLS__-->',flowerControls).replace('/*__BUNDLE__*/',()=>bundle.replace(/<\/script/gi,'<\\/script'));
+await writeFile(resolve(root,studioMode?'studio.html':'index.html'),page.replace(/[ \t]+$/gm,''));
+console.log(`Built ${studioMode?'studio.html (local development only)':'index.html (scene only, no debug UI)'} — self-contained, offline, no runtime dependencies.`);

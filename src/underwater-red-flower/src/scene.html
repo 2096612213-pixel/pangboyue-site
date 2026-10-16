@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="一朵红花浸在黑白水境中。固定水下视角、持续水波与实时焦散的交互艺术场景。">
+  <title>黑白水境中的红花</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;overflow:hidden;background:#000}
+    .stage,.canvas-frame{position:absolute;inset:0}
+    #glCanvas{display:block;width:100%;height:100%;touch-action:pan-y;opacity:0;transition:opacity .38s ease}
+    html[data-scene-ready] #glCanvas{opacity:1}
+    @media(prefers-reduced-motion:reduce){#glCanvas{transition:none}}
+  </style>
+</head>
+<body>
+  <main class="stage" aria-label="实时水下红花场景">
+    <div class="canvas-frame"><canvas id="glCanvas" aria-label="水下红花，花瓣缓慢舒展，黑白水面持续流动"></canvas></div>
+  </main>
+  <script>/*__BUNDLE__*/</script>
+</body>
+</html>
