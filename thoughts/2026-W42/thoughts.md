@@ -466,3 +466,8 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
   <source src="/thoughts/2026-W42/media/ji-ming-yue-dance.mp4?v=28db19350f30" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/ji-ming-yue-dance.mp4?v=28db19350f30">打开视频</a>观看。
 </video>
+
+
+---
+
+我觉得写这些日记很有意义 可以让我每次在飞机上 或者睡不着的时候常常回来翻看 就能让我不会忘记我的初心 我的信念
