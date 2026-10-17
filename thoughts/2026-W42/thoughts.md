@@ -437,3 +437,32 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
 雨中黄叶树，灯下白头人。
 以我独沉久，愧君相见频。
 平生自有分，况是蔡家亲。
+
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/annoying-but-cute-girl-poster.jpg" aria-label="盘点那个超级烦人的同时还很可爱的女孩">
+  <source src="/thoughts/2026-W42/media/annoying-but-cute-girl.mp4?v=10dda8f058de" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/annoying-but-cute-girl.mp4?v=10dda8f058de">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/xjtu-curry-song-dance-poster.jpg" aria-label="西安交通大学千人广场舞2000人共跳库里之歌">
+  <source src="/thoughts/2026-W42/media/xjtu-curry-song-dance.mp4?v=06baf73a734a" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/xjtu-curry-song-dance.mp4?v=06baf73a734a">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/dance-away-stress-poster.jpg" aria-label="跳出活力 释放压力 快乐跳舞 这可能就是大家喜欢的原因吧">
+  <source src="/thoughts/2026-W42/media/dance-away-stress.mp4?v=e2e0645a999e" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/dance-away-stress.mp4?v=e2e0645a999e">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/ji-ming-yue-dance-poster.jpg" aria-label="寄明月，一起来跳吗！">
+  <source src="/thoughts/2026-W42/media/ji-ming-yue-dance.mp4?v=28db19350f30" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/ji-ming-yue-dance.mp4?v=28db19350f30">打开视频</a>观看。
+</video>
