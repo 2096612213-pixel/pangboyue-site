@@ -326,3 +326,20 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
 
 ## 2026-10-17
 
+
+<video controls playsinline preload="none" width="640" height="480" poster="/thoughts/2026-W42/media/dynamic-sketch-poster.jpg" aria-label="动态速写">
+  <source src="/thoughts/2026-W42/media/dynamic-sketch.mp4?v=0d8a8611c657" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/dynamic-sketch.mp4?v=0d8a8611c657">打开视频</a>观看。
+</video>
+
+画的挺好的
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/look-into-my-eyes-poster.jpg" aria-label="你就那样看着我的眼睛">
+  <source src="/thoughts/2026-W42/media/look-into-my-eyes.mp4?v=142f9a675c1a" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/look-into-my-eyes.mp4?v=142f9a675c1a">打开视频</a>观看。
+</video>
+
+
+这个视频我就不评价了 因为评价不了 看看吧 看看就行了
