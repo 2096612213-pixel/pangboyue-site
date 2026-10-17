@@ -118,19 +118,21 @@
 .dropdown-inner {
   position: relative;
   left: var(--menu-x, 40px);
-  width: 156px;
+  width: var(--menu-width, 156px);
   padding: 34px 0 24px;
 }
 
 #projects-menu .dropdown-inner,
 .contact-menu .dropdown-inner {
-  width: max-content;
+  width: var(--menu-width, 156px);
   max-width: calc(100vw - 32px);
 }
 
 #projects-menu .dropdown-links a,
 .contact-menu .dropdown-links a {
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .dropdown-links {

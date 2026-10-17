@@ -343,3 +343,25 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
 
 
 这个视频我就不评价了 因为评价不了 看看吧 看看就行了
+
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/white-house-spokesperson-fast-talking-poster.jpg" aria-label="美国白宫发言人：嘴比大脑还快，这样的人才实在难得！">
+  <source src="/thoughts/2026-W42/media/white-house-spokesperson-fast-talking.mp4?v=fe007fc85450" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/white-house-spokesperson-fast-talking.mp4?v=fe007fc85450">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/karoline-leavitt-farewell-poster.jpg" aria-label="卡罗琳·莱维特卸任，发表告别感言">
+  <source src="/thoughts/2026-W42/media/karoline-leavitt-farewell.mp4?v=45ee1901f8f9" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/karoline-leavitt-farewell.mp4?v=45ee1901f8f9">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W42/media/karoline-leavitt-press-briefing-poster.jpg" aria-label="白宫发言人卡洛琳·莱维特发飙了！">
+  <source src="/thoughts/2026-W42/media/karoline-leavitt-press-briefing.mp4?v=60e1aa206eef" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/karoline-leavitt-press-briefing.mp4?v=60e1aa206eef">打开视频</a>观看。
+</video>
