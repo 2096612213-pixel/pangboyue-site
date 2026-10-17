@@ -365,3 +365,7 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
   <source src="/thoughts/2026-W42/media/karoline-leavitt-press-briefing.mp4?v=60e1aa206eef" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/karoline-leavitt-press-briefing.mp4?v=60e1aa206eef">打开视频</a>观看。
 </video>
+
+---
+
+我觉得社会上好多人真的有点傻逼的 这些人觉得大学生很蠢 很单纯 很好骗 总是想着欺负年轻单纯的大学生 他们自己觉得自己忙着挣钱 阅历丰富 大学生问他们问题的时候 会傲慢 懒得搭理大学生 瞧不起大学生 那他们我说实话我也懒得理他们 我也不会想要和他们有来往
