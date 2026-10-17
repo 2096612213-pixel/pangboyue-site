@@ -45,6 +45,46 @@ float softFlux(sampler2D image,vec2 uv) {
      +texture(image,uv+vec2(0.,b.y)).r+texture(image,uv-vec2(0.,b.y)).r)*.0351351351;
   return c;
 }
+// Compact C2 photon footprint, evaluated at the exact subtexel position.
+vec2 photonWeight(vec2 distance) {
+  vec2 w=max(vec2(0.),1.-distance*distance/9.);
+  // The same compact footprint, with a narrower core to recover fine ribbons.
+  // Its zero-valued boundary still has continuous first and second derivatives.
+  return w*w*w*w*w;
+}
+float receiverFlux(sampler2D image,vec2 uv) {
+  // Reconstruct the background photon map, not the finished scene. Six texels
+  // per axis are paired into nine bilinear reads (the previous filter also used
+  // nine). Phase-aware weights remove the sampling lattice of fixed offsets.
+  vec2 size=vec2(textureSize(image,0)),p=uv*size-.5,f=fract(p),base=floor(p)+.5;
+  vec2 w0=photonWeight(f+2.),w1=photonWeight(f+1.),w2=photonWeight(f);
+  vec2 w3=photonWeight(1.-f),w4=photonWeight(2.-f),w5=photonWeight(3.-f);
+  vec2 a=w0+w1,b=w2+w3,c=w4+w5;
+  vec2 x=(base-2.+w1/a)/size,y=(base+w3/b)/size,z=(base+2.+w5/c)/size;
+  vec2 total=a+b+c;a/=total;b/=total;c/=total;
+  return texture(image,vec2(x.x,x.y)).r*a.x*a.y
+       + texture(image,vec2(y.x,x.y)).r*b.x*a.y
+       + texture(image,vec2(z.x,x.y)).r*c.x*a.y
+       + texture(image,vec2(x.x,y.y)).r*a.x*b.y
+       + texture(image,vec2(y.x,y.y)).r*b.x*b.y
+       + texture(image,vec2(z.x,y.y)).r*c.x*b.y
+       + texture(image,vec2(x.x,z.y)).r*a.x*c.y
+       + texture(image,vec2(y.x,z.y)).r*b.x*c.y
+       + texture(image,vec2(z.x,z.y)).r*c.x*c.y;
+}
+float receiverLight(float c,vec2 uv) {
+  // Integrate the positive threshold over one screen pixel instead of cutting
+  // faint ribbons off abruptly. Away from the small transition it is unchanged.
+  float d=c-.085,w=clamp(fwidth(c),.004,.06);
+  float positive=d<=-w?0.:(d>=w?d:(d+w)*(d+w)/(4.*w));
+  float edge=smoothstep(0.,.06,min(min(uv.x,uv.y),min(1.-uv.x,1.-uv.y)));
+  // Lift the ribbons above the existing black threshold, not the ambient floor.
+  float light=positive*4.1;
+  // A smooth shoulder replaces the flat-topped highlight clamp; faint ribbons
+  // retain their contrast, while bright intersections roll off continuously.
+  light*=inversesqrt(1.+.22*light*light);
+  return pow(light,u_causticContrast)*u_causticIntensity*edge;
+}
 vec2 uprightUV(vec3 p) {return vec2(p.x/(DOMAIN*u_scale)+.5,(p.y+3.)/12.+.5);}
 float causticAt(vec3 p) {
   vec2 uv=uprightUV(p);
@@ -60,12 +100,10 @@ vec3 backgroundReceiver(vec3 p) {
   return p;
 }
 float receiverCaustic(vec3 p,vec3 normal) {
-  if(normal.z>.5){
-    vec2 uv=uprightUV(backgroundReceiver(p));
-    return focusedLight(softFlux(u_caustic1,uv),uv);
-  }
-  vec2 uv=p.xz/(DOMAIN*u_scale)+.5;
-  return focusedLight(softFlux(u_caustic2,uv),uv);
+  bool wall=normal.z>.5;
+  vec2 uv=wall?uprightUV(backgroundReceiver(p)):p.xz/(DOMAIN*u_scale)+.5;
+  float c=wall?receiverFlux(u_caustic1,uv):receiverFlux(u_caustic2,uv);
+  return receiverLight(c,uv);
 }
 
 float lowerStemVisibility(vec3 p) {
@@ -150,6 +188,12 @@ vec3 traceUnderwater(vec3 origin,vec3 direction) {
   vec3 p=origin+direction*min(distanceToSurface,100.);
   vec3 normal=wallT<floorT?vec3(0.,0.,1.):vec3(0.,1.,0.);
   vec3 color=distanceToSurface<100.?receiver(p,normal):vec3(0.);
+  // Fade only the receiving water/background before compositing the flower.
+  // A broad C2 screen-space rolloff has no circular outline or hard horizon;
+  // reach pure black just before the bottom, including outside the homepage.
+  float bottomFade=clamp((v_uv.y-.025)/.30,0.,1.);
+  bottomFade=bottomFade*bottomFade*bottomFade*(bottomFade*(bottomFade*6.-15.)+10.);
+  color*=bottomFade;
   float t=abs(direction.z)>.001?-origin.z/direction.z:-1.;
   if(t>0. && t<distanceToSurface) {
     vec3 hit=origin+direction*t;
