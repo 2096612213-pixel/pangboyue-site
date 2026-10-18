@@ -474,3 +474,11 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
 
 ## 2026-10-18
 
+<video controls playsinline preload="none" width="540" height="540" poster="/thoughts/2026-W42/media/ai-laser-weeding-poster.jpg" aria-label="AI激光除杂草">
+  <source src="/thoughts/2026-W42/media/ai-laser-weeding.mp4?v=d7cc7fbdf85e" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/ai-laser-weeding.mp4?v=d7cc7fbdf85e">打开视频</a>观看。
+</video>
+
+---
+
+
