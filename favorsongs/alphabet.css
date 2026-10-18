@@ -75,3 +75,16 @@
     background: #0f0f0f; pointer-events: none;
   }
 }
+
+/* Only the song area scrolls on phones. The touch rail and search toolbar are
+   siblings of this viewport, so list jumps cannot move their coordinate space. */
+.playlist-viewport { display: contents; }
+@media (max-width: 1000px) {
+  html, body { height: 100%; overflow: hidden; }
+  .playlist-viewport {
+    display: block; position: fixed; inset: 0;
+    overflow-y: auto; overflow-x: hidden;
+    overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch;
+  }
+  .playlist-viewport .page { min-height: 100%; }
+}

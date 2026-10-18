@@ -263,12 +263,26 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="alphabet.css?v=571572508f78">
+  <link rel="stylesheet" href="alphabet.css?v=3c535c579dc8">
 </head>
 
 
 <body>
 
+    <form class="song-search" id="song-search" role="search" aria-label="搜索歌单">
+      <div class="search-glass">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5" stroke-linecap="round"/></svg>
+        <input id="song-query" type="search" aria-label="搜索歌名或歌手" aria-describedby="search-status" placeholder="搜歌名或歌手，Enter 跳转" autocomplete="off" enterkeyhint="search">
+        <span class="search-enter" aria-hidden="true">Enter ↵</span>
+      </div>
+      <p class="search-status" id="search-status" role="status" aria-live="polite">搜索只定位歌曲，点击播放按钮开始听。</p>
+      <div class="sort-buttons" role="group" aria-label="歌单排序">
+        <button type="button" id="sort-pinyin" aria-pressed="false">拼音顺序 ↑</button>
+        <button type="button" id="sort-added" aria-pressed="true">添加时间 ↑</button>
+      </div>
+    </form>
+
+  <div class="playlist-viewport" id="playlist-viewport">
   <main class="page">
 
     <a href="../index.html" class="back">
@@ -286,28 +300,18 @@
     </p>
 
 
-    <form class="song-search" id="song-search" role="search" aria-label="搜索歌单">
-      <div class="search-glass">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5" stroke-linecap="round"/></svg>
-        <input id="song-query" type="search" aria-label="搜索歌名或歌手" aria-describedby="search-status" placeholder="搜歌名或歌手，Enter 跳转" autocomplete="off" enterkeyhint="search">
-        <span class="search-enter" aria-hidden="true">Enter ↵</span>
-      </div>
-      <p class="search-status" id="search-status" role="status" aria-live="polite">搜索只定位歌曲，点击播放按钮开始听。</p>
-      <div class="sort-buttons" role="group" aria-label="歌单排序">
-        <button type="button" id="sort-pinyin" aria-pressed="false">拼音顺序 ↑</button>
-        <button type="button" id="sort-added" aria-pressed="true">添加时间 ↑</button>
-      </div>
-    </form>
 
     <section class="songs" id="songs" role="list" aria-label="最爱的歌曲"></section>
 
   </main>
+  </div>
+
 
   <nav class="song-alphabet" id="song-alphabet" aria-label="按歌名首字母定位">
     <div class="alphabet-preview" aria-hidden="true" hidden></div>
   </nav>
 
-  <script type="module" src="playlist.js?v=6a621496db28"></script>
+  <script type="module" src="playlist.js?v=f70cd4ff5784"></script>
 </body>
 
 </html>

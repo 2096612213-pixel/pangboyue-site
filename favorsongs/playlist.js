@@ -51,12 +51,13 @@ function syncAlphabet(listTop, stride) {
   // starts a different scroll/search/sort action.
   if (letterNavigation && performance.now() < letterNavigation.until) {
     markLetter(letterNavigation.letter);
-    if (Math.abs(scrollY - letterNavigation.top) < 2) letterNavigation = null;
+    if (Math.abs(scrollPosition().top - letterNavigation.top) < 2) letterNavigation = null;
     return;
   }
   letterNavigation = null;
   const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
-  const atBottom = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
+  const position = scrollPosition();
+  const atBottom = position.top + position.height >= position.scrollHeight - 2;
   const first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
   markLetter(sortMode === 'pinyin' ? initials.get(songs[first]?.file) : '');
 }
@@ -65,6 +66,7 @@ function syncAlphabet(listTop, stride) {
 const list = document.querySelector('#songs');
 const cards = new Map();
 const flowLayout = matchMedia('(max-width: 1000px)');
+const scrollViewport = document.querySelector('#playlist-viewport');
 let searchScrollFrame = 0;
 let rowsNeedLayout = true;
 let lastFlow = null;
@@ -76,11 +78,17 @@ let searchIndex = -1;
 let previousQuery = "";
 let matchCursor = -1;
 
-function listDocumentTop() {
-  // Layout offsets do not mix an asynchronously scrolling webview's client
-  // rectangle with a separately sampled scrollY.
+function scrollPosition() {
+  return flowLayout.matches
+    ? { top: scrollViewport.scrollTop, height: scrollViewport.clientHeight, scrollHeight: scrollViewport.scrollHeight }
+    : { top: scrollY, height: innerHeight, scrollHeight: document.documentElement.scrollHeight };
+}
+function scrollPlaylist(top, behavior = 'auto') {
+  (flowLayout.matches ? scrollViewport : window).scrollTo({ top, behavior });
+}
+function listContentTop() {
   let top = 0;
-  for (let node = list; node; node = node.offsetParent) top += node.offsetTop;
+  for (let node = list; node && node !== scrollViewport; node = node.offsetParent) top += node.offsetTop;
   return top;
 }
 
@@ -209,6 +217,7 @@ function scheduleRender() {
 }
 
 addEventListener('scroll', scheduleRender, { passive: true });
+scrollViewport.addEventListener('scroll', scheduleRender, { passive: true });
 addEventListener('resize', scheduleRender);
 window.visualViewport?.addEventListener('resize', scheduleRender);
 render();
@@ -259,7 +268,9 @@ searchForm.addEventListener('submit', event => {
   const card = cards.get(searchIndex);
   card.focus({ preventScroll: true });
   searchScrollFrame = requestAnimationFrame(() => {
-    card.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    const { height, gap } = dimensions();
+    const top = listContentTop() + searchIndex * (height + gap) - (scrollPosition().height - height) / 2;
+    scrollPlaylist(Math.max(0, top), matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
   });
 });
 
@@ -291,7 +302,7 @@ function sortPlaylist(mode, resetScroll = true) {
   document.querySelector('#sort-added').setAttribute('aria-pressed', String(mode === 'added'));
   searchStatus.textContent = mode === 'pinyin' ? '已按歌名拼音 A–Z 排序。' : '已按添加时间排序（最早 → 最新）。';
   render();
-  if (resetScroll) window.scrollTo({ top: 0, behavior: 'auto' });
+  if (resetScroll) scrollPlaylist(0);
 }
 document.querySelector('#sort-pinyin').addEventListener('click', () => sortPlaylist('pinyin'));
 document.querySelector('#sort-added').addEventListener('click', () => sortPlaylist('added'));
@@ -335,12 +346,13 @@ function jumpToLetter(letter) {
   render();
   // Use the virtual row's layout position, not a card's animated hover transform.
   const { height, gap } = dimensions();
-  const listOrigin = dragBounds?.listOrigin ?? listDocumentTop();
+  const listOrigin = dragBounds?.listOrigin ?? listContentTop();
   const top = listOrigin + index * (height + gap);
   const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
-  const target = Math.max(0, Math.min(top - edge, document.documentElement.scrollHeight - innerHeight));
+  const position = scrollPosition();
+  const target = Math.max(0, Math.min(top - edge, position.scrollHeight - position.height));
   letterNavigation = { letter, top: target, until: performance.now() + 800 };
-  window.scrollTo({ top: target, behavior: 'auto' });
+  scrollPlaylist(target);
   // Materialize/reconcile the destination now, without waiting for a Safari
   // scroll event or animation frame during the active touch gesture.
   render(); markLetter(letter); showPreview(letter);
@@ -354,13 +366,17 @@ let navigationFrame = 0;
 let committedLetter = '';
 function letterAtPoint(point) {
   const rect = dragBounds || alphabetNav.getBoundingClientRect();
-  // Screen-space deltas stay independent of document scroll and webview chrome.
-  // Some webviews report remapped clientY in the middle of a programmatic jump.
-  if (!Number.isFinite(point.clientY) || !Number.isFinite(point.screenY)) return null;
-  // Empty/cancel coordinates are not a request to jump to the first letter.
-  if (point.clientY === 0 && point.screenY === 0 && rect.clientY > 0) return null;
-  const y = rect.screenY === null ? point.clientY : rect.clientY + point.screenY - rect.screenY;
-  const index = Math.max(0, Math.min(alphabet.length - 1, Math.floor((y - rect.top) / (rect.height / alphabet.length))));
+  // Both coordinates use the same viewport. Never combine screen/page deltas
+  // with client coordinates: programmatic scrolling can magnify those deltas.
+  const y = point.clientY;
+  if (!Number.isFinite(y) || y <= 0 || y > innerHeight) return null;
+  const row = rect.height / alphabet.length;
+  const index = Math.max(0, Math.min(alphabet.length - 1, Math.floor((y - rect.top) / row)));
+  const previous = alphabet.indexOf(draggedLetter);
+  // A small deadband prevents one-pixel finger jitter at a letter boundary.
+  const slop = Math.min(2, row * .15);
+  if (previous >= 0 && index > previous && y < rect.top + (previous + 1) * row + slop) return draggedLetter;
+  if (previous >= 0 && index < previous && y > rect.top + previous * row - slop) return draggedLetter;
   return alphabet[index];
 }
 function flushNavigation() {
@@ -379,15 +395,13 @@ function dragToPoint(point) {
   markLetter(letter); showPreview(letter); pendingLetter = letter;
   if (!navigationFrame) navigationFrame = requestAnimationFrame(flushNavigation);
 }
-function beginDrag(point, owner, useScreen) {
+function beginDrag(point, owner) {
   lastPointerTime = performance.now();
   cancelAnimationFrame(searchScrollFrame);
   const rect = alphabetNav.getBoundingClientRect();
   dragBounds = {
     top: rect.top, height: rect.height,
-    listOrigin: listDocumentTop(),
-    clientY: point.clientY,
-    screenY: useScreen && Number.isFinite(point.screenY) ? point.screenY : null,
+    listOrigin: listContentTop(),
   };
   for (const key of ['left', 'top', 'width', 'height']) alphabetNav.style.setProperty(`--drag-${key}`, `${rect[key]}px`);
   alphabetNav.classList.add('is-dragging');
@@ -399,7 +413,7 @@ function finishDrag(event) {
   if (draggingPointer === null || (event && event.pointerId !== draggingPointer)) return;
   // Commit the last move, not a potentially stale/missing coordinate on release.
   flushNavigation(); lastPointerTime = performance.now();
-  if (letterNavigation && Math.abs(scrollY - letterNavigation.top) < 2) letterNavigation = null;
+  if (letterNavigation && Math.abs(scrollPosition().top - letterNavigation.top) < 2) letterNavigation = null;
   const pointer = draggingPointer;
   draggingPointer = null; touchId = null; draggedLetter = ''; dragBounds = null;
   alphabetNav.classList.remove('is-dragging');
@@ -412,7 +426,7 @@ alphabetNav.addEventListener('touchstart', event => {
   if (event.cancelable) event.preventDefault();
   const touch = event.changedTouches[0];
   touchId = touch.identifier;
-  beginDrag(touch, `touch:${touchId}`, true);
+  beginDrag(touch, `touch:${touchId}`);
 }, { passive: false });
 alphabetNav.addEventListener('touchmove', event => {
   if (touchId === null) return;
@@ -429,7 +443,7 @@ alphabetNav.addEventListener('pointerdown', event => {
   if (nativeTouch && event.pointerType === 'touch') return;
   if (event.button !== 0 || event.isPrimary === false || draggingPointer !== null) return;
   event.preventDefault();
-  beginDrag(event, event.pointerId, event.pointerType === 'touch');
+  beginDrag(event, event.pointerId);
   alphabetNav.setPointerCapture(event.pointerId);
 });
 alphabetNav.addEventListener('pointermove', event => {
