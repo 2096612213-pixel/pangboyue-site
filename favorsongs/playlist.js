@@ -54,6 +54,12 @@ function syncAlphabet(listTop, stride) {
 
 const list = document.querySelector('#songs');
 const cards = new Map();
+const flowLayout = matchMedia('(max-width: 1000px)');
+let searchScrollFrame = 0;
+let rowsNeedLayout = true;
+let lastFlow = null;
+let lastStride = 0;
+let matchedCard = null;
 let activeIndex = -1;
 let scheduled = false;
 let searchIndex = -1;
@@ -83,51 +89,40 @@ function makeCard(song, index) {
 
   const player = document.createElement('div');
   player.className = 'player';
-  const audio = document.createElement('audio');
-  audio.controls = true;
-  audio.preload = 'none';
-  audio.hidden = true;
-  audio.setAttribute('aria-label', song.title);
-
-  // Audio stays source-free until this song's play button is pressed.
+  let audio;
+  // Keep unplayed rows lightweight: no native media element or source until play.
   const playButton = document.createElement('button');
   playButton.type = 'button';
   playButton.className = 'load-play';
   playButton.setAttribute('aria-label', `播放 ${song.title}`);
   playButton.innerHTML = '<span class="play-triangle">▶</span><span class="play-time">0:00 / 0:00</span><span class="play-progress"></span><span class="play-volume">◖</span><span class="play-more">⋮</span>';
   async function startSong() {
-    if (audio.src) return;
+    if (audio) return;
     const index = songs.indexOf(song);
-    if (activeIndex !== -1 && activeIndex !== index) {
-      cards.get(activeIndex)?.querySelector('audio')?.pause();
-    }
+    cards.get(activeIndex)?.querySelector('audio')?.pause();
     activeIndex = index;
+    audio = document.createElement('audio');
+    audio.controls = true; audio.preload = 'none';
+    audio.setAttribute('aria-label', song.title);
+    audio.addEventListener('play', () => {
+      for (const card of cards.values()) {
+        const other = card.querySelector('audio');
+        if (other && other !== audio) other.pause();
+      }
+      activeIndex = songs.indexOf(song); scheduleRender();
+    });
+    audio.addEventListener('ended', () => {
+      if (activeIndex === songs.indexOf(song)) activeIndex = -1;
+      scheduleRender();
+    });
     audio.src = song.file;
-    audio.hidden = false;
-    playButton.remove();
+    playButton.replaceWith(audio);
     render();
-    try {
-      await audio.play();
-    } catch {
-      // Native controls remain available if autoplay is blocked or a file fails.
-    }
+    try { await audio.play(); } catch { /* Native controls allow retry. */ }
   }
-  playButton.addEventListener('pointerdown', startSong);
   playButton.addEventListener('click', startSong);
-  audio.addEventListener('play', () => {
-    for (const card of cards.values()) {
-      const other = card.querySelector('audio');
-      if (other !== audio) other.pause();
-    }
-    activeIndex = songs.indexOf(song);
-    scheduleRender();
-  });
-  audio.addEventListener('ended', () => {
-    if (activeIndex === songs.indexOf(song)) activeIndex = -1;
-    scheduleRender();
-  });
 
-  player.append(audio, playButton);
+  player.append(playButton);
   card.append(name, player);
   return card;
 }
@@ -135,11 +130,25 @@ function makeCard(song, index) {
 function render() {
   const { height, gap } = dimensions();
   const stride = height + gap;
-  list.style.height = `${songs.length * stride - gap}px`;
+  // iOS scrolling/compositing must not depend on recycling absolute rows in a
+  // 100,000px layer. Phone/tablet rows stay in normal flow; desktop stays virtual.
+  const flow = flowLayout.matches;
+  if (flow && lastFlow === flow && lastStride === stride && !rowsNeedLayout) {
+    const nextMatch = cards.get(searchIndex);
+    if (matchedCard !== nextMatch) {
+      matchedCard?.classList.remove('search-match');
+      nextMatch?.classList.add('search-match'); matchedCard = nextMatch;
+    }
+    syncAlphabet(list.getBoundingClientRect().top, stride);
+    return;
+  }
+  lastFlow = flow; lastStride = stride; rowsNeedLayout = false;
+  list.classList.toggle('is-flow-list', flow);
+  list.style.height = flow ? 'auto' : `${songs.length * stride - gap}px`;
 
   const listTop = list.getBoundingClientRect().top;
-  const start = Math.max(0, Math.floor(-listTop / stride) - 2);
-  const end = Math.min(songs.length, Math.max(0, Math.ceil((innerHeight - listTop) / stride) + 2));
+  const start = flow ? 0 : Math.max(0, Math.floor(-listTop / stride) - 2);
+  const end = flow ? songs.length : Math.min(songs.length, Math.max(0, Math.ceil((innerHeight - listTop) / stride) + 2));
   const wanted = new Set();
   for (let index = start; index < end; index++) wanted.add(index);
   if (activeIndex !== -1) wanted.add(activeIndex);
@@ -151,6 +160,7 @@ function render() {
       cards.delete(index);
     }
   }
+  let previousCard = null;
   for (const index of wanted) {
     let card = cards.get(index);
     if (!card) {
@@ -158,10 +168,16 @@ function render() {
       cards.set(index, card);
       list.append(card);
     }
+    if (flow) {
+      const next = previousCard ? previousCard.nextElementSibling : list.firstElementChild;
+      if (next !== card) list.insertBefore(card, next);
+      previousCard = card;
+    }
     card.setAttribute('aria-posinset', String(index + 1));
     card.style.top = `${index * stride}px`;
     card.classList.toggle("search-match", index === searchIndex);
   }
+  matchedCard = cards.get(searchIndex);
   syncAlphabet(listTop, stride);
 }
 
@@ -176,6 +192,7 @@ function scheduleRender() {
 
 addEventListener('scroll', scheduleRender, { passive: true });
 addEventListener('resize', scheduleRender);
+window.visualViewport?.addEventListener('resize', scheduleRender);
 render();
 
 // Search navigates the virtual list without loading, starting, or pausing audio.
@@ -196,6 +213,7 @@ searchInput.addEventListener('input', () => {
 });
 searchForm.addEventListener('submit', event => {
   event.preventDefault();
+  cancelAnimationFrame(searchScrollFrame);
   if (composing) return;
   const query = normalizeSearch(searchInput.value);
   if (!query) {
@@ -220,13 +238,15 @@ searchForm.addEventListener('submit', event => {
   render(); // Materialize even a far-off card before scrolling to it.
   const card = cards.get(searchIndex);
   card.focus({ preventScroll: true });
-  requestAnimationFrame(() => {
-    card.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
+  searchScrollFrame = requestAnimationFrame(() => {
+    card.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   });
 });
 
 
 function sortPlaylist(mode, resetScroll = true) {
+  cancelAnimationFrame(searchScrollFrame);
+  rowsNeedLayout = true;
   sortMode = mode;
   const activeFile = songs[activeIndex]?.file;
   const matchedFile = songs[searchIndex]?.file;
@@ -250,7 +270,7 @@ function sortPlaylist(mode, resetScroll = true) {
   document.querySelector('#sort-added').setAttribute('aria-pressed', String(mode === 'added'));
   searchStatus.textContent = mode === 'pinyin' ? '已按歌名拼音 A–Z 排序。' : '已按添加时间排序（最早 → 最新）。';
   render();
-  if (resetScroll) window.scrollTo({ top: 0, behavior: 'instant' });
+  if (resetScroll) window.scrollTo({ top: 0, behavior: 'auto' });
 }
 document.querySelector('#sort-pinyin').addEventListener('click', () => sortPlaylist('pinyin'));
 document.querySelector('#sort-added').addEventListener('click', () => sortPlaylist('added'));
@@ -260,6 +280,7 @@ document.querySelector('#sort-added').addEventListener('click', () => sortPlayli
 alphabetNav = document.querySelector('#song-alphabet');
 const preview = alphabetNav.querySelector('.alphabet-preview');
 let previewTimer = 0;
+let lastPointerTime = -Infinity;
 for (const letter of alphabet) {
   const button = document.createElement('button');
   button.type = 'button'; button.dataset.letter = letter;
@@ -283,6 +304,7 @@ function hidePreview() {
   previewTimer = setTimeout(() => { preview.hidden = true; }, 450);
 }
 function jumpToLetter(letter) {
+  cancelAnimationFrame(searchScrollFrame);
   if (alphabetButtons.get(letter)?.disabled) return;
   if (sortMode !== 'pinyin') sortPlaylist('pinyin', false);
   const index = songs.findIndex(song => initials.get(song.file) === letter);
@@ -294,8 +316,10 @@ function jumpToLetter(letter) {
   const { height, gap } = dimensions();
   const top = list.getBoundingClientRect().top + scrollY + index * (height + gap);
   const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
-  window.scrollTo({ top: Math.max(0, top - edge), behavior: 'instant' });
-  markLetter(letter); scheduleRender(); showPreview(letter);
+  window.scrollTo({ top: Math.max(0, top - edge), behavior: 'auto' });
+  // Materialize/reconcile the destination now, without waiting for a Safari
+  // scroll event or animation frame during the active touch gesture.
+  render(); markLetter(letter); showPreview(letter);
 }
 function letterAtPointer(event) {
   const rect = dragBounds || alphabetNav.getBoundingClientRect();
@@ -310,6 +334,7 @@ function dragToLetter(event) {
 alphabetNav.addEventListener('pointerdown', event => {
   if (event.button !== 0 || event.isPrimary === false || draggingPointer !== null) return;
   event.preventDefault();
+  lastPointerTime = performance.now();
   const rect = alphabetNav.getBoundingClientRect();
   dragBounds = {top: rect.top, height: rect.height};
   // Mobile browser chrome / keyboard can resize the viewport as the list jumps.
@@ -323,10 +348,11 @@ alphabetNav.addEventListener('pointerdown', event => {
   alphabetNav.setPointerCapture(event.pointerId); dragToLetter(event);
 });
 alphabetNav.addEventListener('pointermove', event => {
-  if (event.pointerId === draggingPointer) dragToLetter(event);
+  if (event.pointerId === draggingPointer) { event.preventDefault(); dragToLetter(event); }
 });
 function finishDrag(event) {
   if (draggingPointer === null || (event && event.pointerId !== draggingPointer)) return;
+  lastPointerTime = performance.now();
   const pointer = draggingPointer;
   draggingPointer = null; draggedLetter = ''; dragBounds = null;
   alphabetNav.classList.remove('is-dragging');
@@ -337,9 +363,20 @@ function finishDrag(event) {
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) alphabetNav.addEventListener(event, finishDrag);
 addEventListener('blur', () => finishDrag());
 addEventListener('pagehide', () => finishDrag());
+// Older iOS builds can still pan the page while a captured pointer moves.
+alphabetNav.addEventListener('touchmove', event => {
+  if (draggingPointer !== null && event.cancelable) event.preventDefault();
+}, { passive: false });
+alphabetNav.addEventListener('keydown', event => {
+  const button = event.target.closest('button[data-letter]');
+  if (button && !button.disabled && ['Enter', ' '].includes(event.key)) {
+    event.preventDefault(); jumpToLetter(button.dataset.letter); hidePreview();
+  }
+});
 alphabetNav.addEventListener('click', event => {
   // 鼠标和触摸已由 pointerdown 处理；detail=0 是键盘触发。
-  if (event.detail !== 0) return;
+  // WebKit may emit a compatibility click after the touch, including detail=0.
+  if (event.detail !== 0 || performance.now() - lastPointerTime < 800) return;
   const button = event.target.closest('button[data-letter]');
   if (button && !button.disabled) { jumpToLetter(button.dataset.letter); hidePreview(); }
 });

@@ -47,29 +47,22 @@
     first.addEventListener('focus', () => first.classList.add('is-visible'));
   }
 
-  // Reveal pictures only as they approach the viewport. Keep their size reserved.
-  const deferredImages = document.querySelectorAll('picture img[data-src]');
-  function revealPicture(picture) {
-    const source = picture.querySelector('source[data-srcset]');
-    const image = picture.querySelector('img[data-src]');
-    if (source) { source.srcset = source.dataset.srcset; delete source.dataset.srcset; }
-    if (image.dataset.srcset) { image.srcset = image.dataset.srcset; delete image.dataset.srcset; }
-    image.src = image.dataset.src;
-    delete image.dataset.src;
-  }
-  if ('IntersectionObserver' in window) {
-    const imageObserver = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        revealPicture(entry.target.closest('picture'));
-        imageObserver.unobserve(entry.target);
-      }
-    }, { rootMargin: '50px 0px' });
-    deferredImages.forEach(image => imageObserver.observe(image));
-  } else {
-    deferredImages.forEach(image => revealPicture(image.closest('picture')));
-  }
-
+  // Native lazy loading works before JS/IntersectionObserver and chooses a small
+  // responsive image. If a selected source fails, retry the compatible img URL.
+  document.querySelectorAll('picture img').forEach(image => {
+    image.addEventListener('error', () => {
+      if (image.dataset.fallbackTried) return;
+      image.dataset.fallbackTried = 'true';
+      image.closest('picture').querySelectorAll('source').forEach(source => source.remove());
+      image.removeAttribute('srcset');
+      image.loading = 'eager';
+      const fallback = new URL(image.getAttribute('src'), location.href);
+      fallback.searchParams.set('retry', '1');
+      image.src = fallback.href;
+    });
+    // A cached decode error can arrive before the deferred script attaches.
+    if (image.complete && image.naturalWidth === 0) image.dispatchEvent(new Event('error'));
+  });
   // Warm up only the HTML of a destination the visitor is about to choose.
   const prefetchedPages = new Set();
   function prefetchDestination(link) {
@@ -176,10 +169,14 @@
   let visible = true;
   let mode = root.dataset.homeScene || 'bright';
   const api = () => frame.contentWindow?.HomeMountains;
+  const blossomApi = () => {
+    try { return blossomFrame.contentWindow?.HomeBlossom; }
+    catch { return null; } // Network/error documents may not share our origin.
+  };
   function sync() {
     const active = mode === 'bright' && visible && !document.hidden;
     api()?.setActive(active);
-    blossomFrame.contentWindow?.HomeBlossom?.setActive(mode === 'flower' && visible && !document.hidden);
+    blossomApi()?.setActive(mode === 'flower' && visible && !document.hidden);
     const flowerActive = mode === 'flower' && visible && !document.hidden;
     if (!flowerActive && (flowerStarting || (flowerAudio && !flowerAudio.paused))) stopFlowerMusic();
     const playing = mode === 'flower' ? flowerActive && flowerAudio && !flowerAudio.paused : active && api()?.isPlaying();
@@ -209,7 +206,9 @@
   musicButton.addEventListener('click', () => { if (mode === 'flower') toggleFlowerMusic(); else api()?.toggleMusic(); });
   frame.addEventListener('load', sync);
   function syncBlossomReady() {
-    const ready=blossomFrame.contentWindow?.HomeBlossom?.ready===true;
+    let ready = false;
+    try { ready = blossomApi()?.ready === true; }
+    catch { /* A failed/redirected frame keeps the locally hosted preview. */ }
     blossomFrame.parentElement.dataset.ready=String(ready);
     root.dataset.blossomReady=String(ready);
     sync();
@@ -223,7 +222,7 @@
   window.addEventListener('mountain-music-change', sync);
   document.addEventListener('visibilitychange', sync);
   new IntersectionObserver(entries => { visible = entries[0].isIntersecting; sync(); }).observe(tank);
-  window.addEventListener('pagehide', () => { stopFlowerMusic(); api()?.setActive(false); blossomFrame.contentWindow?.HomeBlossom?.setActive(false); });
+  window.addEventListener('pagehide', () => { stopFlowerMusic(); api()?.setActive(false); blossomApi()?.setActive(false); });
   window.addEventListener('pageshow', sync);
   select(mode);
 })();

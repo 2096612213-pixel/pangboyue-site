@@ -57,3 +57,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) { .song-alphabet button span { transition: none; } }
+
+/* Retain real rows on mobile Safari: no scroll-time recycling/absolute layers. */
+.songs.is-flow-list { display: flex; flex-direction: column; gap: var(--card-gap); }
+.songs.is-flow-list .song {
+  position: relative; top: auto !important; flex: 0 0 var(--card-height);
+}
+@media (hover: none) { .song:hover { transform: none; } }

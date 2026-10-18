@@ -11,26 +11,19 @@
     first.addEventListener('focus', () => first.classList.add('is-visible'));
   }
 
-  // Reveal pictures only as they approach the viewport. Keep their size reserved.
-  const deferredImages = document.querySelectorAll('picture img[data-src]');
-  function revealPicture(picture) {
-    const source = picture.querySelector('source[data-srcset]');
-    const image = picture.querySelector('img[data-src]');
-    if (source) { source.srcset = source.dataset.srcset; delete source.dataset.srcset; }
-    if (image.dataset.srcset) { image.srcset = image.dataset.srcset; delete image.dataset.srcset; }
-    image.src = image.dataset.src;
-    delete image.dataset.src;
-  }
-  if ('IntersectionObserver' in window) {
-    const imageObserver = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        revealPicture(entry.target.closest('picture'));
-        imageObserver.unobserve(entry.target);
-      }
-    }, { rootMargin: '50px 0px' });
-    deferredImages.forEach(image => imageObserver.observe(image));
-  } else {
-    deferredImages.forEach(image => revealPicture(image.closest('picture')));
-  }
-
+  // Native lazy loading works before JS/IntersectionObserver and chooses a small
+  // responsive image. If a selected source fails, retry the compatible img URL.
+  document.querySelectorAll('picture img').forEach(image => {
+    image.addEventListener('error', () => {
+      if (image.dataset.fallbackTried) return;
+      image.dataset.fallbackTried = 'true';
+      image.closest('picture').querySelectorAll('source').forEach(source => source.remove());
+      image.removeAttribute('srcset');
+      image.loading = 'eager';
+      const fallback = new URL(image.getAttribute('src'), location.href);
+      fallback.searchParams.set('retry', '1');
+      image.src = fallback.href;
+    });
+    // A cached decode error can arrive before the deferred script attaches.
+    if (image.complete && image.naturalWidth === 0) image.dispatchEvent(new Event('error'));
+  });

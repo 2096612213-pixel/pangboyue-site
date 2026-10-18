@@ -5,7 +5,7 @@ class GPU {
     this.gl = canvas.getContext('webgl2', { alpha: true, antialias: false, preserveDrawingBuffer: true, premultipliedAlpha: true });
     if (!this.gl) throw new Error('需要支持 WebGL2 的浏览器。请开启浏览器硬件加速。');
     const gl = this.gl;
-    if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('当前设备不能渲染浮点水波纹理，请使用支持浮点渲染的 WebGL2 浏览器。');
+    if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) throw new Error('当前设备不能渲染浮点水波纹理，请使用支持浮点渲染的 WebGL2 浏览器。');
     this.resources = { textures: 0, framebuffers: 0, buffers: 0, programs: 0, vaos: 0 };
     this.errors = [];
     this.drawCalls = 0;

@@ -60,6 +60,9 @@ class Studio {
       reset:()=>this.reset(),diagnostics:()=>this.diagnostics(),debugWater:()=>this.debugWater(),
       exportSettings:()=>this.settings(),capture:()=>this.capture(),extractFlowerIcon:()=>this.extractIcon()
     };
+    if (this.gpu.gl.isContextLost() || this.gpu.gl.getError() !== this.gpu.gl.NO_ERROR) {
+      throw new Error('首帧渲染失败，保留场景预览。');
+    }
     setSceneReady(true);
   }
   settings() { return Object.fromEntries(Object.keys(SETTINGS_DEFAULTS).map(key=>[key,this.state[key]])); }
@@ -183,6 +186,7 @@ function setSceneReady(ready) {
 }
 function showFailure(error) {
   console.error(error);setSceneReady(false);
+  if(studio){studio.active=false;cancelAnimationFrame(studio.raf);}
   if(!STUDIO_MODE)return;
   const loading=document.getElementById('loading');loading.hidden=false;loading.classList.add('error');
   loading.textContent=error.message;const button=document.createElement('button');button.textContent='重新载入';button.onclick=()=>location.reload();loading.appendChild(button);

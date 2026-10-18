@@ -32,7 +32,7 @@ class GPU {
     this.gl = canvas.getContext('webgl2', { alpha: true, antialias: false, preserveDrawingBuffer: true, premultipliedAlpha: true });
     if (!this.gl) throw new Error('需要支持 WebGL2 的浏览器。请开启浏览器硬件加速。');
     const gl = this.gl;
-    if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('当前设备不能渲染浮点水波纹理，请使用支持浮点渲染的 WebGL2 浏览器。');
+    if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) throw new Error('当前设备不能渲染浮点水波纹理，请使用支持浮点渲染的 WebGL2 浏览器。');
     this.resources = { textures: 0, framebuffers: 0, buffers: 0, programs: 0, vaos: 0 };
     this.errors = [];
     this.drawCalls = 0;
@@ -410,6 +410,9 @@ class Studio {
       reset:()=>this.reset(),diagnostics:()=>this.diagnostics(),debugWater:()=>this.debugWater(),
       exportSettings:()=>this.settings(),capture:()=>this.capture(),extractFlowerIcon:()=>this.extractIcon()
     };
+    if (this.gpu.gl.isContextLost() || this.gpu.gl.getError() !== this.gpu.gl.NO_ERROR) {
+      throw new Error('首帧渲染失败，保留场景预览。');
+    }
     setSceneReady(true);
   }
   settings() { return Object.fromEntries(Object.keys(SETTINGS_DEFAULTS).map(key=>[key,this.state[key]])); }
@@ -533,6 +536,7 @@ function setSceneReady(ready) {
 }
 function showFailure(error) {
   console.error(error);setSceneReady(false);
+  if(studio){studio.active=false;cancelAnimationFrame(studio.raf);}
   if(!STUDIO_MODE)return;
   const loading=document.getElementById('loading');loading.hidden=false;loading.classList.add('error');
   loading.textContent=error.message;const button=document.createElement('button');button.textContent='重新载入';button.onclick=()=>location.reload();loading.appendChild(button);

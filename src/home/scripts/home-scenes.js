@@ -48,10 +48,14 @@
   let visible = true;
   let mode = root.dataset.homeScene || 'bright';
   const api = () => frame.contentWindow?.HomeMountains;
+  const blossomApi = () => {
+    try { return blossomFrame.contentWindow?.HomeBlossom; }
+    catch { return null; } // Network/error documents may not share our origin.
+  };
   function sync() {
     const active = mode === 'bright' && visible && !document.hidden;
     api()?.setActive(active);
-    blossomFrame.contentWindow?.HomeBlossom?.setActive(mode === 'flower' && visible && !document.hidden);
+    blossomApi()?.setActive(mode === 'flower' && visible && !document.hidden);
     const flowerActive = mode === 'flower' && visible && !document.hidden;
     if (!flowerActive && (flowerStarting || (flowerAudio && !flowerAudio.paused))) stopFlowerMusic();
     const playing = mode === 'flower' ? flowerActive && flowerAudio && !flowerAudio.paused : active && api()?.isPlaying();
@@ -81,7 +85,9 @@
   musicButton.addEventListener('click', () => { if (mode === 'flower') toggleFlowerMusic(); else api()?.toggleMusic(); });
   frame.addEventListener('load', sync);
   function syncBlossomReady() {
-    const ready=blossomFrame.contentWindow?.HomeBlossom?.ready===true;
+    let ready = false;
+    try { ready = blossomApi()?.ready === true; }
+    catch { /* A failed/redirected frame keeps the locally hosted preview. */ }
     blossomFrame.parentElement.dataset.ready=String(ready);
     root.dataset.blossomReady=String(ready);
     sync();
@@ -95,7 +101,7 @@
   window.addEventListener('mountain-music-change', sync);
   document.addEventListener('visibilitychange', sync);
   new IntersectionObserver(entries => { visible = entries[0].isIntersecting; sync(); }).observe(tank);
-  window.addEventListener('pagehide', () => { stopFlowerMusic(); api()?.setActive(false); blossomFrame.contentWindow?.HomeBlossom?.setActive(false); });
+  window.addEventListener('pagehide', () => { stopFlowerMusic(); api()?.setActive(false); blossomApi()?.setActive(false); });
   window.addEventListener('pageshow', sync);
   select(mode);
 })();
