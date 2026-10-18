@@ -497,3 +497,84 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
   <source src="/thoughts/2026-W42/media/ye-du-shu-douyin.mp4?v=ee89fc6760f2" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/ye-du-shu-douyin.mp4?v=ee89fc6760f2">打开视频</a>观看。
 </video>
+
+---
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-01.jpg" width="1280" height="1707" alt="10月18日照片，第1张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-02.jpg" width="1280" height="1707" alt="10月18日照片，第2张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-03.jpg" width="1270" height="1694" alt="10月18日照片，第3张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-04.jpg" width="1280" height="1707" alt="10月18日照片，第4张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-05.jpg" width="1280" height="1707" alt="10月18日照片，第5张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-06.jpg" width="1280" height="1707" alt="10月18日照片，第6张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-07.jpg" width="1280" height="1707" alt="10月18日照片，第7张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-08.jpg" width="1280" height="1707" alt="10月18日照片，第8张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-09.jpg" width="1280" height="1707" alt="10月18日照片，第9张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-10.jpg" width="1280" height="1707" alt="10月18日照片，第10张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-11.jpg" width="1168" height="2532" alt="10月18日照片，第11张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-12.jpg" width="1280" height="1707" alt="10月18日照片，第12张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-13.jpg" width="1280" height="1707" alt="10月18日照片，第13张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-14.jpg" width="2532" height="1168" alt="10月18日照片，第14张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-15.jpg" width="1707" height="1280" alt="10月18日照片，第15张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-16.jpg" width="1707" height="1280" alt="10月18日照片，第16张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-17.jpg" width="1280" height="1707" alt="10月18日照片，第17张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-18.jpg" width="1707" height="1280" alt="10月18日照片，第18张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-19.jpg" width="1280" height="1707" alt="10月18日照片，第19张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-20.jpg" width="1707" height="1280" alt="10月18日照片，第20张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-21.jpg" width="1707" height="1280" alt="10月18日照片，第21张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-22.jpg" width="1707" height="1280" alt="10月18日照片，第22张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-23.jpg" width="1707" height="1280" alt="10月18日照片，第23张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-24.jpg" width="1707" height="1280" alt="10月18日照片，第24张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-25.jpg" width="1280" height="1707" alt="10月18日照片，第25张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-26.jpg" width="1707" height="1280" alt="10月18日照片，第26张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-27.jpg" width="1707" height="1280" alt="10月18日照片，第27张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-28.jpg" width="1707" height="1280" alt="10月18日照片，第28张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-29.jpg" width="1707" height="1280" alt="10月18日照片，第29张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-30.jpg" width="1707" height="1280" alt="10月18日照片，第30张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-31.jpg" width="1707" height="1280" alt="10月18日照片，第31张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-32.jpg" width="1707" height="1280" alt="10月18日照片，第32张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-33.jpg" width="1707" height="1280" alt="10月18日照片，第33张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-34.jpg" width="1280" height="1707" alt="10月18日照片，第34张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-35.jpg" width="1280" height="1707" alt="10月18日照片，第35张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-36.jpg" width="1707" height="1280" alt="10月18日照片，第36张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-37.jpg" width="1707" height="1280" alt="10月18日照片，第37张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W42/media/2026-10-18-photo-38.jpg" width="1280" height="1707" alt="10月18日照片，第38张" loading="lazy" decoding="async">
+
+
+突然想起来我小学老师都40多岁了 时间过得真快 我的流体力学老师wx ID叫 康斯坦斯 罗 真厉害 好老师
