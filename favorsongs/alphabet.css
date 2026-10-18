@@ -64,3 +64,14 @@
   position: relative; top: auto !important; flex: 0 0 var(--card-height);
 }
 @media (hover: none) { .song:hover { transform: none; } }
+
+/* A fast scrub has exactly one marker, without fading remnants of old letters. */
+.song-alphabet.is-dragging button span { transition: none; }
+@media (max-width: 1000px) {
+  /* Keep bright player controls behind the fixed toolbar out of its glass blur. */
+  .song-search { isolation: isolate; }
+  .song-search::before {
+    content: ''; position: absolute; z-index: -1; inset: -12px -12px -8px;
+    background: #0f0f0f; pointer-events: none;
+  }
+}

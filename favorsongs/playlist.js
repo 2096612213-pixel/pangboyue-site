@@ -33,6 +33,7 @@ let alphabetNav = null;
 let draggingPointer = null;
 let draggedLetter = '';
 let dragBounds = null;
+let letterNavigation = null;
 const alphabetButtons = new Map();
 function markLetter(letter) {
   for (const [key, button] of alphabetButtons) button.setAttribute('aria-pressed', String(key === letter));
@@ -45,6 +46,15 @@ function syncAlphabet(listTop, stride) {
     if (draggedLetter) markLetter(draggedLetter);
     return;
   }
+  // A programmatic scroll can be delivered after touchend in a mobile webview.
+  // Retain the requested selection until that scroll has settled, or the user
+  // starts a different scroll/search/sort action.
+  if (letterNavigation && performance.now() < letterNavigation.until) {
+    markLetter(letterNavigation.letter);
+    if (Math.abs(scrollY - letterNavigation.top) < 2) letterNavigation = null;
+    return;
+  }
+  letterNavigation = null;
   const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
   const atBottom = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
   const first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
@@ -65,6 +75,14 @@ let scheduled = false;
 let searchIndex = -1;
 let previousQuery = "";
 let matchCursor = -1;
+
+function listDocumentTop() {
+  // Layout offsets do not mix an asynchronously scrolling webview's client
+  // rectangle with a separately sampled scrollY.
+  let top = 0;
+  for (let node = list; node; node = node.offsetParent) top += node.offsetTop;
+  return top;
+}
 
 function dimensions() {
   const styles = getComputedStyle(list);
@@ -207,6 +225,7 @@ searchInput.addEventListener('keydown', event => {
   if (event.key === 'Enter' && (event.isComposing || composing || event.keyCode === 229)) event.preventDefault();
 });
 searchInput.addEventListener('input', () => {
+  letterNavigation = null;
   previousQuery = ''; matchCursor = -1; searchIndex = -1;
   searchStatus.textContent = '搜索只定位歌曲，点击播放按钮开始听。';
   render();
@@ -214,6 +233,7 @@ searchInput.addEventListener('input', () => {
 searchForm.addEventListener('submit', event => {
   event.preventDefault();
   cancelAnimationFrame(searchScrollFrame);
+  letterNavigation = null;
   if (composing) return;
   const query = normalizeSearch(searchInput.value);
   if (!query) {
@@ -246,6 +266,7 @@ searchForm.addEventListener('submit', event => {
 
 function sortPlaylist(mode, resetScroll = true) {
   cancelAnimationFrame(searchScrollFrame);
+  letterNavigation = null;
   rowsNeedLayout = true;
   sortMode = mode;
   const activeFile = songs[activeIndex]?.file;
@@ -314,59 +335,118 @@ function jumpToLetter(letter) {
   render();
   // Use the virtual row's layout position, not a card's animated hover transform.
   const { height, gap } = dimensions();
-  const top = list.getBoundingClientRect().top + scrollY + index * (height + gap);
+  const listOrigin = dragBounds?.listOrigin ?? listDocumentTop();
+  const top = listOrigin + index * (height + gap);
   const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
-  window.scrollTo({ top: Math.max(0, top - edge), behavior: 'auto' });
+  const target = Math.max(0, Math.min(top - edge, document.documentElement.scrollHeight - innerHeight));
+  letterNavigation = { letter, top: target, until: performance.now() + 800 };
+  window.scrollTo({ top: target, behavior: 'auto' });
   // Materialize/reconcile the destination now, without waiting for a Safari
   // scroll event or animation frame during the active touch gesture.
   render(); markLetter(letter); showPreview(letter);
 }
-function letterAtPointer(event) {
+// Touch Events own phone gestures; Pointer Events are only used for mouse/pen
+// or browsers without Touch Events. Never let both streams drive one gesture.
+const nativeTouch = 'ontouchstart' in window;
+let touchId = null;
+let pendingLetter = '';
+let navigationFrame = 0;
+let committedLetter = '';
+function letterAtPoint(point) {
   const rect = dragBounds || alphabetNav.getBoundingClientRect();
-  const index = Math.max(0, Math.min(alphabet.length - 1, Math.floor((event.clientY - rect.top) / (rect.height / alphabet.length))));
+  // Screen-space deltas stay independent of document scroll and webview chrome.
+  // Some webviews report remapped clientY in the middle of a programmatic jump.
+  if (!Number.isFinite(point.clientY) || !Number.isFinite(point.screenY)) return null;
+  // Empty/cancel coordinates are not a request to jump to the first letter.
+  if (point.clientY === 0 && point.screenY === 0 && rect.clientY > 0) return null;
+  const y = rect.screenY === null ? point.clientY : rect.clientY + point.screenY - rect.screenY;
+  const index = Math.max(0, Math.min(alphabet.length - 1, Math.floor((y - rect.top) / (rect.height / alphabet.length))));
   return alphabet[index];
 }
-function dragToLetter(event) {
-  const letter = letterAtPointer(event);
-  if (letter === draggedLetter || alphabetButtons.get(letter).disabled) return;
-  draggedLetter = letter; jumpToLetter(letter);
-}
-alphabetNav.addEventListener('pointerdown', event => {
-  if (event.button !== 0 || event.isPrimary === false || draggingPointer !== null) return;
-  event.preventDefault();
-  lastPointerTime = performance.now();
-  const rect = alphabetNav.getBoundingClientRect();
-  dragBounds = {top: rect.top, height: rect.height};
-  // Mobile browser chrome / keyboard can resize the viewport as the list jumps.
-  // Keep both the rail and its hit regions at their gesture-start coordinates.
-  for (const key of ['left', 'top', 'width', 'height']) {
-    alphabetNav.style.setProperty(`--drag-${key}`, `${rect[key]}px`);
+function flushNavigation() {
+  cancelAnimationFrame(navigationFrame); navigationFrame = 0;
+  const letter = pendingLetter; pendingLetter = '';
+  if (letter && letter !== committedLetter) {
+    committedLetter = letter; jumpToLetter(letter);
   }
+}
+function dragToPoint(point) {
+  const letter = letterAtPoint(point);
+  if (!letter || letter === draggedLetter || alphabetButtons.get(letter).disabled) return;
+  draggedLetter = letter;
+  // Feedback follows the finger immediately; scroll at most once per frame,
+  // using only the latest sample. Intermediate jumps must not queue up.
+  markLetter(letter); showPreview(letter); pendingLetter = letter;
+  if (!navigationFrame) navigationFrame = requestAnimationFrame(flushNavigation);
+}
+function beginDrag(point, owner, useScreen) {
+  lastPointerTime = performance.now();
+  cancelAnimationFrame(searchScrollFrame);
+  const rect = alphabetNav.getBoundingClientRect();
+  dragBounds = {
+    top: rect.top, height: rect.height,
+    listOrigin: listDocumentTop(),
+    clientY: point.clientY,
+    screenY: useScreen && Number.isFinite(point.screenY) ? point.screenY : null,
+  };
+  for (const key of ['left', 'top', 'width', 'height']) alphabetNav.style.setProperty(`--drag-${key}`, `${rect[key]}px`);
   alphabetNav.classList.add('is-dragging');
-  draggingPointer = event.pointerId; draggedLetter = '';
+  draggingPointer = owner; draggedLetter = ''; committedLetter = '';
   if (document.activeElement === searchInput) searchInput.blur();
-  alphabetNav.setPointerCapture(event.pointerId); dragToLetter(event);
-});
-alphabetNav.addEventListener('pointermove', event => {
-  if (event.pointerId === draggingPointer) { event.preventDefault(); dragToLetter(event); }
-});
+  dragToPoint(point);
+}
 function finishDrag(event) {
   if (draggingPointer === null || (event && event.pointerId !== draggingPointer)) return;
-  lastPointerTime = performance.now();
+  // Commit the last move, not a potentially stale/missing coordinate on release.
+  flushNavigation(); lastPointerTime = performance.now();
+  if (letterNavigation && Math.abs(scrollY - letterNavigation.top) < 2) letterNavigation = null;
   const pointer = draggingPointer;
-  draggingPointer = null; draggedLetter = ''; dragBounds = null;
+  draggingPointer = null; touchId = null; draggedLetter = ''; dragBounds = null;
   alphabetNav.classList.remove('is-dragging');
   for (const key of ['left', 'top', 'width', 'height']) alphabetNav.style.removeProperty(`--drag-${key}`);
-  if (alphabetNav.hasPointerCapture(pointer)) alphabetNav.releasePointerCapture(pointer);
+  if (typeof pointer === 'number' && alphabetNav.hasPointerCapture(pointer)) alphabetNav.releasePointerCapture(pointer);
   hidePreview();
 }
+alphabetNav.addEventListener('touchstart', event => {
+  if (draggingPointer !== null || event.touches.length !== 1) return;
+  if (event.cancelable) event.preventDefault();
+  const touch = event.changedTouches[0];
+  touchId = touch.identifier;
+  beginDrag(touch, `touch:${touchId}`, true);
+}, { passive: false });
+alphabetNav.addEventListener('touchmove', event => {
+  if (touchId === null) return;
+  if (event.cancelable) event.preventDefault();
+  const touch = [...event.changedTouches].find(t => t.identifier === touchId);
+  if (touch) dragToPoint(touch);
+}, { passive: false });
+for (const type of ['touchend', 'touchcancel']) alphabetNav.addEventListener(type, event => {
+  if (touchId === null || ![...event.changedTouches].some(t => t.identifier === touchId)) return;
+  if (event.cancelable) event.preventDefault();
+  finishDrag();
+}, { passive: false });
+alphabetNav.addEventListener('pointerdown', event => {
+  if (nativeTouch && event.pointerType === 'touch') return;
+  if (event.button !== 0 || event.isPrimary === false || draggingPointer !== null) return;
+  event.preventDefault();
+  beginDrag(event, event.pointerId, event.pointerType === 'touch');
+  alphabetNav.setPointerCapture(event.pointerId);
+});
+alphabetNav.addEventListener('pointermove', event => {
+  if (event.pointerId !== draggingPointer) return;
+  event.preventDefault(); dragToPoint(event);
+});
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) alphabetNav.addEventListener(event, finishDrag);
 addEventListener('blur', () => finishDrag());
 addEventListener('pagehide', () => finishDrag());
-// Older iOS builds can still pan the page while a captured pointer moves.
-alphabetNav.addEventListener('touchmove', event => {
-  if (draggingPointer !== null && event.cancelable) event.preventDefault();
-}, { passive: false });
+// Ordinary scrolling takes ownership back immediately.
+addEventListener('wheel', () => { letterNavigation = null; }, { passive: true });
+addEventListener('touchstart', event => {
+  if (!alphabetNav.contains(event.target)) letterNavigation = null;
+}, { passive: true });
+addEventListener('keydown', event => {
+  if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key) && !alphabetNav.contains(event.target)) letterNavigation = null;
+});
 alphabetNav.addEventListener('keydown', event => {
   const button = event.target.closest('button[data-letter]');
   if (button && !button.disabled && ['Enter', ' '].includes(event.key)) {
