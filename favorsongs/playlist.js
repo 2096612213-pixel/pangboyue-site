@@ -30,12 +30,21 @@ const initials = new Map(addedSongs.map(song => [song.file, initialFor(song)]));
 const groupOrder = song => alphabet.indexOf(initials.get(song.file));
 let sortMode = 'added';
 let alphabetNav = null;
+let draggingPointer = null;
+let draggedLetter = '';
+let dragBounds = null;
 const alphabetButtons = new Map();
 function markLetter(letter) {
   for (const [key, button] of alphabetButtons) button.setAttribute('aria-pressed', String(key === letter));
 }
 function syncAlphabet(listTop, stride) {
   if (!alphabetNav) return;
+  // A gesture owns the selection. Scroll/render callbacks must not replace the
+  // letter under the finger with the group currently passing the viewport edge.
+  if (draggingPointer !== null) {
+    if (draggedLetter) markLetter(draggedLetter);
+    return;
+  }
   const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
   const atBottom = scrollY + innerHeight >= document.documentElement.scrollHeight - 2;
   const first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
@@ -251,8 +260,6 @@ document.querySelector('#sort-added').addEventListener('click', () => sortPlayli
 alphabetNav = document.querySelector('#song-alphabet');
 const preview = alphabetNav.querySelector('.alphabet-preview');
 let previewTimer = 0;
-let draggingPointer = null;
-let draggedLetter = '';
 for (const letter of alphabet) {
   const button = document.createElement('button');
   button.type = 'button'; button.dataset.letter = letter;
@@ -283,13 +290,15 @@ function jumpToLetter(letter) {
   searchIndex = index; previousQuery = ''; matchCursor = -1;
   searchStatus.textContent = `已定位 ${letter}：${songs[index].title}`;
   render();
-  const top = cards.get(index).getBoundingClientRect().top + scrollY;
+  // Use the virtual row's layout position, not a card's animated hover transform.
+  const { height, gap } = dimensions();
+  const top = list.getBoundingClientRect().top + scrollY + index * (height + gap);
   const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
   window.scrollTo({ top: Math.max(0, top - edge), behavior: 'instant' });
   markLetter(letter); scheduleRender(); showPreview(letter);
 }
 function letterAtPointer(event) {
-  const rect = alphabetNav.getBoundingClientRect();
+  const rect = dragBounds || alphabetNav.getBoundingClientRect();
   const index = Math.max(0, Math.min(alphabet.length - 1, Math.floor((event.clientY - rect.top) / (rect.height / alphabet.length))));
   return alphabet[index];
 }
@@ -299,20 +308,35 @@ function dragToLetter(event) {
   draggedLetter = letter; jumpToLetter(letter);
 }
 alphabetNav.addEventListener('pointerdown', event => {
-  if (event.button !== 0) return;
-  event.preventDefault(); draggingPointer = event.pointerId; draggedLetter = '';
+  if (event.button !== 0 || event.isPrimary === false || draggingPointer !== null) return;
+  event.preventDefault();
+  const rect = alphabetNav.getBoundingClientRect();
+  dragBounds = {top: rect.top, height: rect.height};
+  // Mobile browser chrome / keyboard can resize the viewport as the list jumps.
+  // Keep both the rail and its hit regions at their gesture-start coordinates.
+  for (const key of ['left', 'top', 'width', 'height']) {
+    alphabetNav.style.setProperty(`--drag-${key}`, `${rect[key]}px`);
+  }
+  alphabetNav.classList.add('is-dragging');
+  draggingPointer = event.pointerId; draggedLetter = '';
+  if (document.activeElement === searchInput) searchInput.blur();
   alphabetNav.setPointerCapture(event.pointerId); dragToLetter(event);
 });
 alphabetNav.addEventListener('pointermove', event => {
   if (event.pointerId === draggingPointer) dragToLetter(event);
 });
-function finishDrag() {
-  if (draggingPointer === null) return;
-  const pointer = draggingPointer; draggingPointer = null; draggedLetter = '';
+function finishDrag(event) {
+  if (draggingPointer === null || (event && event.pointerId !== draggingPointer)) return;
+  const pointer = draggingPointer;
+  draggingPointer = null; draggedLetter = ''; dragBounds = null;
+  alphabetNav.classList.remove('is-dragging');
+  for (const key of ['left', 'top', 'width', 'height']) alphabetNav.style.removeProperty(`--drag-${key}`);
   if (alphabetNav.hasPointerCapture(pointer)) alphabetNav.releasePointerCapture(pointer);
   hidePreview();
 }
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) alphabetNav.addEventListener(event, finishDrag);
+addEventListener('blur', () => finishDrag());
+addEventListener('pagehide', () => finishDrag());
 alphabetNav.addEventListener('click', event => {
   // 鼠标和触摸已由 pointerdown 处理；detail=0 是键盘触发。
   if (event.detail !== 0) return;

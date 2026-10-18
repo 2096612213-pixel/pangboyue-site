@@ -7,6 +7,13 @@
   display: grid; grid-template-rows: repeat(27, minmax(0, 1fr));
   touch-action: none; user-select: none; -webkit-user-select: none;
 }
+/* Freeze gesture geometry while mobile toolbars or the keyboard change height. */
+.song-alphabet.is-dragging {
+  left: var(--drag-left); top: var(--drag-top);
+  width: var(--drag-width); height: var(--drag-height); transform: none;
+}
+/* Recycling virtual cards must not make the browser anchor-scroll the list. */
+.songs { overflow-anchor: none; }
 .song-alphabet button {
   display: grid; place-items: center; min-height: 0; min-width: 0;
   padding: 0; border: 0; background: none; color: #787878; cursor: pointer;
