@@ -491,3 +491,9 @@ OK 院长他就是提醒我每次用完要及时收起来 不要一直放在那�
 
 我现在发现我的设计风格了 简单克制 追求真实 精益求精
 
+---
+
+<video controls playsinline preload="none" width="1024" height="576" poster="/thoughts/2026-W42/media/ye-du-shu-douyin-poster.jpg" aria-label="也读书的抖音">
+  <source src="/thoughts/2026-W42/media/ye-du-shu-douyin.mp4?v=ee89fc6760f2" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W42/media/ye-du-shu-douyin.mp4?v=ee89fc6760f2">打开视频</a>观看。
+</video>
