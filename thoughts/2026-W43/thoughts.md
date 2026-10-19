@@ -48,3 +48,7 @@
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W43/media/tongji-tenure-reflection.mp4?v=29ae05fec9d2">打开视频</a>观看。
 </video>
 
+---
+
+## 2026-10-20
+
