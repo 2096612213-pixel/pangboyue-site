@@ -11,3 +11,20 @@
 
 ---
 
+
+<img src="/thoughts/2026-W43/media/2026-10-19-image-01.png" width="1170" height="2532" alt="10月19日图片，第1张" loading="lazy" decoding="async">
+
+
+<img src="/thoughts/2026-W43/media/2026-10-19-image-02.jpg" width="1170" height="2532" alt="10月19日图片，第2张" loading="lazy" decoding="async">
+
+
+<img src="/thoughts/2026-W43/media/2026-10-19-image-03.png" width="1170" height="2532" alt="10月19日图片，第3张" loading="lazy" decoding="async">
+
+
+<img src="/thoughts/2026-W43/media/2026-10-19-image-04.png" width="1170" height="2532" alt="10月19日图片，第4张" loading="lazy" decoding="async">
+
+
+<img src="/thoughts/2026-W43/media/2026-10-19-image-05.png" width="1170" height="2532" alt="10月19日图片，第5张" loading="lazy" decoding="async">
+
+
+<img src="/thoughts/2026-W43/media/2026-10-19-image-06.png" width="1170" height="2532" alt="10月19日图片，第6张" loading="lazy" decoding="async">
