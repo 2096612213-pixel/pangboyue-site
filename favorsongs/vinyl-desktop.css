@@ -1,0 +1,53 @@
+.vinyl-stage {display:none}
+@media (min-width:1001px) {
+  :root {--queue-width:304px;--queue-right:44px;--stage-right:374px}
+  html {background:#09090a;scroll-padding-top:190px}
+  body {background:#09090a;color:#e9e6e0}
+  .page {width:var(--queue-width);margin:0 var(--queue-right) 0 auto;padding:226px 0 90px;min-height:100vh}
+  .back {position:fixed;z-index:12;left:32px;top:25px;margin:0;font-size:12px;color:#9a958d}
+  .title {position:fixed;z-index:12;left:32px;top:53px;margin:0;font-size:25px;font-weight:500;letter-spacing:2px}
+  .title .star {color:#c8a97e;font-size:19px}
+  .subtitle {position:fixed;z-index:12;top:97px;left:32px;margin:0;font-size:12px;letter-spacing:1px;color:#827c73}
+  body.vinyl-selected .subtitle {display:none}
+  .song-search {left:auto;right:var(--queue-right);top:23px;transform:none;width:var(--queue-width);padding:16px;border:1px solid #c8a97e26;border-radius:16px;background:#111113;box-shadow:0 22px 20px 6px #09090a;z-index:20}
+  .song-search input {background:transparent;color:#e9e6e0;font-size:12px}
+  .search-glass {min-height:50px;padding:0 14px;gap:10px;border-radius:12px;background:#1b1a1b;border-color:#c8a97e24;box-shadow:none}
+  .search-glass input {padding:14px 0}
+  .search-glass svg {width:16px;color:#bba88e}
+  .search-glass:focus-within {border-color:#c8a97e88;box-shadow:0 0 0 2px #c8a97e16}
+  .search-status {font-size:11px;line-height:1.5}
+  .sort-buttons button[aria-pressed="true"] {background:#c8a97e24;border-color:#c8a97e55;color:#e1caa8}
+  .songs {--card-height:112px;--card-gap:12px}
+  .song {padding:18px 20px;border:1px solid #c8a97e1f;background:#141416;border-radius:14px;cursor:pointer;transition:background .2s,border-color .2s}
+  .song:hover {transform:none;border-color:#c8a97e66;background:#1b1a1c}
+  .song.search-match {border-color:#c8a97e;box-shadow:0 0 0 2px #c8a97e22}
+  .song-name {font-size:14px;line-height:1.55;margin-bottom:9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#dfdcd7}
+  .player {width:auto}
+  .load-play {height:24px;width:auto;min-width:70px;padding:0;gap:8px;background:none;color:#aaa398;border:0;border-radius:4px;box-shadow:none;font-size:11px}
+  .load-play:hover {background:none;color:#e6cba2}
+  .load-play .play-progress,.load-play .play-volume,.load-play .play-more {display:none}
+  .load-play .play-triangle {font-size:9px}
+  .load-play .play-time {font-size:11px}
+  .load-play:focus-visible {outline:2px solid #c8a97e;outline-offset:5px}
+  .song.is-current {position:fixed;z-index:15;left:32px;right:var(--stage-right);top:103px!important;width:auto;height:75px;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;background:linear-gradient(110deg,#24211d,#131315);border-color:#c8a97e44;border-radius:14px;box-shadow:0 12px 36px #0004}
+  .song.is-current .song-name {margin:0;font-size:17px;min-width:0}
+  .song.is-current .player {flex-shrink:0}
+  .song.is-current .load-play {color:#dfc69e;font-size:12px}
+  .song.is-current::before {content:'当前唱片';position:absolute;right:0;top:-31px;font-size:10px;letter-spacing:2px;color:#928575}
+  .vinyl-stage {display:block;position:fixed;inset:188px var(--stage-right) 0 0;z-index:0;overflow:hidden;background:radial-gradient(ellipse at 22% 50%,#20201f55,transparent 65%)}
+  .vinyl-stage iframe {display:block;border:0;width:100%;height:100%;position:absolute;inset:0;opacity:0}
+  .vinyl-stage.is-ready iframe {opacity:1}
+  .vinyl-idle {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-left:16%;pointer-events:none}
+  .vinyl-idle::before {content:'';position:absolute;width:min(58vw,72vh);height:min(58vw,72vh);border-radius:50%;left:-30%;top:50%;transform:translateY(-50%);background:repeating-radial-gradient(circle,#141416 0 1px,#0d0d0f 2px 4px);border:3px solid #37332d;box-shadow:0 0 0 12px #131314,0 0 0 13px #34302a;opacity:.65}
+  .vinyl-idle small {color:#b59b78;letter-spacing:5px;font-size:10px;margin-bottom:20px}
+  .vinyl-idle strong {color:#d5cfc4;font-weight:400;font-size:clamp(20px,2.2vw,32px);letter-spacing:3px}
+  .vinyl-idle p {color:#716e68;font-size:12px;letter-spacing:1px;margin-top:18px}
+  .vinyl-stage.is-ready .vinyl-idle {display:none}
+  .vinyl-stage.is-loading .vinyl-idle strong {font-size:0}
+  .vinyl-stage.is-loading .vinyl-idle strong::after {content:'正在准备唱片机…';font-size:20px}
+  .song-alphabet:not(.is-dragging) {left:auto;right:7px;top:calc(218px + (100svh - 218px)/2);transform:translateY(-50%);height:calc(100svh - 240px);width:26px}
+  .song-alphabet button {font-size:clamp(9px,1.5svh,13px)}
+  .song-alphabet button[aria-pressed="true"] span {background:#a88b60}
+  .song-alphabet button:focus-visible {outline-color:#c8a97e}
+  @media (max-width:1150px) {:root {--queue-width:270px;--stage-right:338px}.song.is-current .song-name {font-size:15px}}
+}

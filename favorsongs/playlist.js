@@ -55,7 +55,7 @@ function syncAlphabet(listTop, stride) {
     return;
   }
   letterNavigation = null;
-  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
+  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 226;
   const position = scrollPosition();
   const atBottom = position.top + position.height >= position.scrollHeight - 2;
   const first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
@@ -77,6 +77,86 @@ let scheduled = false;
 let searchIndex = -1;
 let previousQuery = "";
 let matchCursor = -1;
+let desktopPlayer = null;
+let desktopModule = null;
+let selectionRevision = 0;
+let desktopState = 'idle';
+let currentCard = null;
+function updateDesktopState({file, state, message, resetMedia}) {
+  if (flowLayout.matches || songs[activeIndex]?.file !== file) return;
+  desktopState = state;
+  if (resetMedia) releaseDesktopAudio();
+  const playing = ['playing','preparing','spinningUp','movingArm','loweringStylus','loading'].includes(state);
+  for (const card of [cards.get(activeIndex), currentCard]) {
+    const button = card?.querySelector('.load-play');
+    if (!button) continue;
+    button.querySelector('.play-triangle').textContent = playing ? 'Ⅱ' : '▶';
+    button.querySelector('.play-time').textContent = state === 'error' ? '重试' : state === 'loading' ? '加载中' : playing ? '暂停' : '播放';
+    button.setAttribute('aria-label', `${state === 'error' ? '重试播放' : playing ? '暂停' : '播放'} ${songs[activeIndex].title}`);
+    button.setAttribute('aria-pressed', String(playing));
+    button.title = message || button.getAttribute('aria-label');
+  }
+}
+function releaseDesktopAudio() {
+  window.__favoriteVinylAudioContext?.close().catch(() => {});
+  delete window.__favoriteVinylAudioContext;
+  window.__favoriteVinylAudio?.pause(); window.__favoriteVinylAudio?.remove();
+  delete window.__favoriteVinylAudio;
+}
+function unlockDesktopAudio() {
+  // WebKit needs AudioContext.resume inside the original page click, before
+  // the lazy module/iframe or selected file has finished loading.
+  if (!window.__favoriteVinylAudio) {
+    const audio = document.createElement('audio');
+    audio.hidden = true; audio.preload = 'none'; audio.dataset.vinylWarm = 'true';
+    audio.src = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+    window.__favoriteVinylAudio = audio; document.body.append(audio);
+    // A short, genuinely silent local WAV unlocks this same media element.
+    audio.play().then(() => {
+      if (audio.dataset.vinylWarm === 'true') {audio.pause();audio.removeAttribute('src');audio.load();}
+    }).catch(() => {});
+  }
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) return;
+  try {
+    window.__favoriteVinylAudioContext ||= new Context();
+    window.__favoriteVinylAudioContext.resume().catch(() => {});
+  } catch { /* The player's controls expose a retry if audio is unavailable. */ }
+}
+async function selectDesktopSong(song) {
+  unlockDesktopAudio();
+  const revision = ++selectionRevision;
+  for (const card of cards.values()) card.querySelector('audio')?.pause();
+  const same = songs[activeIndex]?.file === song.file;
+  activeIndex = songs.indexOf(song);
+  if (!same) desktopState = 'loading';
+  document.body.classList.add('vinyl-selected');
+  cancelAnimationFrame(searchScrollFrame); letterNavigation = null;
+  render();
+  try {
+    desktopModule ||= import('./vinyl-desktop.js?v=2cec6e6c7643');
+    const {createVinylPlayer} = await desktopModule;
+    if (revision !== selectionRevision || flowLayout.matches) return;
+    desktopPlayer ||= createVinylPlayer({onState:updateDesktopState, onNavigate:direction => {
+      const next = (activeIndex + direction + songs.length) % songs.length;
+      selectDesktopSong(songs[next]);
+    }});
+    desktopPlayer.select(song);
+  } catch (error) {
+    desktopModule = null;
+    if (revision === selectionRevision) updateDesktopState({file:song.file,state:'error',message:'播放器加载失败，请重试',resetMedia:true});
+  }
+}
+flowLayout.addEventListener('change', () => {
+  selectionRevision++;
+  desktopPlayer?.destroy(); desktopPlayer = null;
+  releaseDesktopAudio();
+  for (const card of cards.values()) {card.querySelector('audio')?.pause();card.remove();}
+  cards.clear(); activeIndex = -1; rowsNeedLayout = true;
+  currentCard?.remove(); currentCard = null;
+  document.body.classList.remove('vinyl-selected');
+  render(); scrollPlaylist(0);
+});
 
 function scrollPosition() {
   return flowLayout.matches
@@ -123,6 +203,7 @@ function makeCard(song, index) {
   playButton.setAttribute('aria-label', `播放 ${song.title}`);
   playButton.innerHTML = '<span class="play-triangle">▶</span><span class="play-time">0:00 / 0:00</span><span class="play-progress"></span><span class="play-volume">◖</span><span class="play-more">⋮</span>';
   async function startSong() {
+    if (!flowLayout.matches) { selectDesktopSong(song); return; }
     if (audio) return;
     const index = songs.indexOf(song);
     cards.get(activeIndex)?.querySelector('audio')?.pause();
@@ -147,6 +228,9 @@ function makeCard(song, index) {
     try { await audio.play(); } catch { /* Native controls allow retry. */ }
   }
   playButton.addEventListener('click', startSong);
+  card.addEventListener('click', event => {
+    if (!flowLayout.matches && !event.target.closest('button,audio')) selectDesktopSong(song);
+  });
 
   player.append(playButton);
   card.append(name, player);
@@ -176,7 +260,10 @@ function render() {
   const start = flow ? 0 : Math.max(0, Math.floor(-listTop / stride) - 2);
   const end = flow ? songs.length : Math.min(songs.length, Math.max(0, Math.ceil((innerHeight - listTop) / stride) + 2));
   const wanted = new Set();
-  for (let index = start; index < end; index++) wanted.add(index);
+  for (let row = start; row < end; row++) {
+    const index = row;
+    if (index < songs.length) wanted.add(index);
+  }
   if (activeIndex !== -1) wanted.add(activeIndex);
   if (searchIndex !== -1) wanted.add(searchIndex);
 
@@ -201,7 +288,30 @@ function render() {
     }
     card.setAttribute('aria-posinset', String(index + 1));
     card.style.top = `${index * stride}px`;
+    if (!flow) {
+      const button = card.querySelector('.load-play');
+      if (button && index !== activeIndex) {
+        button.querySelector('.play-time').textContent = '播放';
+        button.querySelector('.play-triangle').textContent = '▶';
+        button.setAttribute('aria-label', `播放 ${songs[index].title}`);
+        button.setAttribute('aria-pressed','false');
+      }
+    }
     card.classList.toggle("search-match", index === searchIndex);
+  }
+  if (!flow && activeIndex >= 0) {
+    // The fixed now-playing card is separate: queue rows and scroll stay put.
+    if (currentCard?.dataset.file !== songs[activeIndex].file) {
+      currentCard?.remove();
+      currentCard = makeCard(songs[activeIndex], activeIndex);
+      currentCard.classList.add('is-current');
+      currentCard.setAttribute('role', 'group');
+      currentCard.setAttribute('aria-label', '当前播放');
+      currentCard.removeAttribute('aria-posinset');
+      currentCard.removeAttribute('aria-setsize');
+      document.body.append(currentCard);
+    }
+    updateDesktopState({file:songs[activeIndex].file,state:desktopState});
   }
   matchedCard = cards.get(searchIndex);
   syncAlphabet(listTop, stride);
@@ -348,7 +458,7 @@ function jumpToLetter(letter) {
   const { height, gap } = dimensions();
   const listOrigin = dragBounds?.listOrigin ?? listContentTop();
   const top = listOrigin + index * (height + gap);
-  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 24;
+  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 226;
   const position = scrollPosition();
   const target = Math.max(0, Math.min(top - edge, position.scrollHeight - position.height));
   letterNavigation = { letter, top: target, until: performance.now() + 800 };
