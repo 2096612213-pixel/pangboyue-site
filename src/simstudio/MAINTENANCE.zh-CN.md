@@ -4,7 +4,7 @@
 
 ## 网站入口与构建
 
-- 卡片：`../../visibleproductsshow/index.html`，放在第一个，宽屏占两列、两行，小屏单列。
+- 卡片：`../../visibleproductsshow/index.html`，放在第一个，与其他卡片保持相同尺寸；全部项目按现有顺序从左到右、逐行排列，小屏单列。
 - 封面：`../../visibleproductsshow/assets/lego-studio-cover.png`，使用用户提供的原图。
 - 页面：`/visibleproductsshow/lego/`。
 - 源码：本目录。部署产物：`../../visibleproductsshow/lego/`，不要直接编辑产物。
