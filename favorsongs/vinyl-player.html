@@ -3690,7 +3690,15 @@ class TurntableTransport {
         this.gate(false);
         this.setState('preparing', 'waitingMedia');
         this.move({lift: 1}, .3);
-      } else if (this.advance(dt)) this.commit();
+      } else if (this.advance(dt) && !this.audioStarting) {
+        // MP3 duration can be corrected after a seek or decoder warm-up. The
+        // groove target then changes even with a paused media clock. Lift and
+        // realign instead of leaving commit() waiting forever for contact.
+        if (this.intent && this.ready && !this.contact) {
+          this.setState('preparing', 'reposition');
+          this.move({lift: 1}, .34);
+        } else this.commit();
+      }
     } else if (this.state === 'pausing') {
       if (this.advance(dt)) {
         if(this.phase==='lift'){

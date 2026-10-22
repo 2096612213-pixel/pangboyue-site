@@ -134,7 +134,7 @@ async function selectDesktopSong(song) {
   cancelAnimationFrame(searchScrollFrame); letterNavigation = null;
   render();
   try {
-    desktopModule ||= import('./vinyl-desktop.js?v=2cec6e6c7643');
+    desktopModule ||= import('./vinyl-desktop.js?v=8c716b0cd04a');
     const {createVinylPlayer} = await desktopModule;
     if (revision !== selectionRevision || flowLayout.matches) return;
     desktopPlayer ||= createVinylPlayer({onState:updateDesktopState, onNavigate:direction => {
