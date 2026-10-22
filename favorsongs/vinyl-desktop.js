@@ -23,7 +23,7 @@ export function createVinylPlayer({onState, onNavigate}) {
         stage.classList.remove('is-loading'); stage.classList.add('is-ready');
         resolve(win.vinylPlayer);
       }, {once:true});
-      frame.src = new URL('./vinyl-player.html?v=5d1722284514', import.meta.url).href;
+      frame.src = new URL('./vinyl-player.html?v=ee6289bced11', import.meta.url).href;
       stage.append(frame);
     });
     return pending;

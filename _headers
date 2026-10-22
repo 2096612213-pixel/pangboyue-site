@@ -28,3 +28,9 @@
 
 /daily/*.md
   Cache-Control: public, max-age=0, must-revalidate
+
+# Content-fingerprinted entry; a changed song list produces a new URL.
+/favorsongs/playlist.bundle.js
+  Cache-Control: public, max-age=86400
+/favorsongs/
+  Cache-Control: public, max-age=0, must-revalidate

@@ -13,7 +13,7 @@
 
 新增歌曲只需更新 `songs.js`，字母分组随清单自动更新；不用维护另一份索引或引入拼音字典。
 
-更新 `playlist.js` 或 `alphabet.css` 后，同时更新 `index.html` 中对应资源的 `?v=` 内容指纹。
+更新歌单、样式或播放代码后运行 `npm run build:songs`，再运行 `npm run check:songs` 验证发布入口。不要直接修改生成的 `playlist.bundle.js` 或 `index.html` 中 `songs:styles` 标记之间的样式。
 
 手机索引由独立的原生触摸事件处理，统一使用视口 clientY 定位同一根手指，不混合 screenY/pageY 差值；每帧仅执行最后一次字母定位，忽略重复 Pointer 事件及无效坐标，抬手时提交最后落点。修改此逻辑时，应测试快速往返、触摸取消、普通页面滚动及播放互斥。
 
@@ -30,4 +30,8 @@
 
 歌词优先读取内嵌时间轴及按音频内容保存的缓存，然后请求 LRCLIB。网络匹配保留歌曲、歌手、版本和时长校验（允许整数秒时长舍入及 MP3 填充误差），不把网络时间轴称为已核验音频。现场版与录音棚版不能互换。无可用歌词时显示提示，可在“歌词总览”中补充 LRC；无时间轴的文本不伪造同步。歌词同步检查应区分实际在线可用性和受控测试时间轴。
 
-修改播放器资源后，按依赖顺序更新 SHA-256 前 12 位查询指纹：`vinyl-bridge.js` → `vinyl-player.html` → `vinyl-desktop.js` → `playlist.js` → `index.html`；`vinyl-desktop.css` 的指纹也写入 `index.html`。这样浏览器不会混用新旧适配代码。
+`scripts/build-favorsongs.mjs` 按依赖顺序更新 SHA-256 前 12 位查询指纹：`vinyl-bridge.js` → `vinyl-player.html` → `vinyl-desktop.js` → `playlist.js` → `playlist.bundle.js` → `index.html`，避免浏览器混用版本。
+
+跨设备播放：音频元素直接使用本站 MP3 地址，由浏览器流式加载；不再等待整首下载完成。实际出声后才在后台读取完整文件的内嵌封面/歌词和内容哈希，60 秒未完成则放弃本次附加读取，音乐继续。点歌、播放中断或拖动后连续 30 秒无法继续播放会停止请求并显示重试；用户主动暂停不计超时。图形初始化失败或超过 12 秒会自动切换兼容画面，避免无 WebGL 的电脑一直等待。播放器模块和 iframe 各有 30 秒加载上限。
+
+首屏只请求页面和一个 `playlist.bundle.js`（含歌单数据和列表逻辑），两份小样式在构建时内联；入口脚本在 head 中 modulepreload，去掉串行歌曲清单请求。使用内容指纹而非每次打开的随机时间戳，清单变化会生成新地址。初次打开不下载播放器、Three.js、音频或封面。`_headers` 为带指纹的入口设置一天缓存，并要求歌曲页 HTML 重新验证。三秒目标以歌单和搜索/字母索引可操作为准，仍取决于实际网络和服务器响应。

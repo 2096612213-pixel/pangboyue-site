@@ -1,5 +1,5 @@
-// The song list is tiny; give it a fresh URL so Safari never keeps an old list.
-const { songs: addedSongs } = await import(`./songs.js?v=${Date.now()}`);
+// Readable module source; build:songs bundles the manifest for one startup request.
+import { songs as addedSongs } from './songs.js';
 let songs = [...addedSongs];
 // Manifest order records addition order, including older entries without timestamps.
 const additionOrder = new Map(addedSongs.map((song, index) => [song.file, index]));
@@ -134,8 +134,11 @@ async function selectDesktopSong(song) {
   cancelAnimationFrame(searchScrollFrame); letterNavigation = null;
   render();
   try {
-    desktopModule ||= import('./vinyl-desktop.js?v=8c716b0cd04a');
-    const {createVinylPlayer} = await desktopModule;
+    desktopModule ||= import('./vinyl-desktop.js?v=ae9f60db53b5');
+    let loadTimer;
+    const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
+      loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);
+    })]).finally(() => clearTimeout(loadTimer));
     if (revision !== selectionRevision || flowLayout.matches) return;
     desktopPlayer ||= createVinylPlayer({onState:updateDesktopState, onNavigate:direction => {
       const next = (activeIndex + direction + songs.length) % songs.length;

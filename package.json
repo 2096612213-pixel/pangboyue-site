@@ -8,6 +8,8 @@
     "build:book": "node scripts/build-book.mjs",
     "check:book": "node scripts/build-book.mjs --check",
     "build:lego": "node scripts/build-simstudio.mjs",
-    "check:lego": "node scripts/build-simstudio.mjs --check"
+    "check:lego": "node scripts/build-simstudio.mjs --check",
+    "build:songs": "node scripts/build-favorsongs.mjs",
+    "check:songs": "node scripts/build-favorsongs.mjs --check"
   }
 }
