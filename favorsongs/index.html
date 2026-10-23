@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 
 <head>
-  <link rel="modulepreload" href="playlist.bundle.js?v=6dc00abfe4c0">
+  <link rel="modulepreload" href="playlist.bundle.js?v=dce7011a8ec1">
   <meta name="description" content="庞博约最爱的歌曲列表与播放器。">
   <link rel="canonical" href="https://pangboyue.com/favorsongs/">
   <link rel="icon" type="image/x-icon" href="../favicon.ico">
@@ -357,12 +357,17 @@
   .playlist-viewport .page { min-height: 100%; }
 }
 
+.audio-quality{display:flex;align-items:center;gap:10px;margin:8px 4px;color:#bab6ad;font-size:12px;}
+.audio-quality select{min-width:0;flex:1;padding:5px 8px;border:1px solid #ffffff30;border-radius:8px;background:#1c1c1e;color:#e3e0d9;font:inherit;color-scheme:dark;}
+
+@media(max-width:1000px){.page{padding-top:260px!important}.song-alphabet{top:calc(216px + (100svh - 216px)/2);height:min(486px,calc(100svh - 232px));}}
+
 .vinyl-stage {display:none}
 @media (min-width:1001px) {
   :root {--queue-width:304px;--queue-right:44px;--stage-right:374px}
   html {background:#09090a;scroll-padding-top:190px}
   body {background:#09090a;color:#e9e6e0}
-  .page {width:var(--queue-width);margin:0 var(--queue-right) 0 auto;padding:226px 0 90px;min-height:100vh}
+  .page {width:var(--queue-width);margin:0 var(--queue-right) 0 auto;padding:266px 0 90px;min-height:100vh}
   .back {position:fixed;z-index:12;left:32px;top:25px;margin:0;font-size:12px;color:#9a958d}
   .title {position:fixed;z-index:12;left:32px;top:53px;margin:0;font-size:25px;font-weight:500;letter-spacing:2px}
   .title .star {color:#c8a97e;font-size:19px}
@@ -404,7 +409,7 @@
   .vinyl-stage.is-ready .vinyl-idle {display:none}
   .vinyl-stage.is-loading .vinyl-idle strong {font-size:0}
   .vinyl-stage.is-loading .vinyl-idle strong::after {content:'正在准备唱片机…';font-size:20px}
-  .song-alphabet:not(.is-dragging) {left:auto;right:7px;top:calc(218px + (100svh - 218px)/2);transform:translateY(-50%);height:calc(100svh - 240px);width:26px}
+  .song-alphabet:not(.is-dragging) {left:auto;right:7px;top:calc(258px + (100svh - 258px)/2);transform:translateY(-50%);height:calc(100svh - 280px);width:26px}
   .song-alphabet button {font-size:clamp(9px,1.5svh,13px)}
   .song-alphabet button[aria-pressed="true"] span {background:#a88b60}
   .song-alphabet button:focus-visible {outline-color:#c8a97e}
@@ -424,6 +429,7 @@
         <span class="search-enter" aria-hidden="true">Enter ↵</span>
       </div>
       <p class="search-status" id="search-status" role="status" aria-live="polite">搜索只定位歌曲，点击播放按钮开始听。</p>
+      <label class="audio-quality">音质 <select id="audio-quality" aria-label="播放音质"><option value="smooth">流畅 · 省流量</option><option value="original">原音质</option></select></label>
       <div class="sort-buttons" role="group" aria-label="歌单排序">
         <button type="button" id="sort-pinyin" aria-pressed="false">拼音顺序 ↑</button>
         <button type="button" id="sort-added" aria-pressed="true">添加时间 ↑</button>
@@ -462,7 +468,7 @@
     <div class="alphabet-preview" aria-hidden="true" hidden></div>
   </nav>
 
-  <script type="module" src="playlist.bundle.js?v=6dc00abfe4c0"></script>
+  <script type="module" src="playlist.bundle.js?v=dce7011a8ec1"></script>
 </body>
 
 </html>

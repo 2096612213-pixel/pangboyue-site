@@ -3,7 +3,7 @@
   :root {--queue-width:304px;--queue-right:44px;--stage-right:374px}
   html {background:#09090a;scroll-padding-top:190px}
   body {background:#09090a;color:#e9e6e0}
-  .page {width:var(--queue-width);margin:0 var(--queue-right) 0 auto;padding:226px 0 90px;min-height:100vh}
+  .page {width:var(--queue-width);margin:0 var(--queue-right) 0 auto;padding:266px 0 90px;min-height:100vh}
   .back {position:fixed;z-index:12;left:32px;top:25px;margin:0;font-size:12px;color:#9a958d}
   .title {position:fixed;z-index:12;left:32px;top:53px;margin:0;font-size:25px;font-weight:500;letter-spacing:2px}
   .title .star {color:#c8a97e;font-size:19px}
@@ -45,7 +45,7 @@
   .vinyl-stage.is-ready .vinyl-idle {display:none}
   .vinyl-stage.is-loading .vinyl-idle strong {font-size:0}
   .vinyl-stage.is-loading .vinyl-idle strong::after {content:'正在准备唱片机…';font-size:20px}
-  .song-alphabet:not(.is-dragging) {left:auto;right:7px;top:calc(218px + (100svh - 218px)/2);transform:translateY(-50%);height:calc(100svh - 240px);width:26px}
+  .song-alphabet:not(.is-dragging) {left:auto;right:7px;top:calc(258px + (100svh - 258px)/2);transform:translateY(-50%);height:calc(100svh - 280px);width:26px}
   .song-alphabet button {font-size:clamp(9px,1.5svh,13px)}
   .song-alphabet button[aria-pressed="true"] span {background:#a88b60}
   .song-alphabet button:focus-visible {outline-color:#c8a97e}

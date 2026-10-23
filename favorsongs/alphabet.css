@@ -88,3 +88,8 @@
   }
   .playlist-viewport .page { min-height: 100%; }
 }
+
+.audio-quality{display:flex;align-items:center;gap:10px;margin:8px 4px;color:#bab6ad;font-size:12px;}
+.audio-quality select{min-width:0;flex:1;padding:5px 8px;border:1px solid #ffffff30;border-radius:8px;background:#1c1c1e;color:#e3e0d9;font:inherit;color-scheme:dark;}
+
+@media(max-width:1000px){.page{padding-top:260px!important}.song-alphabet{top:calc(216px + (100svh - 216px)/2);height:min(486px,calc(100svh - 232px));}}

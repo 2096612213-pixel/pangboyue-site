@@ -23,7 +23,7 @@ export function createVinylPlayer({onState, onNavigate}) {
         stage.classList.remove('is-loading'); stage.classList.add('is-ready');
         resolve(win.vinylPlayer);
       }, {once:true});
-      frame.src = new URL('./vinyl-player.html?v=ee6289bced11', import.meta.url).href;
+      frame.src = new URL('./vinyl-player.html?v=1502bc8b65e5', import.meta.url).href;
       stage.append(frame);
     });
     return pending;
@@ -31,7 +31,7 @@ export function createVinylPlayer({onState, onNavigate}) {
   return {
     async select(song) {
       if (disposed) return;
-      if (selected?.file === song.file && state !== 'error') {
+      if (selected?.file === song.file && selected?.audioFile === song.audioFile && state !== 'error') {
         const player = await ready(); if (!disposed) player.toggle(); return;
       }
       selected = song; state = 'loading';

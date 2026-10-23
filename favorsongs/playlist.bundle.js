@@ -537,6 +537,15 @@ const addedSongs = [
 ];
 
 let songs = [...addedSongs];
+// AAC-LC copies have no large embedded artwork and their index is at the start.
+const STREAM_REVISION = '4bd829df035f'; // updated by build:songs
+const qualityControl = document.querySelector('#audio-quality');
+let audioQuality = 'smooth';
+try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
+qualityControl.value = audioQuality;
+const audioPath = song => audioQuality === 'original' ? song.file : `streams/${song.file.replace(/\.mp3$/i, '.m4a')}?v=${STREAM_REVISION}`;
+const playbackSong = song => ({...song, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.mp3$/i, '.json')}?v=${STREAM_REVISION}`});
+
 // Manifest order records addition order, including older entries without timestamps.
 const additionOrder = new Map(addedSongs.map((song, index) => [song.file, index]));
 const pinyinCollator = new Intl.Collator('zh-Hans-CN-u-co-pinyin', { numeric: true, sensitivity: 'base' });
@@ -591,7 +600,7 @@ function syncAlphabet(listTop, stride) {
     return;
   }
   letterNavigation = null;
-  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 226;
+  const edge = matchMedia('(max-width: 1000px)').matches ? 216 : 266;
   const position = scrollPosition();
   const atBottom = position.top + position.height >= position.scrollHeight - 2;
   const first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
@@ -661,6 +670,16 @@ function unlockDesktopAudio() {
 }
 async function selectDesktopSong(song) {
   unlockDesktopAudio();
+  // Start buffering the selected audio while the renderer is downloading.
+  if (!desktopPlayer) {
+    const audio = window.__favoriteVinylAudio;
+    delete audio.dataset.vinylWarm;
+    const url = new URL(audioPath(song), location.href).href;
+    if (audio.dataset.prebufferSrc !== url) {
+      audio.muted = true; audio.src = url; audio.preload = 'auto';
+      audio.dataset.prebufferSrc = url; audio.load();
+    }
+  }
   const revision = ++selectionRevision;
   for (const card of cards.values()) card.querySelector('audio')?.pause();
   const same = songs[activeIndex]?.file === song.file;
@@ -670,7 +689,7 @@ async function selectDesktopSong(song) {
   cancelAnimationFrame(searchScrollFrame); letterNavigation = null;
   render();
   try {
-    desktopModule ||= import('./vinyl-desktop.js?v=ae9f60db53b5');
+    desktopModule ||= import('./vinyl-desktop.js?v=ea4be30dd4f8');
     let loadTimer;
     const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
       loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);
@@ -680,7 +699,7 @@ async function selectDesktopSong(song) {
       const next = (activeIndex + direction + songs.length) % songs.length;
       selectDesktopSong(songs[next]);
     }});
-    desktopPlayer.select(song);
+    desktopPlayer.select(playbackSong(song));
   } catch (error) {
     desktopModule = null;
     if (revision === selectionRevision) updateDesktopState({file:song.file,state:'error',message:'播放器加载失败，请重试',resetMedia:true});
@@ -761,7 +780,7 @@ function makeCard(song, index) {
       if (activeIndex === songs.indexOf(song)) activeIndex = -1;
       scheduleRender();
     });
-    audio.src = song.file;
+    audio.src = audioPath(song);
     playButton.replaceWith(audio);
     render();
     try { await audio.play(); } catch { /* Native controls allow retry. */ }
@@ -997,7 +1016,7 @@ function jumpToLetter(letter) {
   const { height, gap } = dimensions();
   const listOrigin = dragBounds?.listOrigin ?? listContentTop();
   const top = listOrigin + index * (height + gap);
-  const edge = matchMedia('(max-width: 1000px)').matches ? 176 : 226;
+  const edge = matchMedia('(max-width: 1000px)').matches ? 216 : 266;
   const position = scrollPosition();
   const target = Math.max(0, Math.min(top - edge, position.scrollHeight - position.height));
   letterNavigation = { letter, top: target, until: performance.now() + 800 };
@@ -1124,3 +1143,18 @@ alphabetNav.addEventListener('click', event => {
   if (button && !button.disabled) { jumpToLetter(button.dataset.letter); hidePreview(); }
 });
 render();
+
+qualityControl.addEventListener('change', () => {
+  audioQuality = qualityControl.value;
+  try {localStorage.setItem('favorite-audio-quality', audioQuality);} catch {}
+  if (activeIndex < 0) return;
+  if (!flowLayout.matches) {
+    if (['playing','preparing','spinningUp','movingArm','loweringStylus','loading'].includes(desktopState)) selectDesktopSong(songs[activeIndex]);
+  } else {
+    const audio = cards.get(activeIndex)?.querySelector('audio');
+    if (!audio) return;
+    const playing = !audio.paused;
+    audio.src = audioPath(songs[activeIndex]); audio.load();
+    if (playing) audio.play().catch(() => {});
+  }
+});

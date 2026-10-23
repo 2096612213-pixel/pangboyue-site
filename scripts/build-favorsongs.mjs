@@ -1,5 +1,6 @@
-import {readFile, writeFile} from 'node:fs/promises';
+import {readFile, writeFile, stat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
+import {songs} from '../favorsongs/songs.js';
 
 // Keep editable modules/CSS, but publish a single startup module and inline the
 // small layout styles. No random manifest request or eager player/media load.
@@ -8,13 +9,23 @@ const check = process.argv.includes('--check');
 const read = name => readFile(new URL(name, root), 'utf8');
 const hash = text => createHash('sha256').update(text).digest('hex').slice(0,12);
 const pending = new Map();
+const identities = [];
+for (const song of songs) {
+  const details = await read(`details/${song.file.replace(/\.mp3$/i, '.json')}`);
+  const info = JSON.parse(details);
+  const audio = await stat(new URL(`streams/${song.file.replace(/\.mp3$/i, '.m4a')}`, root));
+  if (audio.size !== info.streamBytes || !info.sourceHash || !('embedded' in info)) throw Error(`Incomplete stream assets: ${song.file}`);
+  if (info.cover) await stat(new URL(info.cover, root));
+  identities.push(details);
+}
+pending.set('playlist.js', (await read('playlist.js')).replace(/const STREAM_REVISION = '[^']+';/, `const STREAM_REVISION = '${hash(identities.join(''))}';`));
 const value = async name => pending.get(name) ?? await read(name);
 for (const [host, asset] of [
   ['vinyl-player.html','vinyl-bridge.js'],
   ['vinyl-desktop.js','vinyl-player.html'],
   ['playlist.js','vinyl-desktop.js'],
 ]) {
-  const text = await read(host);
+  const text = await value(host);
   const pattern = new RegExp(asset.replaceAll('.', '\\.') + '\\?v=[a-f0-9]+', 'g');
   if (!pattern.test(text)) throw Error(`Missing ${asset} reference in ${host}`);
   pending.set(host, text.replace(pattern, `${asset}?v=${hash(await value(asset))}`));

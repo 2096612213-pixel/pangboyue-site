@@ -10,6 +10,7 @@
     "build:lego": "node scripts/build-simstudio.mjs",
     "check:lego": "node scripts/build-simstudio.mjs --check",
     "build:songs": "node scripts/build-favorsongs.mjs",
-    "check:songs": "node scripts/build-favorsongs.mjs --check"
+    "check:songs": "node scripts/build-favorsongs.mjs --check",
+    "build:song-media": "python3 scripts/build-song-streams.py && node scripts/build-song-details.mjs && node scripts/build-favorsongs.mjs"
   }
 }

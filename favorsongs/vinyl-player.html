@@ -836,10 +836,10 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
 
     #plx-scene-canvas{position:absolute;z-index:12;pointer-events:none;display:none;}
     .plx-render-ready #plx-scene-canvas{display:block;}
-    .plx-render-ready .platter-base,.plx-render-ready .vinyl-disc,
-    .plx-render-ready .tonearm-container,.plx-render-ready .tonearm-fixed-layer,
-    .plx-render-ready .tonearm-material-plane,.plx-render-ready .tonearm-rest-dock,
-    .plx-render-ready .vinyl-sheen,.plx-render-ready #vinyl-reflection-canvas{visibility:hidden;}
+    .plx-render-ready:not(.plx-compatibility) .platter-base,.plx-render-ready:not(.plx-compatibility) .vinyl-disc,
+    .plx-render-ready:not(.plx-compatibility) .tonearm-container,.plx-render-ready:not(.plx-compatibility) .tonearm-fixed-layer,
+    .plx-render-ready:not(.plx-compatibility) .tonearm-material-plane,.plx-render-ready:not(.plx-compatibility) .tonearm-rest-dock,
+    .plx-render-ready:not(.plx-compatibility) .vinyl-sheen,.plx-render-ready:not(.plx-compatibility) #vinyl-reflection-canvas{visibility:hidden;}
     .plx-render-ready #visualizer-canvas{width:133%;height:133%;}
 
     /* The legacy DOM is an explicit compatibility mode, never an initial frame. */
@@ -3406,7 +3406,7 @@ class VinylSurfaceLighting {render(angle){tonearmMetalLighting.setRecordAngle(an
       flushProgressDrag();syncFromMedia();transport.tick(dt,vinylAngularVel,TARGET_VINYL_SPEED);
       stepLyricsScrollPhysics(dt);
       if(Math.abs(currentTime-lastRingTime)>.03||duration!==lastRingDuration){renderVisualizerRing(currentTime);lastRingTime=currentTime;lastRingDuration=duration;}
-      tonearmMetalLighting.renderFrame();
+      if(!tonearmMetalLighting.host.classList.contains('plx-compatibility'))tonearmMetalLighting.renderFrame();
       requestAnimationFrame(animateLoop);
     }
 
@@ -4136,7 +4136,7 @@ const AutomaticLyrics=(()=>{
       try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch(_){return new TextDecoder('gb18030').decode(bytes);}
     }
     async function beginLyricsMatching(reference=[],embedded=null,force=false){
-      if(!currentAudioFile)return;
+      if(!currentAudioFile&&!currentTrackMeta.title)return;
       cancelLyricsResolution();const request=lyricsRequest,generation=trackGeneration,file=currentAudioFile,signal=lyricsAbort.signal;
       const valid=()=>generation===trackGeneration&&request===lyricsRequest&&!signal.aborted;
       const status=message=>{if(valid())setLyricsStatus(message);};
@@ -4307,10 +4307,10 @@ const AutomaticLyrics=(()=>{
       });
       window.addEventListener('pagehide',()=>{progressDrag=null;});
     }
-    function clearCurrentTrack(){
+    function clearCurrentTrack(preserveMedia=false){
       trackGeneration++;trackAbort.abort();trackAbort=new AbortController();
       cancelLyricsResolution();lyricOffset=0;lyricSourceInfo={};currentTrackMeta={};setLyricsStatus('正在读取歌词');
-      transport.replaceSource();audioEl.removeAttribute('src');audioEl.load();
+      transport.replaceSource();if(!preserveMedia){audioEl.removeAttribute('src');audioEl.load();}
       isPlaying=false;currentTime=0;duration=0;isUserScrolling=false;clearTimeout(userScrollResumeTimer);
       if(currentAudioObjectUrl)URL.revokeObjectURL(currentAudioObjectUrl);currentAudioObjectUrl=null;
       updatePlayUI();return trackGeneration;
@@ -4579,14 +4579,14 @@ const AutomaticLyrics=(()=>{
         applyTonearmTransformAndLighting();
       }},{restAngle:ARM_REST_ANGLE,reducedMotion:prefersReducedMotion});
     document.querySelector('#plx-startup-status button').addEventListener('click',()=>{
-      if(tonearmMetalLighting.ready)return;
-      tonearmMetalLighting.host.classList.add('plx-compatibility');tonearmMetalLighting.host.classList.remove('plx-starting');
-      document.getElementById('plx-startup-status').hidden=true;renderClassicHiFiVinyl();addVinylMicrofinish();
+      if(tonearmMetalLighting.host.classList.contains('plx-compatibility'))return;
+      tonearmMetalLighting.host.classList.add('plx-compatibility');tonearmMetalLighting.host.classList.remove('plx-starting','plx-render-ready');
+      document.getElementById('plx-startup-status').hidden=true;renderClassicHiFiVinyl();
     });
     const vinylSurfaceLighting=new VinylSurfaceLighting();vinylSurfaceLighting.render(vinylAngle);
     applyTonearmTransformAndLighting();bindProgressRing();
     requestAnimationFrame(animateLoop);
   </script>
-  <script src="vinyl-bridge.js?v=46a38d2ee53c"></script>
+  <script src="vinyl-bridge.js?v=f4b07bc4e21f"></script>
 </body>
 </html>

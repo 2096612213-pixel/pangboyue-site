@@ -7,7 +7,10 @@
   const statusLine = text => installLyrics(LyricTimeline.normalize([{text, source:'status'}]), false);
   async function select(song) {
     selected = song; failed = false;
-    const generation = clearCurrentTrack(), signal = trackAbort.signal;
+    const requestedURL = new URL(song.audioFile || song.file, location.href).href;
+    const prebuffered = audioEl.dataset.prebufferSrc === requestedURL && audioEl.src === requestedURL;
+    delete audioEl.dataset.prebufferSrc;
+    const generation = clearCurrentTrack(prebuffered), signal = trackAbort.signal;
     const valid = () => generation === trackGeneration && !signal.aborted;
     const [title, ...artists] = song.title.split('—');
     const artist = artists.join('—').trim();
@@ -26,15 +29,15 @@
     };
     ensureMediaConnection().catch(() => {});
     try {
-      const url = new URL(song.file, location.href);
+      const url = new URL(requestedURL);
       if (url.origin !== location.origin || !url.pathname.startsWith(new URL('./', location.href).pathname)) throw Error('无效的歌曲地址');
       currentTrackMeta = {title:title.trim(), artist, album:''};
       // Let the media engine stream/range-request the original URL. Never gate
       // playback on downloading a complete MP3 or on a lyrics service response.
-      audioEl.src = url.href; audioEl.preload = 'auto'; audioEl.load();
+      if (!prebuffered) {audioEl.src = url.href; audioEl.preload = 'auto'; audioEl.load();}
       let lastTime = audioEl.currentTime, lastAdvance = performance.now();
       let waitingSince = null, tagsStarted = false;
-      const startedAt = performance.now();
+      const startedAt = performance.now(), startDraw = tonearmMetalLighting.drawCount;
       const mediaError = () => fail('音频连接失败，请点击重试');
       const stateError = event => {
         if (event.detail.state === 'error') fail(transport.error || '播放失败，请点击重试');
@@ -44,8 +47,11 @@
         const now = performance.now();
         if (audioEl.currentTime !== lastTime) {lastTime = audioEl.currentTime; lastAdvance = now;}
         // A missing GPU must not keep an otherwise playable song waiting.
-        if (!tonearmMetalLighting.ready && !tonearmMetalLighting.host.classList.contains('plx-compatibility') &&
-            (tonearmMetalLighting.startupPhase === 'error' || now - startedAt > 12000)) {
+        const slowGraphics = transport.state !== 'playing' && audioEl.readyState >= 3 &&
+          now - startedAt > 8000 && tonearmMetalLighting.drawCount - startDraw < (now - startedAt) / 500;
+        if (!tonearmMetalLighting.host.classList.contains('plx-compatibility') &&
+            (slowGraphics || (!tonearmMetalLighting.ready &&
+              (tonearmMetalLighting.startupPhase === 'error' || now - startedAt > 12000)))) {
           document.querySelector('#plx-startup-status button').click();
         }
         if (!transport.intent || audioEl.ended) {waitingSince = null; return;}
@@ -57,7 +63,7 @@
             if (revision === timelineRevision) {
               statusLine('正在读取歌词，音乐继续播放'); revision = timelineRevision;
             }
-            loadTrackDetails(url, {signal, valid, revision, title:title.trim(), artist});
+            loadTrackDetails(song, {signal, valid, revision, title:title.trim(), artist});
           }
         } else {
           waitingSince ??= now;
@@ -77,30 +83,38 @@
       fail(error.message);
     }
   }
-  async function loadTrackDetails(url, {signal, valid, revision, title, artist}) {
-    // Full-file hashing and embedded tags remain optional background work, only
-    // started after sound. Slow/failed metadata never pauses a healthy stream.
+  async function loadTrackDetails(song, {signal, valid, revision, title, artist}) {
+    // Read a tiny build-time sidecar, never a second copy of the full song.
     const details = new AbortController();
     const abort = () => details.abort();
     signal.addEventListener('abort', abort, {once:true});
-    const timer = setTimeout(abort, 60000);
+    const timer = setTimeout(abort, 15000);
     try {
-      const response = await fetch(url, {signal:details.signal, priority:'low'});
-      if (!response.ok) throw Error('无法读取歌曲信息');
-      const blob = await response.blob();
+      const response = await fetch(new URL(song.detailsFile, location.href), {signal:details.signal, priority:'low'});
+      if (!response.ok) throw Error('暂未读取到歌曲信息');
+      const meta = await response.json();
       if (!valid()) return;
-      const file = new File([blob], decodeURIComponent(url.pathname.split('/').pop()), {type:blob.type || 'audio/mpeg'});
-      currentAudioFile = file;
-      const [meta, tags] = await Promise.all([extractID3Metadata(file), EmbeddedLyrics.read(file)]);
-      if (!valid()) {if (meta.coverUrl) URL.revokeObjectURL(meta.coverUrl); return;}
       currentTrackMeta = {title, lookupTitle:meta.title || title, artist:meta.artist || artist, album:meta.album || ''};
-      updateAlbumCover(meta.coverUrl || null);
+      // A small thumbnail can wait until there is a playback buffer to spare.
+      if (meta.cover) {
+        let coverTimer;
+        const showCover = () => {
+          if (!valid()) {clearInterval(coverTimer); return;}
+          const buffered = audioEl.buffered;
+          const end = buffered.length ? buffered.end(buffered.length - 1) : 0;
+          if (end - audioEl.currentTime >= 15 || end >= audioEl.duration - .1) {
+            clearInterval(coverTimer); updateAlbumCover(new URL(meta.cover, location.href).href);
+          }
+        };
+        coverTimer = setInterval(showCover, 1000);
+        signal.addEventListener('abort', () => clearInterval(coverTimer), {once:true});
+        showCover();
+      }
       if (revision !== timelineRevision) return;
-      const text = meta.lyrics || tags.plain || '';
-      const rows = text ? await parseAndCheckLyrics(text) : [];
+      const rows = meta.lyrics ? await parseAndCheckLyrics(meta.lyrics) : [];
       if (!valid()) return;
       if (rows.length) installLyrics(rows, false); else statusLine('正在寻找这首歌的歌词…');
-      await beginLyricsMatching(rows, tags);
+      await beginLyricsMatching(rows, meta.embedded || null);
     } catch (error) {
       if (valid() && revision === timelineRevision) {
         statusLine('暂未加载歌词，先听听旋律。');
