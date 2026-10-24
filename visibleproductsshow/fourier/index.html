@@ -12,16 +12,35 @@ main>.workspace{margin-top:24px}@media(max-width:560px){.brand{font-size:14px;ga
 
 .angular-control input[type=number]{width:76px;flex:0 0 76px}@media(max-width:1150px){.angular-control input[type=number]{width:100%;flex:auto}}@media(min-width:561px) and (max-width:900px){.angular-control input[type=number]{width:76px;flex:0 0 76px}}
 
+
+/* Direct editing keeps explanatory prose out of the working view. */
+.control-note,.small-note,.canvas-help,.source-panel .subtle,.function-options>span,.advice,.aside-label,#tips,.formula-panel>p,.help-note>span,.help-note>p,footer{display:none}
+.term-id .term-open{padding:3px;border:0;background:none;font:10px var(--mono)}
+#scene.circle-hover{cursor:pointer}
+.circle-editor[hidden]{display:none}
+.circle-editor{position:fixed;z-index:20;width:300px;max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px);overflow:auto;padding:14px;background:#1b2229f5;border:1px solid #586552;border-radius:12px;box-shadow:0 14px 44px #0008;backdrop-filter:blur(16px)}
+.editor-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}.editor-head strong{flex:1;font:13px var(--mono);color:var(--green)}.editor-head button{padding:3px 8px;background:transparent;border:0;font-size:20px}.editor-head input[type=color]{width:28px;height:26px;border:0;padding:0;background:none}.editor-head input[type=checkbox]{accent-color:var(--green)}
+.editor-field{display:grid;grid-template-columns:88px 1fr;gap:10px;align-items:center;padding:6px 0;font-size:12px;color:#b6c2c5}.editor-field input{width:100%}.editor-field input[type=range]{height:18px}.editor-more{margin:8px 0 0;font-size:11px}.editor-more summary{padding:4px 0}
+@media(max-width:560px){.circle-editor{width:280px}.term-head{font-size:8px}}
 </style></head>
 <body id="top"><header><a class="brand" href="#top"><span class="brand-icon">∿</span><span>傅里叶级数拟合可视化</span></a><button id="export" class="quiet">导出参数 ↗</button></header>
 <main>
-<div class="workspace"><div class="left-column"><section class="panel stage"><div class="panel-top"><div><span id="modeBadge" class="tag">函数拟合</span></div><div class="segmented"><button id="singleView" class="active">主视图</button><button id="compareView">逐层对比</button></div></div><div class="canvas-wrap"><canvas id="scene" tabindex="0" aria-label="可拖动和缩放的动画画布"></canvas><div class="canvas-toolbar" aria-label="画布视角"><button id="zoomOut" type="button" aria-label="缩小画布" title="缩小">−</button><output id="viewZoom">100%</output><button id="zoomIn" type="button" aria-label="放大画布" title="放大">＋</button><button id="resetView" type="button" title="恢复初始视角（也可双击画布）">复位视角</button></div></div><div class="legend"><span><i class="green"></i> 已记录合成</span><span><i class="dash"></i> 目标 f(x)</span><span><i class="white"></i> 连杆 / 投影</span><label><input id="showTarget" type="checkbox" checked> 目标</label><label><input id="showTrace" type="checkbox" checked> 端点轨迹</label><label><input id="showCircles" type="checkbox" checked> 圆轨道</label><span class="canvas-help">拖动平移 · 滚轮 / 双指缩放 · 双击复位</span></div><div class="transport"><button id="play" class="primary">Ⅱ 暂停</button><button id="reset" class="quiet" title="回到 x=0 并开始新记录">↶ 归零</button><div class="speed"><label for="speed">播放速度</label><input id="speed" aria-label="播放速度滑条" type="range" min="0" max="3" step="0.001" value="0.6"><input id="speedNumber" aria-label="精确播放速度" type="number" min="0" max="3" step="0.001" value="0.600"><span>×</span></div><span class="phase-readout">x = <b id="timeValue">0.000</b></span></div><div class="scrub"><label for="time">跳转时间（新记录）</label><input id="time" type="range" min="0" max="1000" value="0"><span id="periodLabel">4π</span></div></section>
-<section class="panel source-panel"><div class="panel-top"><div><span class="section-no">02</span><h2>选择一个函数</h2></div><span class="subtle">在 [−T/2, T/2) 上计算，周期延拓</span></div><div class="preset-grid" id="presets"></div><form id="functionForm"><div class="function-row"><label class="expression-label"><span>f(x) =</span><input id="expression" aria-label="函数表达式" spellcheck="false" value="sin(x)+0.6*sin(2.5*x)-0.4*sin(7*x)+0.9*sin(5*x)"></label><button class="primary" type="submit">计算并拟合 →</button></div><div class="function-options"><label>周期 T <input id="period" aria-label="周期 T" type="number" min="0.05" max="100" step="any" value="12.566370614359172"></label><span>支持 sin、cos、abs、exp、sqrt、log、sign、^；乘法请写 *。</span></div><div id="functionError" class="error" role="alert"></div></form></section>
-<section class="panel harmonics"><div class="panel-top"><div><span class="section-no">03</span><h2>调节每一个圆</h2></div><button id="restore" class="quiet">恢复拟合参数 ↶</button></div><div class="count-row"><label for="count">圆的数量 <b id="countLabel">4</b></label><input id="count" type="range" min="1" max="64" value="4"><input id="countNumber" aria-label="圆的数量" type="number" min="1" max="64" value="4"></div><p class="control-note">半径 = 棍长 = 振幅 R。每根棍的绝对角速度 ω 独立控制其绕自身圆心的转动，不叠加前一根棍的角速度；正值逆时针、负值顺时针。相位决定起始角度。优先保留非零谐波。调参保留旧轨迹，只影响接下来的输出。</p><div class="global-settings"><label>整体画面缩放 <input id="zoom" type="range" min="0.25" max="100" step="0.01" value="1"><input id="zoomNumber" aria-label="精确画布缩放倍数" type="number" min="0.25" max="100" step="0.01" value="1"><span>×</span></label><label>棍粗 <input id="rodWidth" type="range" min="0.5" max="5" step="0.1" value="1.5"></label><label>圆线宽 <input id="circleWidth" type="range" min="0.3" max="3" step="0.1" value="1"></label><label>波形跨度 <select id="span"><option value="1">1 个周期</option><option value="2" selected>2 个周期</option><option value="3">3 个周期</option></select></label><label>直流偏移 c <input id="dc" type="number" step="0.05" value="0"></label></div><div class="term-head"><span>圆 / 颜色</span><span>半径 R / 棍长</span><span>绝对角速度 ω / rad/s</span><span>相位 φ / °</span><span>棍粗</span></div><div id="termList"></div><div class="small-note">角速度单位 rad/s（弧度/模拟秒），范围 −200～200，步长 0.001。整体播放倍率控制时间快慢；输入 0 时该棍方向固定，其圆心仍可随前面的棍移动。半径范围 0～100。</div></section></div>
-<aside><section class="panel insights"><div class="panel-top"><div><span class="section-no">↗</span><h2>此刻的拟合</h2></div><i class="status-dot"></i></div><div class="stats"><div><span>旋转圆</span><strong id="statCount">4<small>个</small></strong></div><div><span>当前参数 RMS</span><strong id="rmse">0.0000</strong></div></div><div id="advice" class="advice"></div><div class="aside-label">调参建议 <span>随圆数和参数更新</span></div><ul id="tips"></ul></section>
-<section class="panel formula-panel"><div class="panel-top"><div><span class="section-no">ƒ</span><h2>从函数到圆</h2></div></div><p>把 f(x) 拆成不同频率的正弦与余弦；每一组对应一个圆。</p><div class="equation">ω₀ = 2π / T<br>aₙ = (2/T) ∫<sub>−T/2</sub><sup>T/2</sup> f(u) cos(nω₀u) du<br>bₙ = (2/T) ∫<sub>−T/2</sub><sup>T/2</sup> f(u) sin(nω₀u) du<br>c = (1/T) ∫<sub>−T/2</sub><sup>T/2</sup> f(u) du</div><div class="formula-divider"></div><div class="equation accent">Rₙ = √(aₙ² + bₙ²)<br>φₙ = atan2(aₙ, bₙ)<br>f(x) ≈ S(x) = c + ∑ Rₙ sin(nω₀x + φₙ)</div><p class="small-note">函数拟合时由谐波序号 n 自动换算角速度 ωₙ=2πn/10 rad/s；模拟时间 τ=10x/T。自由调整采用 θⱼ=ωⱼτ+φⱼ+δⱼ。每根棍的方向独立计算；改角速度保留当前角度和历史轨迹。</p><details><summary>展开当前参数公式</summary><div id="expanded" class="expanded"></div></details></section>
+<div class="workspace"><div class="left-column"><section class="panel stage"><div class="panel-top"><div><span id="modeBadge" class="tag">函数拟合</span></div><div class="segmented"><button id="singleView" class="active">主视图</button><button id="compareView">逐层对比</button></div></div><div class="canvas-wrap"><canvas id="scene" tabindex="0" aria-label="可拖动和缩放的动画画布"></canvas><div class="canvas-toolbar" aria-label="画布视角"><button id="zoomOut" type="button" aria-label="缩小画布" title="缩小">−</button><output id="viewZoom">100%</output><button id="zoomIn" type="button" aria-label="放大画布" title="放大">＋</button><button id="resetView" type="button" title="恢复初始视角（也可双击画布）">复位视角</button></div></div><div class="legend"><span><i class="green"></i> 已记录合成</span><span><i class="dash"></i> 目标 f(x)</span><span><i class="white"></i> 连杆 / 投影</span><label><input id="showTarget" type="checkbox" checked> 目标</label><label><input id="showTrace" type="checkbox" checked> 端点轨迹</label><label><input id="showCircles" type="checkbox" checked> 圆轨道</label><span class="canvas-help">拖动平移 · 滚轮 / 双指缩放 · 双击复位</span></div><div class="transport"><button id="play" class="primary">Ⅱ 暂停</button><button id="reset" class="quiet" title="回到 x=0 并开始新记录">↶ 归零</button><div class="speed"><label for="speed">播放速度</label><input id="speed" aria-label="播放速度滑条" type="range" min="0" max="3" step="0.001" value="0.6"><input id="speedNumber" aria-label="精确播放速度" type="number" min="0" max="3" step="0.001" value="0.600"><span>×</span></div><span class="phase-readout">x = <b id="timeValue">0.000</b></span></div><div class="scrub"><label for="time">时间</label><input id="time" type="range" min="0" max="1000" value="0"><span id="periodLabel">4π</span></div></section>
+<section class="panel source-panel"><div class="panel-top"><div><span class="section-no">02</span><h2>函数</h2></div><span class="subtle">在 [−T/2, T/2) 上计算，周期延拓</span></div><div class="preset-grid" id="presets"></div><form id="functionForm"><div class="function-row"><label class="expression-label"><span>f(x) =</span><input id="expression" aria-label="函数表达式" spellcheck="false" value="sin(x)+0.6*sin(2.5*x)-0.4*sin(7*x)+0.9*sin(5*x)"></label><button class="primary" type="submit">计算并拟合 →</button></div><div class="function-options"><label>周期 T <input id="period" aria-label="周期 T" type="number" min="0.05" max="100" step="any" value="12.566370614359172"></label><span>支持 sin、cos、abs、exp、sqrt、log、sign、^；乘法请写 *。</span></div><div id="functionError" class="error" role="alert"></div></form></section>
+<section class="panel harmonics"><div class="panel-top"><div><span class="section-no">03</span><h2>圆参数</h2></div><button id="restore" class="quiet">恢复拟合参数 ↶</button></div><div class="count-row"><label for="count">圆的数量 <b id="countLabel">4</b></label><input id="count" type="range" min="1" max="64" value="4"><input id="countNumber" aria-label="圆的数量" type="number" min="1" max="64" value="4"></div><p class="control-note">半径 = 棍长 = 振幅 R。每根棍的绝对角速度 ω 独立控制其绕自身圆心的转动，不叠加前一根棍的角速度；正值逆时针、负值顺时针。相位决定起始角度。优先保留非零谐波。调参保留旧轨迹，只影响接下来的输出。</p><div class="global-settings"><label>整体画面缩放 <input id="zoom" type="range" min="0.25" max="100" step="0.01" value="1"><input id="zoomNumber" aria-label="精确画布缩放倍数" type="number" min="0.25" max="100" step="0.01" value="1"><span>×</span></label><label>棍粗 <input id="rodWidth" type="range" min="0.5" max="5" step="0.1" value="1.5"></label><label>圆线宽 <input id="circleWidth" type="range" min="0.3" max="3" step="0.1" value="1"></label><label>波形跨度 <select id="span"><option value="1">1 个周期</option><option value="2" selected>2 个周期</option><option value="3">3 个周期</option></select></label><label>直流偏移 c <input id="dc" type="number" step="0.05" value="0"></label></div><div class="term-head"><span>圆 / 颜色</span><span>半径 R / 棍长</span><span>绝对角速度 ω / rad/s</span><span>相位 φ / °</span><span>棍粗</span></div><div id="termList"></div><div class="small-note">角速度单位 rad/s（弧度/模拟秒），范围 −200～200，步长 0.001。整体播放倍率控制时间快慢；输入 0 时该棍方向固定，其圆心仍可随前面的棍移动。半径范围 0～100。</div></section></div>
+<aside><section class="panel insights"><div class="panel-top"><div><span class="section-no">↗</span><h2>拟合</h2></div><i class="status-dot"></i></div><div class="stats"><div><span>旋转圆</span><strong id="statCount">4<small>个</small></strong></div><div><span>当前参数 RMS</span><strong id="rmse">0.0000</strong></div></div><div id="advice" class="advice"></div><div class="aside-label">调参建议 <span>随圆数和参数更新</span></div><ul id="tips"></ul></section>
+<section class="panel formula-panel"><div class="panel-top"><div><span class="section-no">ƒ</span><h2>公式</h2></div></div><p>把 f(x) 拆成不同频率的正弦与余弦；每一组对应一个圆。</p><div class="equation">ω₀ = 2π / T<br>aₙ = (2/T) ∫<sub>−T/2</sub><sup>T/2</sup> f(u) cos(nω₀u) du<br>bₙ = (2/T) ∫<sub>−T/2</sub><sup>T/2</sup> f(u) sin(nω₀u) du<br>c = (1/T) ∫<sub>−T/2</sub><sup>T/2</sup> f(u) du</div><div class="formula-divider"></div><div class="equation accent">Rₙ = √(aₙ² + bₙ²)<br>φₙ = atan2(aₙ, bₙ)<br>f(x) ≈ S(x) = c + ∑ Rₙ sin(nω₀x + φₙ)</div><p class="small-note">函数拟合时由谐波序号 n 自动换算角速度 ωₙ=2πn/10 rad/s；模拟时间 τ=10x/T。自由调整采用 θⱼ=ωⱼτ+φⱼ+δⱼ。每根棍的方向独立计算；改角速度保留当前角度和历史轨迹。</p><details><summary>展开当前参数公式</summary><div id="expanded" class="expanded"></div></details></section>
 <section class="panel calc-panel"><div class="panel-top"><div><span class="section-no">＝</span><h2>实时计算</h2></div></div><label class="calc-select">跟踪第 <select id="selectedTerm"></select> 个圆</label><div id="liveCalc" class="live-calc"></div><div class="sum-box"><span>所有竖直分量相加</span><strong id="sumValue">S(x) = 0</strong><small id="targetValue"></small></div><div class="small-note" id="sampleNote"></div></section>
-<section class="help-note"><span>一个观察</span><p>圆的端点上下运动，正好是一条正弦波。把棍首尾相连，就是把每一条波相加。</p><button id="saveImage" class="text-button">保存当前画面 ↓</button></section></aside></div><footer><span>FOURIER LAB</span><p>由简单的旋转，构造复杂的世界。</p><span>无外部依赖 · 可离线使用</span></footer></main><script>
+<section class="help-note"><span>一个观察</span><p>圆的端点上下运动，正好是一条正弦波。把棍首尾相连，就是把每一条波相加。</p><button id="saveImage" class="text-button">保存当前画面 ↓</button></section></aside></div><footer><span>FOURIER LAB</span><p>由简单的旋转，构造复杂的世界。</p><span>无外部依赖 · 可离线使用</span></footer></main><section id="circleEditor" class="circle-editor" role="dialog" aria-modal="false" aria-labelledby="circleEditorTitle" hidden>
+<div class="editor-head"><strong id="circleEditorTitle">圆 01</strong><input type="checkbox" data-key="enabled" aria-label="启用圆"><input type="color" data-key="color" aria-label="圆颜色"><button id="closeCircleEditor" type="button" aria-label="关闭参数">×</button></div>
+<label class="editor-field">半径 R<input data-key="r" type="number" min="0" max="100" step="0.001"></label>
+<label class="editor-field">角速度 rad/s<input data-key="omega" type="number" min="-200" max="200" step="0.001"></label>
+<label class="editor-field">相位 °<input data-key="phase" type="number" min="-180" max="180" step="0.1"></label>
+<label class="editor-field">杆宽 ×<input data-key="width" type="number" min="0.2" max="5" step="0.1"></label>
+<label class="editor-field">圆线宽 ×<input data-key="ringWidth" type="number" min="0.2" max="5" step="0.1"></label>
+<label class="editor-field">透明度<input data-key="opacity" aria-label="圆透明度" type="range" min="0.1" max="1" step="0.01"></label>
+<details class="editor-more"><summary>更多</summary><label class="editor-field">相位修正 rad<input data-key="offset" type="number" step="0.001"></label></details>
+</section><script>
 /* Small, explicit expression parser: user expressions never execute JavaScript. */
 (function(root){
 'use strict';
@@ -80,11 +99,11 @@ function comparisonCounts(){return state.N<=4?Array.from({length:state.N},(_,i)=
 function lockDrawingScale(){state.scaleRadius=Math.max(.8,state.terms.reduce((sum,t)=>sum+(t.enabled?t.r:0),0));state.scaleDc=Math.abs(state.dc);}
 
 function renderPresets(){ $('presets').innerHTML=presets.map(p=>`<button type="button" data-preset="${p.id}" class="${state.preset===p.id?'active':''}">${p.name}</button>`).join('');}
-function chooseHarmonics(N){let a=state.analysis,nonzero=a.harmonics.filter(t=>t.r>Math.max(1e-7,a.peak*1e-6));if(state.preset==='video'){const order=[2,5,14,10];nonzero.sort((a,b)=>(order.includes(a.n)?order.indexOf(a.n):a.n+20)-(order.includes(b.n)?order.indexOf(b.n):b.n+20));}let chosen=nonzero.slice(0,N),included=new Set(chosen.map(t=>t.n));if(chosen.length<N)for(const h of a.harmonics){if(!included.has(h.n)){chosen.push(h);if(chosen.length===N)break;}}return chosen.map((t,i)=>({...t,omega:TAU*t.n/10,r:t.r<1e-7?0:t.r,phase:t.r<1e-7?0:t.phase,enabled:true,color:colors[i%colors.length],width:1}));}
-function applyFunction(expr,T,preset,N){const fn=compile(expr);if(!Number.isFinite(T)||T<.05||T>100)throw Error('周期 T 必须在 0.05～100 之间');const a=analyze(fn,T);Object.assign(state,{fn,expr,T,preset,N,analysis:a,dc:a.dc,manual:false,x:0,selected:0});state.terms=chooseHarmonics(N);$('expression').value=expr;$('period').value=T;$('dc').value=fmt(a.dc,6);$('functionError').textContent='';lockDrawingScale();startRecording();renderPresets();renderTerms();refresh(false);}
-function updateCount(N){N=Math.max(1,Math.min(64,Math.round(Number(N)||1)));if(state.manual){const fresh=chooseHarmonics(N);state.terms=Array.from({length:N},(_,i)=>state.terms[i]||fresh[i]);}else state.terms=chooseHarmonics(N);state.N=N;state.selected=Math.min(state.selected,N-1);renderTerms();refresh();}
+function chooseHarmonics(N){let a=state.analysis,nonzero=a.harmonics.filter(t=>t.r>Math.max(1e-7,a.peak*1e-6));if(state.preset==='video'){const order=[2,5,14,10];nonzero.sort((a,b)=>(order.includes(a.n)?order.indexOf(a.n):a.n+20)-(order.includes(b.n)?order.indexOf(b.n):b.n+20));}let chosen=nonzero.slice(0,N),included=new Set(chosen.map(t=>t.n));if(chosen.length<N)for(const h of a.harmonics){if(!included.has(h.n)){chosen.push(h);if(chosen.length===N)break;}}return chosen.map((t,i)=>({...t,omega:TAU*t.n/10,r:t.r<1e-7?0:t.r,phase:t.r<1e-7?0:t.phase,enabled:true,color:colors[i%colors.length],width:1,ringWidth:1,opacity:1,offset:0}));}
+function applyFunction(expr,T,preset,N){closeCircleEditor();const fn=compile(expr);if(!Number.isFinite(T)||T<.05||T>100)throw Error('周期 T 必须在 0.05～100 之间');const a=analyze(fn,T);Object.assign(state,{fn,expr,T,preset,N,analysis:a,dc:a.dc,manual:false,x:0,selected:0});state.terms=chooseHarmonics(N);$('expression').value=expr;$('period').value=T;$('dc').value=fmt(a.dc,6);$('functionError').textContent='';lockDrawingScale();startRecording();renderPresets();renderTerms();refresh(false);}
+function updateCount(N){closeCircleEditor();N=Math.max(1,Math.min(64,Math.round(Number(N)||1)));if(state.manual){const fresh=chooseHarmonics(N);state.terms=Array.from({length:N},(_,i)=>state.terms[i]||fresh[i]);}else state.terms=chooseHarmonics(N);state.N=N;state.selected=Math.min(state.selected,N-1);renderTerms();refresh();}
 function renderTerms(){ $('count').value=state.N;$('countNumber').value=state.N;$('countLabel').textContent=state.N;
- $('termList').innerHTML=state.terms.map((t,i)=>`<div class="term-row" data-i="${i}"><div class="term-id"><input type="checkbox" aria-label="启用圆 ${i+1}" data-key="enabled" ${t.enabled?'checked':''}><input type="color" aria-label="圆 ${i+1} 颜色" data-key="color" value="${t.color}"><label style="color:${t.color}">${String(i+1).padStart(2,'0')}</label></div><div class="term-control"><input type="range" aria-label="圆 ${i+1} 半径滑块" data-key="r" min="0" max="${Math.max(2,Math.ceil(t.r*1.5))}" step="0.001" value="${t.r}"><input type="number" aria-label="圆 ${i+1} 半径" data-key="r" min="0" max="100" step="0.01" value="${fmt(t.r,4)}"></div><div class="term-control angular-control"><input type="range" aria-label="棍 ${i+1} 绝对角速度滑块" data-key="omega" min="${-Math.max(10,Math.ceil(Math.abs(t.omega)))}" max="${Math.max(10,Math.ceil(Math.abs(t.omega)))}" step="0.001" value="${t.omega}"><input type="number" aria-label="棍 ${i+1} 绝对角速度" title="相对于画布固定方向的角速度，单位 rad/s；不与前一根棍的角速度相加" data-key="omega" min="-200" max="200" step="0.001" value="${fmt(t.omega,3)}"></div><div class="term-control"><input type="range" aria-label="圆 ${i+1} 相位滑块" data-key="phase" min="-180" max="180" step="1" value="${t.phase*180/Math.PI}"><input type="number" aria-label="圆 ${i+1} 相位" data-key="phase" min="-180" max="180" step="1" value="${fmt(t.phase*180/Math.PI,1)}"></div><input type="number" aria-label="圆 ${i+1} 棍粗倍数" data-key="width" min="0.2" max="5" step="0.1" value="${t.width}"></div>`).join('');
+ $('termList').innerHTML=state.terms.map((t,i)=>`<div class="term-row" data-i="${i}"><div class="term-id"><input type="checkbox" aria-label="启用圆 ${i+1}" data-key="enabled" ${t.enabled?'checked':''}><input type="color" aria-label="圆 ${i+1} 颜色" data-key="color" value="${t.color}"><button type="button" class="term-open" aria-label="编辑圆 ${i+1}" style="color:${t.color}">${String(i+1).padStart(2,'0')}</button></div><div class="term-control"><input type="range" aria-label="圆 ${i+1} 半径滑块" data-key="r" min="0" max="${Math.max(2,Math.ceil(t.r*1.5))}" step="0.001" value="${t.r}"><input type="number" aria-label="圆 ${i+1} 半径" data-key="r" min="0" max="100" step="0.01" value="${fmt(t.r,4)}"></div><div class="term-control angular-control"><input type="range" aria-label="棍 ${i+1} 绝对角速度滑块" data-key="omega" min="${-Math.max(10,Math.ceil(Math.abs(t.omega)))}" max="${Math.max(10,Math.ceil(Math.abs(t.omega)))}" step="0.001" value="${t.omega}"><input type="number" aria-label="棍 ${i+1} 绝对角速度" title="相对于画布固定方向的角速度，单位 rad/s；不与前一根棍的角速度相加" data-key="omega" min="-200" max="200" step="0.001" value="${fmt(t.omega,3)}"></div><div class="term-control"><input type="range" aria-label="圆 ${i+1} 相位滑块" data-key="phase" min="-180" max="180" step="1" value="${t.phase*180/Math.PI}"><input type="number" aria-label="圆 ${i+1} 相位" data-key="phase" min="-180" max="180" step="1" value="${fmt(t.phase*180/Math.PI,1)}"></div><input type="number" aria-label="圆 ${i+1} 棍粗倍数" data-key="width" min="0.2" max="5" step="0.1" value="${t.width}"></div>`).join('');
  $('selectedTerm').innerHTML=state.terms.map((t,i)=>`<option value="${i}">${i+1}</option>`).join('');$('selectedTerm').value=state.selected;
 }
 function refresh(record=true){if(record)recordSample(state.x);let err=0;const M=1024;for(let i=0;i<M;i++){let x=-state.T/2+(i+.5)*state.T/M;err+=(synth(x)-target(x))**2;}state.rmse=Math.sqrt(err/M);
@@ -108,10 +127,11 @@ function updateAdvice(){const enabled=state.terms.filter(t=>t.enabled),nonzero=e
 }
 function updateLive(){const t=state.terms[state.selected];if(!t)return;let theta=angleAt(t,state.x),v=t.enabled?t.r*Math.sin(theta):0,omega=t.omega,actualOmega=state.playing?omega*state.speed:0;
  $('timeValue').textContent=fmt(state.x);$('time').value=((state.x%state.T+state.T)%state.T)/state.T*1000;
- $('liveCalc').innerHTML=`<div>圆 ${state.selected+1} · ${t.enabled?'参与合成':'已关闭'}</div><div>a = R sin(φ+δ) = <b>${fmt(t.r*Math.sin(t.phase+(t.offset||0)),4)}</b></div><div>b = R cos(φ+δ) = <b>${fmt(t.r*Math.cos(t.phase+(t.offset||0)),4)}</b></div><div>R = √(a²+b²) = <b>${fmt(t.r,4)}</b></div><div>绝对角速度 ω = <b>${fmt(omega)}</b> rad/s</div><div>φ = <b>${fmt(t.phase)}</b> rad</div><div>连续相位修正 δ = <b>${fmt(t.offset||0)}</b></div><div>模拟时间 τ = <b>${fmt(simulationSeconds())}</b> s</div><div>θ = ωτ + φ + δ = <b>${fmt(theta)}</b></div><div>y = R sin θ = <b>${fmt(v,4)}</b></div><div>实际角速度 = ω × 播放倍率</div><div>= <b>${fmt(actualOmega)}</b> rad/s</div>`;
+ $('liveCalc').innerHTML=`<div>R = <b>${fmt(t.r,4)}</b></div><div>ω = <b>${fmt(omega)}</b> rad/s</div><div>φ = <b>${fmt(t.phase)}</b> rad</div><div>δ = <b>${fmt(t.offset||0)}</b> rad</div><div>τ = <b>${fmt(simulationSeconds())}</b> s</div><div>θ = ωτ + φ + δ = <b>${fmt(theta)}</b></div><div>y = R sin θ = <b>${fmt(v,4)}</b></div>`;
  $('sumValue').textContent='S(x) = '+fmt(synth(state.x),4);const tv=target(state.x);$('targetValue').textContent=Number.isFinite(tv)?'目标 f(x) = '+fmt(tv,4)+'　差值 '+fmt(synth(state.x)-tv,4):'目标函数在此点未定义';
 }
 const canvas=$('scene'),ctx=canvas.getContext('2d');let cw=1,ch=1,dpr=1;
+let circleHits=[],hoverCircle=-1,editorCircle=-1;const editor=$('circleEditor');
 function resize(){const rect=canvas.getBoundingClientRect();cw=rect.width;ch=rect.height;dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(cw*dpr);canvas.height=Math.round(ch*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);draw();}
 // Geometry grows with the camera; strokes and handles stay small in screen pixels.
 function detailFactor(){return Math.pow(Math.max(1,state.zoom),-.2);}
@@ -133,7 +153,9 @@ function drawPanel(terms,top,height,color,caption,rowIndex){const isCompare=stat
  if(caption){label(caption,18,top+20,color,small?9:10);}
  if(state.showTrace&&!isCompare){ctx.beginPath();let started=false;for(let i=state.historyHead;i<state.history.length;i++){const p=state.history[i];if(p.x<state.x-state.T*state.span)continue;const px=originX+p.endpointX*scale,py=centerY-p.endpointY*scale;started?ctx.lineTo(px,py):ctx.moveTo(px,py);started=true;}ctx.strokeStyle='#acbfcc25';ctx.lineWidth=penWidth(1);ctx.stroke();}
  const points=chain(terms,state.x);for(const node of points.nodes){const {t}=node,x=originX+node.x*scale,y=centerY-node.y*scale,nx=originX+node.nx*scale,ny=centerY-node.ny*scale;
- if(state.showCircles&&t.r>1e-7){ctx.beginPath();ctx.arc(x,y,t.r*scale,0,TAU);ctx.strokeStyle=t.color+'a0';ctx.lineWidth=penWidth(state.circleWidth);ctx.shadowColor=t.color;ctx.shadowBlur=glowSize(5);ctx.stroke();ctx.shadowBlur=0;}
+ const index=state.terms.indexOf(t),active=!state.playing&&(index===hoverCircle||index===editorCircle);
+ if(state.showCircles){const screen=(x,y)=>({x:cw/2+state.panX+(x-cw/2)*state.zoom,y:ch/2+state.panY+(y-ch/2)*state.zoom});const c=screen(x,y);circleHits.push({...c,index,r:t.r*scale*state.zoom,top:screen(0,top).y,bottom:screen(0,top+height).y});}
+ if(state.showCircles&&t.r>1e-7){ctx.save();ctx.globalAlpha=active?Math.min(1,(t.opacity??1)*.63+.37):(t.opacity??1)*.63;ctx.beginPath();ctx.arc(x,y,t.r*scale,0,TAU);ctx.strokeStyle=t.color;ctx.lineWidth=active?Math.max(2.5/state.zoom,penWidth(state.circleWidth*(t.ringWidth??1))+1.5/state.zoom):penWidth(state.circleWidth*(t.ringWidth??1));ctx.shadowColor=t.color;ctx.shadowBlur=active?12:glowSize(5);ctx.stroke();ctx.restore();}
  line(x,y,nx,ny,'#e8edf0c0',state.rodWidth*t.width);if(t.r>1e-7){ctx.beginPath();ctx.arc(x,y,dotRadius(2,t.r*scale),0,TAU);ctx.fillStyle=t.color;ctx.fill();}}
  const px=originX+points.x*scale,py=centerY-points.y*scale,lastCircle=[...points.nodes].reverse().find(p=>p.t.r>1e-7),endRadius=dotRadius(2.5,lastCircle?lastCircle.t.r*scale:0);line(px,py,graphX,py,color+'90',.8,[3,3]);ctx.beginPath();ctx.arc(px,py,endRadius,0,TAU);ctx.fillStyle='#f4f7ee';ctx.shadowColor=color;ctx.shadowBlur=glowSize(8);ctx.fill();ctx.shadowBlur=0;
  // Draw only values actually recorded at the time. Parameter changes never rewrite samples.
@@ -151,11 +173,11 @@ function drawPanel(terms,top,height,color,caption,rowIndex){const isCompare=stat
  historyPath(false);ctx.strokeStyle=color;ctx.lineWidth=penWidth(1.8);ctx.shadowColor=color;ctx.shadowBlur=glowSize(7);ctx.stroke();ctx.shadowBlur=0;
  ctx.beginPath();ctx.arc(graphX,py,endRadius,0,TAU);ctx.fillStyle=color;ctx.fill();
  label('x',graphX-3,top+height-12,'#7d8c91',9);label('x − '+state.span+'T',graphRight-43,top+height-12,'#65767e',9);
- if(!isCompare){label('R → 振幅',18,top+height-16,'#89999b',9);label('← 历史波形',graphX+50,top+height-12,'#65767e',9);}
+
  ctx.restore();}
-function draw(){if(!state.fn||cw<40||ch<40)return;ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#11161b';ctx.fillRect(0,0,cw,ch);
+function draw(){circleHits=[];if(!state.fn||cw<40||ch<40)return;ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#11161b';ctx.fillRect(0,0,cw,ch);
  ctx.save();ctx.translate(cw/2+state.panX,ch/2+state.panY);ctx.scale(state.zoom,state.zoom);ctx.translate(-cw/2,-ch/2);
- if(state.view==='compare'){let counts=comparisonCounts();let h=(ch-30)/counts.length;counts.forEach((n,i)=>{drawPanel(state.terms.slice(0,n),25+i*h,h,colors[i],`${String(n).padStart(2,'0')} 个圆 · 前 ${n} 项叠加`,i);if(i)line(16,25+i*h,cw-16,25+i*h,'#293238',.7);});}
+ if(state.view==='compare'){let counts=comparisonCounts();let h=(ch-30)/counts.length;counts.forEach((n,i)=>{drawPanel(state.terms.slice(0,n),25+i*h,h,colors[i],`${String(n).padStart(2,'0')}`,i);if(i)line(16,25+i*h,cw-16,25+i*h,'#293238',.7);});}
  else drawPanel(state.terms,0,ch,'#c2ed95','',0);
  ctx.restore();
 }
@@ -173,25 +195,59 @@ function setZoom(next,anchor={x:cw/2,y:ch/2}){
 }
 function resetView(){state.zoom=1;state.panX=0;state.panY=0;syncView();draw();}
 function canvasPoint(e){const rect=canvas.getBoundingClientRect();return{x:(e.clientX-rect.left)*cw/rect.width,y:(e.clientY-rect.top)*ch/rect.height};}
-const pointers=new Map();let pinch=null,safariGesture=null;
+function hitCircle(p){
+ if(state.playing||!state.showCircles)return -1;
+ const hits=circleHits.filter(c=>p.y>=c.top&&p.y<=c.bottom).map(c=>({...c,d:Math.hypot(p.x-c.x,p.y-c.y)}));
+ const edges=hits.filter(c=>Math.abs(c.d-c.r)<=7).sort((a,b)=>Math.abs(a.d-a.r)-Math.abs(b.d-b.r)||a.r-b.r);
+ return (edges[0]||hits.filter(c=>c.d<c.r).sort((a,b)=>a.r-b.r)[0])?.index??-1;
+}
+function setHover(index){if(hoverCircle===index)return;hoverCircle=index;canvas.classList.toggle('circle-hover',index>=0);draw();}
+function closeCircleEditor(){const el=$('circleEditor');if(el)el.hidden=true;editorCircle=-1;hoverCircle=-1;const c=$('scene');if(c)c.classList.remove('circle-hover');}
+function editValue(t,key){const value=key==='phase'?t.phase*180/Math.PI:(t[key]??(key==='offset'?0:1));return typeof value==='number'?Number(value.toFixed(key==='phase'?4:6)):value;}
+function syncCircleEditor(){
+ const t=state.terms[editorCircle];if(!t||editor.hidden)return;
+ $('circleEditorTitle').textContent='圆 '+String(editorCircle+1).padStart(2,'0');
+ editor.querySelectorAll('[data-key]').forEach(el=>{if(el===document.activeElement)return;const k=el.dataset.key;if(k==='enabled')el.checked=t.enabled;else el.value=editValue(t,k);});
+}
+function placeCircleEditor(x,y){
+ const w=editor.offsetWidth,h=editor.offsetHeight;
+ editor.style.left=Math.max(10,Math.min(x+14,innerWidth-w-10))+'px';
+ editor.style.top=Math.max(10,Math.min(y+14,innerHeight-h-10))+'px';
+}
+function openCircleEditor(index,x,y){
+ if(state.playing||!state.terms[index])return;
+ editorCircle=index;state.selected=index;$('selectedTerm').value=index;editor.hidden=false;syncCircleEditor();placeCircleEditor(x,y);updateLive();draw();editor.querySelector('[data-key="r"]').focus({preventScroll:true});
+}
+$('closeCircleEditor').onclick=()=>{closeCircleEditor();canvas.focus({preventScroll:true});draw();};
+document.addEventListener('pointerdown',e=>{if(!editor.hidden&&!editor.contains(e.target)&&e.target!==canvas){closeCircleEditor();draw();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!editor.hidden){closeCircleEditor();canvas.focus({preventScroll:true});draw();}});
+window.addEventListener('resize',()=>{if(!editor.hidden)placeCircleEditor(parseFloat(editor.style.left)-14,parseFloat(editor.style.top)-14);});
+editor.querySelector('details').addEventListener('toggle',()=>{if(!editor.hidden)placeCircleEditor(parseFloat(editor.style.left)-14,parseFloat(editor.style.top)-14);});
+const pointers=new Map();let pinch=null,safariGesture=null,press=null;
 function beginPinch(){const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(b.x-a.x,b.y-a.y),center:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},zoom:state.zoom,panX:state.panX,panY:state.panY};}
 canvas.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'&&e.button!==0)return;
- e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,canvasPoint(e));canvas.classList.add('dragging');if(pointers.size===2)beginPinch();
+ e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const p=canvasPoint(e);pointers.set(e.pointerId,p);
+ press=pointers.size===1?{id:e.pointerId,start:p,index:hitCircle(p),dragged:false}:null;
+ if(pointers.size===2){closeCircleEditor();beginPinch();}
 });
 canvas.addEventListener('pointermove',e=>{
- if(!pointers.has(e.pointerId))return;
- const prev=pointers.get(e.pointerId),p=canvasPoint(e);pointers.set(e.pointerId,p);
- if(pointers.size===1){state.panX+=p.x-prev.x;state.panY+=p.y-prev.y;draw();}
- else if(pinch&&pinch.distance>0){const [a,b]=[...pointers.values()],center={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+ const p=canvasPoint(e);if(!pointers.has(e.pointerId)){setHover(hitCircle(p));return;}
+ const prev=pointers.get(e.pointerId);pointers.set(e.pointerId,p);
+ if(pointers.size===1){
+  if(press&&!press.dragged&&Math.hypot(p.x-press.start.x,p.y-press.start.y)<4)return;
+  const from=press&&!press.dragged?press.start:prev;if(press)press.dragged=true;closeCircleEditor();canvas.classList.add('dragging');state.panX+=p.x-from.x;state.panY+=p.y-from.y;draw();
+ }else if(pinch&&pinch.distance>0){const [a,b]=[...pointers.values()],center={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
  const z=Math.max(.25,Math.min(100,pinch.zoom*Math.hypot(b.x-a.x,b.y-a.y)/pinch.distance)),r=z/pinch.zoom;
- state.panX=center.x-cw/2-(pinch.center.x-cw/2-pinch.panX)*r;
- state.panY=center.y-ch/2-(pinch.center.y-ch/2-pinch.panY)*r;
- state.zoom=z;syncView();draw();
- }
+ state.panX=center.x-cw/2-(pinch.center.x-cw/2-pinch.panX)*r;state.panY=center.y-ch/2-(pinch.center.y-ch/2-pinch.panY)*r;state.zoom=z;syncView();draw();}
 });
-function endPointer(e){pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;if(!pointers.size)canvas.classList.remove('dragging');}
+function endPointer(e){
+ const click=e.type==='pointerup'&&press&&press.id===e.pointerId&&!press.dragged&&Math.hypot(canvasPoint(e).x-press.start.x,canvasPoint(e).y-press.start.y)<4;
+ if(click){if(press.index>=0)openCircleEditor(press.index,e.clientX,e.clientY);else{closeCircleEditor();draw();}}
+ pointers.delete(e.pointerId);press=null;if(pointers.size<2)pinch=null;if(!pointers.size)canvas.classList.remove('dragging');
+}
 ['pointerup','pointercancel','lostpointercapture'].forEach(name=>canvas.addEventListener(name,endPointer));
+canvas.addEventListener('pointerleave',()=>{if(!pointers.size)setHover(-1);});
 canvas.addEventListener('wheel',e=>{
  e.preventDefault();if(safariGesture)return;
  const unit=e.deltaMode===1?16:e.deltaMode===2?ch:1;
@@ -213,13 +269,29 @@ $('zoomIn').onclick=()=>setZoom(state.zoom*1.2);$('zoomOut').onclick=()=>setZoom
 $('presets').addEventListener('click',e=>{const b=e.target.closest('[data-preset]');if(!b)return;const p=presets.find(p=>p.id===b.dataset.preset);applyFunction(p.expr,p.T,p.id,p.N);});
 $('functionForm').addEventListener('submit',e=>{e.preventDefault();try{let expr=$('expression').value.trim(),T=Number($('period').value),p=presets.find(p=>p.expr===expr&&Math.abs(p.T-T)<1e-8);applyFunction(expr,T,p?.id||'custom',state.N);}catch(err){$('functionError').textContent=err.message;}});
 $('count').addEventListener('input',e=>updateCount(e.target.value));$('countNumber').addEventListener('input',e=>{if(e.target.value!=='')updateCount(e.target.value);});$('countNumber').addEventListener('change',e=>updateCount(e.target.value));
-$('termList').addEventListener('input',e=>{const el=e.target,row=el.closest('.term-row');if(!row||!el.dataset.key)return;const t=state.terms[+row.dataset.i],key=el.dataset.key;if(key==='enabled')t.enabled=el.checked;else if(key==='color'){t.color=el.value;row.querySelector('label').style.color=t.color;}else{let v=Number(el.value);if(!Number.isFinite(v)||el.value==='')return;const bounds={r:[0,100],omega:[-200,200],phase:[-180,180],width:[.2,5]}[key];v=Math.min(bounds[1],Math.max(bounds[0],v));const theta=angleAt(t,state.x);t[key]=key==='phase'?v*Math.PI/180:v;if(key==='omega'){t.n=t.omega*10/TAU;t.offset=theta-t.omega*simulationSeconds()-t.phase;}row.querySelectorAll(`[data-key="${key}"]`).forEach(other=>{if(other!==el){if(other.type==='range'){if(v>Number(other.max))other.max=v;if(v<Number(other.min))other.min=v;}other.value=v;}});}
- if(!['color','width'].includes(key))state.manual=true;refresh();});
-$('termList').addEventListener('change',e=>{let el=e.target,row=el.closest('.term-row');if(row&&el.type==='number'){let key=el.dataset.key,t=state.terms[+row.dataset.i];el.value=key==='phase'?fmt(t.phase*180/Math.PI,1):fmt(t[key],key==='r'?4:key==='omega'?3:2);}});
-$('restore').onclick=()=>{state.terms=chooseHarmonics(state.N);state.dc=state.analysis.dc;state.manual=false;$('dc').value=fmt(state.dc,6);renderTerms();refresh();};
+function changeTerm(index,el){
+ const t=state.terms[index],key=el.dataset.key;if(!t||!key)return;
+ if(key==='enabled')t.enabled=el.checked;else if(key==='color')t.color=el.value;
+ else{
+  let v=Number(el.value);if(!Number.isFinite(v)||el.value==='')return;
+  const bounds={r:[0,100],omega:[-200,200],phase:[-180,180],width:[.2,5],ringWidth:[.2,5],opacity:[.1,1],offset:[-1000000,1000000]}[key];if(!bounds)return;
+  v=Math.min(bounds[1],Math.max(bounds[0],v));const theta=angleAt(t,state.x);t[key]=key==='phase'?v*Math.PI/180:v;
+  if(key==='omega'){t.n=t.omega*10/TAU;t.offset=theta-t.omega*simulationSeconds()-t.phase;}
+ }
+ const row=$('termList').querySelector(`[data-i="${index}"]`);row.querySelector('.term-open').style.color=t.color;
+ row.querySelectorAll('[data-key]').forEach(other=>{if(other===el)return;const k=other.dataset.key,v=k==='phase'?t.phase*180/Math.PI:t[k];if(k==='enabled')other.checked=v;else{if(other.type==='range'){other.max=Math.max(+other.max,v);other.min=Math.min(+other.min,v);}other.value=v;}});
+ if(!['color','width','ringWidth','opacity'].includes(key))state.manual=true;syncCircleEditor();refresh();
+}
+$('termList').addEventListener('input',e=>{const row=e.target.closest('.term-row');if(row)changeTerm(+row.dataset.i,e.target);});
+$('termList').addEventListener('click',e=>{const b=e.target.closest('.term-open');if(b){setPlaying(false);openCircleEditor(+b.closest('.term-row').dataset.i,e.clientX,e.clientY);}});
+editor.addEventListener('input',e=>changeTerm(editorCircle,e.target));
+function normalizeTermInput(e,index){const el=e.target,t=state.terms[index];if(t&&el.type==='number'&&el.dataset.key){el.value=editValue(t,el.dataset.key);}}
+editor.addEventListener('change',e=>normalizeTermInput(e,editorCircle));
+$('termList').addEventListener('change',e=>{const row=e.target.closest('.term-row');if(row)normalizeTermInput(e,+row.dataset.i);});
+$('restore').onclick=()=>{closeCircleEditor();state.terms=chooseHarmonics(state.N);state.dc=state.analysis.dc;state.manual=false;$('dc').value=fmt(state.dc,6);renderTerms();refresh();};
 $('dc').oninput=e=>{let v=Number(e.target.value);if(!Number.isFinite(v))return;state.dc=Math.max(-100,Math.min(100,v));e.target.value=state.dc;state.manual=true;refresh();};
-function setPlaying(v){state.playing=v;$('play').textContent=v?'Ⅱ 暂停':'▶ 播放';updateLive();}
-$('play').onclick=()=>setPlaying(!state.playing);$('reset').onclick=()=>{state.x=0;state.terms.forEach(t=>t.offset=0);lockDrawingScale();startRecording();refresh(false);};$('time').oninput=e=>{setPlaying(false);state.x=+e.target.value/1000*state.T;startRecording();updateLive();draw();};
+function setPlaying(v){state.playing=v;if(v)closeCircleEditor();$('play').textContent=v?'Ⅱ 暂停':'▶ 播放';updateLive();draw();}
+$('play').onclick=()=>setPlaying(!state.playing);$('reset').onclick=()=>{closeCircleEditor();state.x=0;state.terms.forEach(t=>t.offset=0);lockDrawingScale();startRecording();refresh(false);};$('time').oninput=e=>{setPlaying(false);state.x=+e.target.value/1000*state.T;startRecording();updateLive();draw();};
 function setSpeed(v,source){if(!Number.isFinite(v))return;state.speed=Math.round(Math.max(0,Math.min(3,v))*1000)/1000;$('speed').value=state.speed;if(source!=='number')$('speedNumber').value=fmt(state.speed,3);updateLive();}
 $('speed').oninput=e=>setSpeed(Number(e.target.value),'slider');
 $('speedNumber').oninput=e=>{if(e.target.value!==''&&Number.isFinite(e.target.valueAsNumber))setSpeed(e.target.valueAsNumber,'number');};
@@ -229,12 +301,12 @@ $('zoom').oninput=e=>setZoom(Number(e.target.value),{x:cw/2,y:ch/2});
 $('zoomNumber').oninput=e=>{const v=e.target.valueAsNumber;if(Number.isFinite(v)&&v>=.25&&v<=100)setZoom(v);};
 $('zoomNumber').onchange=e=>{const v=e.target.valueAsNumber;setZoom(Number.isFinite(v)?v:state.zoom);};
 ['showTarget','showTrace','showCircles'].forEach(k=>$(k).onchange=e=>{state[k]=e.target.checked;draw();});
-function view(v){state.view=v;$('singleView').classList.toggle('active',v==='single');$('compareView').classList.toggle('active',v==='compare');document.querySelector('.canvas-wrap').classList.toggle('compare',v==='compare');resize();}
+function view(v){closeCircleEditor();state.view=v;$('singleView').classList.toggle('active',v==='single');$('compareView').classList.toggle('active',v==='compare');document.querySelector('.canvas-wrap').classList.toggle('compare',v==='compare');resize();}
 $('singleView').onclick=()=>view('single');$('compareView').onclick=()=>view('compare');$('selectedTerm').onchange=e=>{state.selected=+e.target.value;updateLive();};
 function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-$('export').onclick=()=>download(new Blob([JSON.stringify({version:2,expression:state.expr,period:state.T,dc:state.dc,circles:state.terms.map(t=>({radius:t.r,angularVelocityRadPerSecond:t.omega,harmonicRatio:t.n,phaseRadians:t.phase,continuousPhaseOffset:t.offset||0,color:t.color,enabled:t.enabled,rodWidthMultiplier:t.width})),playbackSpeed:state.speed,recordingX:state.x,simulationTimeSeconds:simulationSeconds(),mode:state.manual?'manual':'fourier'},null,2)],{type:'application/json'}),'傅里叶实验室-参数.json');
+$('export').onclick=()=>download(new Blob([JSON.stringify({version:3,expression:state.expr,period:state.T,dc:state.dc,circles:state.terms.map(t=>({radius:t.r,angularVelocityRadPerSecond:t.omega,harmonicRatio:t.n,phaseRadians:t.phase,continuousPhaseOffset:t.offset||0,color:t.color,enabled:t.enabled,rodWidthMultiplier:t.width,circleWidthMultiplier:t.ringWidth??1,circleOpacity:t.opacity??1})),playbackSpeed:state.speed,recordingX:state.x,simulationTimeSeconds:simulationSeconds(),mode:state.manual?'manual':'fourier'},null,2)],{type:'application/json'}),'傅里叶实验室-参数.json');
 $('saveImage').onclick=()=>canvas.toBlob(blob=>blob&&download(blob,'傅里叶实验室-画面.png'));
-window.addEventListener('keydown',e=>{if(e.code==='Space'&&!['INPUT','SELECT','TEXTAREA','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();setPlaying(!state.playing);}});
+window.addEventListener('keydown',e=>{if(e.code==='Space'&&!['INPUT','SELECT','TEXTAREA','BUTTON','SUMMARY'].includes(document.activeElement.tagName)){e.preventDefault();setPlaying(!state.playing);}});
 let last=performance.now(),lastUI=0;
 function advanceSimulation(dx){
  if(!(dx>0))return;
