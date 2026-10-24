@@ -131,7 +131,7 @@ function updateLive(){const t=state.terms[state.selected];if(!t)return;let theta
  $('sumValue').textContent='S(x) = '+fmt(synth(state.x),4);const tv=target(state.x);$('targetValue').textContent=Number.isFinite(tv)?'目标 f(x) = '+fmt(tv,4)+'　差值 '+fmt(synth(state.x)-tv,4):'目标函数在此点未定义';
 }
 const canvas=$('scene'),ctx=canvas.getContext('2d');let cw=1,ch=1,dpr=1;
-let circleHits=[],hoverCircle=-1,editorCircle=-1;const editor=$('circleEditor');
+let circleHits=[],hoverCircle=-1,editorCircle=-1,hoverPointer=null;const editor=$('circleEditor');
 function resize(){const rect=canvas.getBoundingClientRect();cw=rect.width;ch=rect.height;dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(cw*dpr);canvas.height=Math.round(ch*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);draw();}
 // Geometry grows with the camera; strokes and handles stay small in screen pixels.
 function detailFactor(){return Math.pow(Math.max(1,state.zoom),-.2);}
@@ -153,7 +153,7 @@ function drawPanel(terms,top,height,color,caption,rowIndex){const isCompare=stat
  if(caption){label(caption,18,top+20,color,small?9:10);}
  if(state.showTrace&&!isCompare){ctx.beginPath();let started=false;for(let i=state.historyHead;i<state.history.length;i++){const p=state.history[i];if(p.x<state.x-state.T*state.span)continue;const px=originX+p.endpointX*scale,py=centerY-p.endpointY*scale;started?ctx.lineTo(px,py):ctx.moveTo(px,py);started=true;}ctx.strokeStyle='#acbfcc25';ctx.lineWidth=penWidth(1);ctx.stroke();}
  const points=chain(terms,state.x);for(const node of points.nodes){const {t}=node,x=originX+node.x*scale,y=centerY-node.y*scale,nx=originX+node.nx*scale,ny=centerY-node.ny*scale;
- const index=state.terms.indexOf(t),active=!state.playing&&(index===hoverCircle||index===editorCircle);
+ const index=state.terms.indexOf(t),active=index===hoverCircle||(!state.playing&&index===editorCircle);
  if(state.showCircles){const screen=(x,y)=>({x:cw/2+state.panX+(x-cw/2)*state.zoom,y:ch/2+state.panY+(y-ch/2)*state.zoom});const c=screen(x,y);circleHits.push({...c,index,r:t.r*scale*state.zoom,top:screen(0,top).y,bottom:screen(0,top+height).y});}
  if(state.showCircles&&t.r>1e-7){ctx.save();ctx.globalAlpha=active?Math.min(1,(t.opacity??1)*.63+.37):(t.opacity??1)*.63;ctx.beginPath();ctx.arc(x,y,t.r*scale,0,TAU);ctx.strokeStyle=t.color;ctx.lineWidth=active?Math.max(2.5/state.zoom,penWidth(state.circleWidth*(t.ringWidth??1))+1.5/state.zoom):penWidth(state.circleWidth*(t.ringWidth??1));ctx.shadowColor=t.color;ctx.shadowBlur=active?12:glowSize(5);ctx.stroke();ctx.restore();}
  line(x,y,nx,ny,'#e8edf0c0',state.rodWidth*t.width);if(t.r>1e-7){ctx.beginPath();ctx.arc(x,y,dotRadius(2,t.r*scale),0,TAU);ctx.fillStyle=t.color;ctx.fill();}}
@@ -175,11 +175,14 @@ function drawPanel(terms,top,height,color,caption,rowIndex){const isCompare=stat
  label('x',graphX-3,top+height-12,'#7d8c91',9);label('x − '+state.span+'T',graphRight-43,top+height-12,'#65767e',9);
 
  ctx.restore();}
-function draw(){circleHits=[];if(!state.fn||cw<40||ch<40)return;ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#11161b';ctx.fillRect(0,0,cw,ch);
+function draw(refreshHover=true){circleHits=[];if(!state.fn||cw<40||ch<40)return;ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#11161b';ctx.fillRect(0,0,cw,ch);
  ctx.save();ctx.translate(cw/2+state.panX,ch/2+state.panY);ctx.scale(state.zoom,state.zoom);ctx.translate(-cw/2,-ch/2);
  if(state.view==='compare'){let counts=comparisonCounts();let h=(ch-30)/counts.length;counts.forEach((n,i)=>{drawPanel(state.terms.slice(0,n),25+i*h,h,colors[i],`${String(n).padStart(2,'0')}`,i);if(i)line(16,25+i*h,cw-16,25+i*h,'#293238',.7);});}
  else drawPanel(state.terms,0,ch,'#c2ed95','',0);
  ctx.restore();
+ // A moving circle can enter or leave a stationary mouse. Recheck the current
+ // geometry every frame; repaint once only if the highlighted circle changed.
+ if(refreshHover&&hoverPointer){const next=hitCircle(canvasPoint(hoverPointer));if(next!==hoverCircle){hoverCircle=next;canvas.classList.toggle('circle-hover',next>=0);draw(false);}}
 }
 
 // View navigation transforms the complete scene, leaving the function parameters unchanged.
@@ -196,7 +199,7 @@ function setZoom(next,anchor={x:cw/2,y:ch/2}){
 function resetView(){state.zoom=1;state.panX=0;state.panY=0;syncView();draw();}
 function canvasPoint(e){const rect=canvas.getBoundingClientRect();return{x:(e.clientX-rect.left)*cw/rect.width,y:(e.clientY-rect.top)*ch/rect.height};}
 function hitCircle(p){
- if(state.playing||!state.showCircles)return -1;
+ if(!state.showCircles)return -1;
  const hits=circleHits.filter(c=>p.y>=c.top&&p.y<=c.bottom).map(c=>({...c,d:Math.hypot(p.x-c.x,p.y-c.y)}));
  const edges=hits.filter(c=>Math.abs(c.d-c.r)<=7).sort((a,b)=>Math.abs(a.d-a.r)-Math.abs(b.d-b.r)||a.r-b.r);
  return (edges[0]||hits.filter(c=>c.d<c.r).sort((a,b)=>a.r-b.r)[0])?.index??-1;
@@ -227,12 +230,13 @@ const pointers=new Map();let pinch=null,safariGesture=null,press=null;
 function beginPinch(){const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(b.x-a.x,b.y-a.y),center:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},zoom:state.zoom,panX:state.panX,panY:state.panY};}
 canvas.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'&&e.button!==0)return;
+ hoverPointer=null;
  e.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);const p=canvasPoint(e);pointers.set(e.pointerId,p);
  press=pointers.size===1?{id:e.pointerId,start:p,index:hitCircle(p),dragged:false}:null;
  if(pointers.size===2){closeCircleEditor();beginPinch();}
 });
 canvas.addEventListener('pointermove',e=>{
- const p=canvasPoint(e);if(!pointers.has(e.pointerId)){setHover(hitCircle(p));return;}
+ const p=canvasPoint(e);if(!pointers.has(e.pointerId)){hoverPointer=e.pointerType==='mouse'?{clientX:e.clientX,clientY:e.clientY}:null;setHover(hitCircle(p));return;}
  const prev=pointers.get(e.pointerId);pointers.set(e.pointerId,p);
  if(pointers.size===1){
   if(press&&!press.dragged&&Math.hypot(p.x-press.start.x,p.y-press.start.y)<4)return;
@@ -245,9 +249,10 @@ function endPointer(e){
  const click=e.type==='pointerup'&&press&&press.id===e.pointerId&&!press.dragged&&Math.hypot(canvasPoint(e).x-press.start.x,canvasPoint(e).y-press.start.y)<4;
  if(click){if(press.index>=0)openCircleEditor(press.index,e.clientX,e.clientY);else{closeCircleEditor();draw();}}
  pointers.delete(e.pointerId);press=null;if(pointers.size<2)pinch=null;if(!pointers.size)canvas.classList.remove('dragging');
+ if(!pointers.size&&e.type==='pointerup'&&e.pointerType==='mouse'){const p=canvasPoint(e);hoverPointer=p.x>=0&&p.x<=cw&&p.y>=0&&p.y<=ch?{clientX:e.clientX,clientY:e.clientY}:null;setHover(hoverPointer?hitCircle(p):-1);}
 }
 ['pointerup','pointercancel','lostpointercapture'].forEach(name=>canvas.addEventListener(name,endPointer));
-canvas.addEventListener('pointerleave',()=>{if(!pointers.size)setHover(-1);});
+canvas.addEventListener('pointerleave',()=>{hoverPointer=null;if(!pointers.size)setHover(-1);});
 canvas.addEventListener('wheel',e=>{
  e.preventDefault();if(safariGesture)return;
  const unit=e.deltaMode===1?16:e.deltaMode===2?ch:1;
