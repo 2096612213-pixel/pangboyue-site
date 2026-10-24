@@ -37,7 +37,11 @@
       if (!prebuffered) {audioEl.src = url.href; audioEl.preload = 'auto'; audioEl.load();}
       let lastTime = audioEl.currentTime, lastAdvance = performance.now();
       let waitingSince = null, tagsStarted = false;
-      const startedAt = performance.now(), startDraw = tonearmMetalLighting.drawCount;
+      let lastCheck = performance.now(), foregroundAt = lastCheck;
+      const resetWatchdog = () => {
+        lastCheck = foregroundAt = lastAdvance = performance.now();
+        lastTime = audioEl.currentTime; waitingSince = null;
+      };
       const mediaError = () => fail('音频连接失败，请点击重试');
       const stateError = event => {
         if (event.detail.state === 'error') fail(transport.error || '播放失败，请点击重试');
@@ -46,15 +50,14 @@
         if (!valid()) return;
         const now = performance.now();
         if (audioEl.currentTime !== lastTime) {lastTime = audioEl.currentTime; lastAdvance = now;}
-        // A missing GPU must not keep an otherwise playable song waiting.
-        const slowGraphics = transport.state !== 'playing' && audioEl.readyState >= 3 &&
-          now - startedAt > 8000 && tonearmMetalLighting.drawCount - startDraw < (now - startedAt) / 500;
-        if (!tonearmMetalLighting.host.classList.contains('plx-compatibility') &&
-            (slowGraphics || (!tonearmMetalLighting.ready &&
-              (tonearmMetalLighting.startupPhase === 'error' || now - startedAt > 12000)))) {
-          document.querySelector('#plx-startup-status button').click();
+        // Suspended tabs and idle graphics are not audio failures. Only count
+        // continuous foreground playback stalls, allowing time to resume.
+        const suspended = now - lastCheck > 2500;
+        lastCheck = now;
+        if (document.hidden || suspended) {resetWatchdog(); return;}
+        if (!transport.intent || audioEl.ended || !tonearmMetalLighting.ready || now - foregroundAt < 2000) {
+          waitingSince = null; return;
         }
-        if (!transport.intent || audioEl.ended) {waitingSince = null; return;}
         const audible = transport.state === 'playing' && !audioEl.paused && now - lastAdvance < 2000;
         if (audible) {
           waitingSince = null;
@@ -70,10 +73,14 @@
           if (now - waitingSince >= 30000) fail('音频连接超时，请点击重试');
         }
       }, 500);
+      document.addEventListener('visibilitychange', resetWatchdog);
+      window.addEventListener('pageshow', resetWatchdog);
       audioEl.addEventListener('error', mediaError);
       document.addEventListener('transportstatechange', stateError);
       signal.addEventListener('abort', () => {
         clearInterval(watchdog);
+        document.removeEventListener('visibilitychange', resetWatchdog);
+        window.removeEventListener('pageshow', resetWatchdog);
         audioEl.removeEventListener('error', mediaError);
         document.removeEventListener('transportstatechange', stateError);
       }, {once:true});

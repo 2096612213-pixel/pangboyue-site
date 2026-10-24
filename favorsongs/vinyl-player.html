@@ -834,27 +834,18 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
     .lyric-sync-tools {display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:10px 0;font-size:12px;color:#a1a1aa;}
     #lyric-offset {width:72px;padding:5px 7px;border:1px solid #3f3f46;border-radius:5px;background:#171719;color:#ddd;font:inherit;user-select:text;}
 
-    #plx-scene-canvas{position:absolute;z-index:12;pointer-events:none;display:none;}
-    .plx-render-ready #plx-scene-canvas{display:block;}
-    .plx-render-ready:not(.plx-compatibility) .platter-base,.plx-render-ready:not(.plx-compatibility) .vinyl-disc,
-    .plx-render-ready:not(.plx-compatibility) .tonearm-container,.plx-render-ready:not(.plx-compatibility) .tonearm-fixed-layer,
-    .plx-render-ready:not(.plx-compatibility) .tonearm-material-plane,.plx-render-ready:not(.plx-compatibility) .tonearm-rest-dock,
-    .plx-render-ready:not(.plx-compatibility) .vinyl-sheen,.plx-render-ready:not(.plx-compatibility) #vinyl-reflection-canvas{visibility:hidden;}
-    .plx-render-ready #visualizer-canvas{width:133%;height:133%;}
-
-    /* The legacy DOM is an explicit compatibility mode, never an initial frame. */
-    .turntable-wrapper:not(.plx-compatibility) .platter-base,
-    .turntable-wrapper:not(.plx-compatibility) .vinyl-disc,
-    .turntable-wrapper:not(.plx-compatibility) .tonearm-container,
-    .turntable-wrapper:not(.plx-compatibility) .tonearm-fixed-layer,
-    .turntable-wrapper:not(.plx-compatibility) .tonearm-material-plane,
-    .turntable-wrapper:not(.plx-compatibility) .tonearm-rest-dock,
-    .turntable-wrapper:not(.plx-compatibility) .vinyl-sheen,
-    .turntable-wrapper:not(.plx-compatibility) #vinyl-reflection-canvas {visibility:hidden;}
-    #plx-scene-canvas{display:block;opacity:0;}
+    /* Legacy elements still supply geometry/state, but never paint a fallback. */
+    .turntable-wrapper .platter-base,
+    .turntable-wrapper .vinyl-disc,
+    .turntable-wrapper .tonearm-container,
+    .turntable-wrapper .tonearm-fixed-layer,
+    .turntable-wrapper .tonearm-material-plane,
+    .turntable-wrapper .tonearm-rest-dock,
+    .turntable-wrapper .vinyl-sheen,
+    .turntable-wrapper #vinyl-reflection-canvas {visibility:hidden;}
+    #plx-scene-canvas{position:absolute;z-index:12;pointer-events:none;display:block;opacity:0;}
     .plx-render-ready #plx-scene-canvas{opacity:1;}
-    .plx-compatibility #plx-scene-canvas{display:none;}
-    .turntable-wrapper:not(.plx-compatibility) #visualizer-canvas{width:133%;height:133%;}
+    .turntable-wrapper #visualizer-canvas{width:133%;height:133%;}
     #plx-startup-status{position:fixed;left:24px;bottom:24px;z-index:30;color:#85858e;font:11px/1.5 sans-serif;}
     #plx-startup-status[hidden]{display:none;}
     #plx-startup-status button{margin-left:10px;color:inherit;background:transparent;border:1px solid #3f3f46;border-radius:5px;padding:4px 8px;font:inherit;cursor:pointer;}
@@ -925,7 +916,7 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
   <input type="file" id="file-input" accept="audio/*,.lrc,.elrc,.yrc,.qrc,.txt,.json" multiple style="display: none;" />
 
   <!-- 左侧高端 Hi-Fi 黑胶唱片与精密机械唱臂总成 -->
-  <div id="plx-startup-status" role="status" aria-live="polite"><span>正在准备唱片机…</span><button type="button" hidden>使用兼容画面</button></div>
+  <div id="plx-startup-status" role="status" aria-live="polite"><span>正在准备唱片机…</span><button type="button" hidden>重试画面</button></div>
   <div class="turntable-wrapper plx-starting" data-plx-phase="loading">
     <canvas id="plx-scene-canvas" aria-hidden="true"></canvas>
     <canvas id="visualizer-canvas" width="1000" height="1000"></canvas>
@@ -1659,11 +1650,16 @@ class PLXTurntableScene {
   this.onResize=()=>this.resize();
   this.onContextLost=e=>{e.preventDefault();this.ready=false;this.warming=false;this.host.classList.remove('plx-render-ready');this.setStartup('restoring','正在恢复唱片机…');};
   this.onContextRestored=()=>{this.readyPromise=this.restoreGraphics();};
-  this.onVisibility=()=>{if(this.ready&&!document.hidden){this.dirty=true;this.renderFrame();}};
+  this.onVisibility=()=>{
+   if(this.disposed||document.hidden)return;
+   // Foreground/bfcache resumes must redraw the same model, even when paused.
+   this.lastPhotoFrame=null;this.cadenceSamples=[];
+   if(this.ready){this.resize();this.dirty=true;this.renderFrame();}
+  };
   this.onPageHide=e=>{if(!e.persisted)this.dispose();};
   document.getElementById('vinyl-cover-img').addEventListener('load',this.coverLoad);
   this.canvas.addEventListener('webglcontextlost',this.onContextLost);this.canvas.addEventListener('webglcontextrestored',this.onContextRestored);
-  document.addEventListener('visibilitychange',this.onVisibility);window.addEventListener('pagehide',this.onPageHide);
+  document.addEventListener('visibilitychange',this.onVisibility);window.addEventListener('pagehide',this.onPageHide);window.addEventListener('pageshow',this.onVisibility);
   this.readyPromise=this.initialize();
  }
  setStartup(phase,message='正在准备唱片机…'){
@@ -3001,12 +2997,12 @@ class PLXTurntableScene {
  dispose(){
   this.disposed=true;this.ro?.disconnect();window.removeEventListener('resize',this.onResize);document.getElementById('vinyl-cover-img').removeEventListener('load',this.coverLoad);
   this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.canvas.removeEventListener('webglcontextrestored',this.onContextRestored);
-  document.removeEventListener('visibilitychange',this.onVisibility);window.removeEventListener('pagehide',this.onPageHide);this.key?.shadow.map?.dispose();this.photoTarget?.dispose();this.aoTarget?.dispose();
+  document.removeEventListener('visibilitychange',this.onVisibility);window.removeEventListener('pagehide',this.onPageHide);window.removeEventListener('pageshow',this.onVisibility);this.key?.shadow.map?.dispose();this.photoTarget?.dispose();this.aoTarget?.dispose();
   for(const resource of this.resources)resource.dispose?.();this.resources.clear();this.environmentTarget?.dispose();this.renderer?.dispose();this.ready=false;
  }
 }
 
-const tonearmMetalLighting=new PLXTurntableScene();
+let tonearmMetalLighting=new PLXTurntableScene();
 class VinylSurfaceLighting {render(angle){tonearmMetalLighting.setRecordAngle(angle);}}
 
     function initAudioContext() {
@@ -3406,7 +3402,7 @@ class VinylSurfaceLighting {render(angle){tonearmMetalLighting.setRecordAngle(an
       flushProgressDrag();syncFromMedia();transport.tick(dt,vinylAngularVel,TARGET_VINYL_SPEED);
       stepLyricsScrollPhysics(dt);
       if(Math.abs(currentTime-lastRingTime)>.03||duration!==lastRingDuration){renderVisualizerRing(currentTime);lastRingTime=currentTime;lastRingDuration=duration;}
-      if(!tonearmMetalLighting.host.classList.contains('plx-compatibility'))tonearmMetalLighting.renderFrame();
+      tonearmMetalLighting.renderFrame();
       requestAnimationFrame(animateLoop);
     }
 
@@ -4573,20 +4569,26 @@ const AutomaticLyrics=(()=>{
       await LineCache.remove(hash);if(generation!==trackGeneration)return;
       lrcModal.classList.remove('open');beginLyricsMatching(lyricsData,null,true);
     });
-    transport=new TurntableTransport({visualReady:()=>tonearmMetalLighting.ready||tonearmMetalLighting.host.classList.contains('plx-compatibility'),media:audioEl,groove:getTargetGrooveAngle,unlock:ensureMediaConnection,gate:gateAudio,
+    transport=new TurntableTransport({visualReady:()=>tonearmMetalLighting.ready,media:audioEl,groove:getTargetGrooveAngle,unlock:ensureMediaConnection,gate:gateAudio,
       change:onTransportChange,sync:syncFromMedia,pose:(pose,t)=>{
         armAngle=pose.angle;armLift=pose.lift;armState=t.state;
         applyTonearmTransformAndLighting();
       }},{restAngle:ARM_REST_ANGLE,reducedMotion:prefersReducedMotion});
     document.querySelector('#plx-startup-status button').addEventListener('click',()=>{
-      if(tonearmMetalLighting.host.classList.contains('plx-compatibility'))return;
-      tonearmMetalLighting.host.classList.add('plx-compatibility');tonearmMetalLighting.host.classList.remove('plx-starting','plx-render-ready');
-      document.getElementById('plx-startup-status').hidden=true;renderClassicHiFiVinyl();
+      const previous=tonearmMetalLighting;
+      if(previous.startupPhase!=='error')return;
+      const {pose,recordAngle,labelText,coverEnabled}=previous;
+      previous.dispose();previous.host.classList.remove('plx-render-ready');
+      // Retry only graphics: preserve the audio element, playhead and transport.
+      tonearmMetalLighting=new PLXTurntableScene();
+      tonearmMetalLighting.setPose(...pose);tonearmMetalLighting.setRecordAngle(recordAngle);
+      tonearmMetalLighting.updateLabel(...(labelText||['','']));
+      if(coverEnabled)tonearmMetalLighting.setCover(document.getElementById('vinyl-cover-img'));
     });
     const vinylSurfaceLighting=new VinylSurfaceLighting();vinylSurfaceLighting.render(vinylAngle);
     applyTonearmTransformAndLighting();bindProgressRing();
     requestAnimationFrame(animateLoop);
   </script>
-  <script src="vinyl-bridge.js?v=f4b07bc4e21f"></script>
+  <script src="vinyl-bridge.js?v=269ab52d71ef"></script>
 </body>
 </html>
