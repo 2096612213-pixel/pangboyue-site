@@ -1,5 +1,10 @@
-#content .journal-video { margin: 24px 0; position: relative; }
-#content .journal-video video { display: block; width: 100%; margin: 0; aspect-ratio: var(--video-ratio); object-fit: contain; border-radius: 12px; background: #000; }
+/* Never enlarge a clip beyond its native size; keep portrait clips within the viewport. */
+#content .journal-video {
+  margin: 24px 0; position: relative;
+  width: min(100%, var(--video-width, 640px), calc(75vh * var(--video-aspect, 1.777777778)));
+  width: min(100%, var(--video-width, 640px), calc(75svh * var(--video-aspect, 1.777777778)));
+}
+#content .journal-video video { display: block; width: 100%; height: auto; margin: 0; aspect-ratio: var(--video-ratio); object-fit: contain; border-radius: 12px; background: #000; }
 .journal-video-play {
   display: block; position: absolute; inset: 0; width: 100%; height: 100%;
   padding: 0; overflow: hidden; border: 0; border-radius: 12px;

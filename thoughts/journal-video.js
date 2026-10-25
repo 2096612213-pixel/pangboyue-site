@@ -33,7 +33,13 @@ export function renderJournalContent(content, html) {
     box.className = 'journal-video';
     const width = Number(original.getAttribute('width'));
     const height = Number(original.getAttribute('height'));
-    box.style.setProperty('--video-ratio', width > 0 && height > 0 ? `${width} / ${height}` : '16 / 9');
+    function setDimensions(w, h) {
+      if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
+      box.style.setProperty('--video-width', `${w}px`);
+      box.style.setProperty('--video-aspect', String(w / h));
+      box.style.setProperty('--video-ratio', `${w} / ${h}`);
+    }
+    setDimensions(width > 0 ? width : 640, height > 0 ? height : 360);
     
     const poster = original.getAttribute('poster');
     const url = original.getAttribute('src') || original.querySelector('source[src]')?.getAttribute('src');
@@ -97,6 +103,7 @@ export function renderJournalContent(content, html) {
     });
 
     video.addEventListener('loadedmetadata', () => {
+      setDimensions(video.videoWidth, video.videoHeight);
       if (state.video === video && state.position > 0 && Number.isFinite(video.duration)) {
         video.currentTime = Math.min(state.position, Math.max(0, video.duration - 0.1));
       }
