@@ -302,7 +302,7 @@ title：算了。我最近想得太多了，不把所有东西抖出来给所有
 
 ---
 
-
+下面保存了一些视频
 
 <video controls playsinline preload="none" width="1280" height="720" poster="/thoughts/2026-W44/media/oct26-clip-01-JDQQxan1JrOSiui2-poster.jpg" aria-label="10月26日分享视频 1">
   <source src="/thoughts/2026-W44/media/oct26-clip-01-JDQQxan1JrOSiui2.mp4?v=db2f46c57f9c" type="video/mp4">
@@ -334,6 +334,28 @@ title：算了。我最近想得太多了，不把所有东西抖出来给所有
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-06-5aDR5wIws4TzBxrf.mp4?v=83152887c5d5">打开视频</a>观看。
 </video>
 
+全部台词为
+
+If I was the moon, would you still look for the stars?
+
+如果我是月亮，你还会去寻找星星吗？
+
+Only if you promise me to shine forever.
+
+只有你答应我永远闪耀，我才会。
+
+But what if I can't shine forever?
+
+可如果我无法永远闪耀呢？
+
+Does it matter? Our lives are temporary, so are those stars.
+
+那又有什么关系呢？我们的生命是短暂的，星星也是如此。
+
+抖音上搜这个台词可以搜到
+
+---
+
 <video controls playsinline preload="none" width="1096" height="720" poster="/thoughts/2026-W44/media/oct26-clip-07-IqJbYkGFP3_jgbii-poster.jpg" aria-label="10月26日分享视频 7">
   <source src="/thoughts/2026-W44/media/oct26-clip-07-IqJbYkGFP3_jgbii.mp4?v=a1bae8a598ff" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-07-IqJbYkGFP3_jgbii.mp4?v=a1bae8a598ff">打开视频</a>观看。
@@ -343,6 +365,10 @@ title：算了。我最近想得太多了，不把所有东西抖出来给所有
   <source src="/thoughts/2026-W44/media/oct26-clip-08-j5pgsb3P3rh9OgLp.mp4?v=e43eac5fe87c" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-08-j5pgsb3P3rh9OgLp.mp4?v=e43eac5fe87c">打开视频</a>观看。
 </video>
+
+---
+
+深圳天际线
 
 <video controls playsinline preload="none" width="1276" height="718" poster="/thoughts/2026-W44/media/oct26-clip-09-shenzhen-skyline-poster.jpg" aria-label="深圳天际线">
   <source src="/thoughts/2026-W44/media/oct26-clip-09-shenzhen-skyline.mp4?v=cd30e116aaec" type="video/mp4">
@@ -376,10 +402,16 @@ title：算了。我最近想得太多了，不把所有东西抖出来给所有
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-14-FOTIwtrkup692i9O.mp4?v=2463d10bd7fa">打开视频</a>观看。
 </video>
 
+夏威夷hawaii
+
+---
+
 <video controls playsinline preload="none" width="2160" height="2160" poster="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9-poster.jpg" aria-label="10月26日分享视频 15">
   <source src="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9.mp4?v=68b6d96de825" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9.mp4?v=68b6d96de825">打开视频</a>观看。
 </video>
+
+## 2026-10-27
 
 
 

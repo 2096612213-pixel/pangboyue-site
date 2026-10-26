@@ -595,11 +595,33 @@ const addedSongs = [
   {"title": "男人信什么 — 卫兰", "file": "nan-ren-xin-shen-me-wei-lan.mp3", "addedAt": "2026-10-26"},
   {"title": "穿越星河拥抱你 — 林子琪", "file": "chuan-yue-xing-he-yong-bao-ni-lin-zi-qi.mp3", "addedAt": "2026-10-26"},
   {"title": "莫斯科郊外的晚上 — 中央乐团合唱团", "file": "mo-si-ke-jiao-wai-de-wan-shang-zhong-yang-yue-tuan.mp3", "addedAt": "2026-10-26"},
+  {"title": "BAD BOY — 张惠妹", "file": "bad-boy-a-mei.mp3", "addedAt": "2026-10-26"},
+  {"title": "Beat It (Single Version) — Michael Jackson", "file": "beat-it-single-version-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "Billie Jean (Long Version) — Michael Jackson", "file": "billie-jean-long-version-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "C’est la vie — 梁静茹", "file": "cest-la-vie-fish-leong.mp3", "addedAt": "2026-10-26"},
+  {"title": "Dangerous — Michael Jackson", "file": "dangerous-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "Lonely (2021 Remastered) — Nana Darkman、Booya Family、NANA", "file": "lonely-2021-remastered-nana.mp3", "addedAt": "2026-10-26"},
+  {"title": "Mantra — JENNIE", "file": "mantra-jennie.mp3", "addedAt": "2026-10-26"},
+  {"title": "ONE MINUTE — 邓紫棋", "file": "one-minute-gem.mp3", "addedAt": "2026-10-26"},
+  {"title": "Should've Let Go — 王嘉尔、林俊杰", "file": "shouldve-let-go-jackson-wang-jj-lin.mp3", "addedAt": "2026-10-26"},
+  {"title": "Struggling in the Southeast — 殷正洋、The Moonbeam Orchestra", "file": "struggling-in-the-southeast-yin-zheng-yang.mp3", "addedAt": "2026-10-26"},
+  {"title": "You Are Not Alone — Michael Jackson", "file": "you-are-not-alone-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "七子之歌-澳门 — 北京市少年宫合唱团", "file": "qi-zi-zhi-ge-ao-men-beijing-shaonian-gong.mp3", "addedAt": "2026-10-26"},
+  {"title": "光阴的故事 — 罗大佑", "file": "guang-yin-de-gu-shi-luo-da-you.mp3", "addedAt": "2026-10-26"},
+  {"title": "恋曲1980 — 罗大佑", "file": "lian-qu-1980-luo-da-you.mp3", "addedAt": "2026-10-26"},
+  {"title": "我的1997 — 艾敬", "file": "wo-de-1997-ai-jing.mp3", "addedAt": "2026-10-26"},
+  {"title": "手牵手 — 伍哥、Wang Yun、小浩、小满、小太阳、女土匪、豆豆", "file": "shou-qian-shou-wu-ge-wang-yun.mp3", "addedAt": "2026-10-26"},
+  {"title": "手牵手 — 罗大佑", "file": "shou-qian-shou-luo-da-you.mp3", "addedAt": "2026-10-26"},
+  {"title": "未来的主人翁 — 罗大佑", "file": "wei-lai-de-zhu-ren-weng-luo-da-you.mp3", "addedAt": "2026-10-26"},
+  {"title": "东方之珠 — 罗大佑", "file": "dong-fang-zhi-zhu-luo-da-you.mp3", "addedAt": "2026-10-26"},
+  {"title": "童年 — 罗大佑", "file": "tong-nian-luo-da-you.mp3", "addedAt": "2026-10-26"},
+  {"title": "让世界充满爱 (feat. 中国中央广播电台儿童合唱团) — Kwok Fung", "file": "rang-shi-jie-chong-man-ai-kwok-fung.mp3", "addedAt": "2026-10-26"},
+  {"title": "鹿港小镇 — 罗大佑", "file": "lu-gang-xiao-zhen-luo-da-you.mp3", "addedAt": "2026-10-26"},
 ];
 
 let songs = [...addedSongs];
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = '9ac4ea94f8e7'; // updated by build:songs
+const STREAM_REVISION = '9037757f9c3f'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = 'smooth';
 try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
