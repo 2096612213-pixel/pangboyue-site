@@ -280,7 +280,7 @@ A：莫泊桑的童年与成长
 
 ---
 
-再贴一下牡丹皮cheallin今天写的文章
+再贴一下牡丹皮Maechiin今天写的文章
 
 ---
 
@@ -300,4 +300,83 @@ title：算了。我最近想得太多了，不把所有东西抖出来给所有
 
 这件事情我以后就不说了。你当时怎么想现在怎么想也不用跟我解释了，我觉得我想得够清楚了也说得够清楚了。
 
+
+
+
+<video controls playsinline preload="none" width="1280" height="720" poster="/thoughts/2026-W44/media/oct26-clip-01-JDQQxan1JrOSiui2-poster.jpg" aria-label="10月26日分享视频 1">
+  <source src="/thoughts/2026-W44/media/oct26-clip-01-JDQQxan1JrOSiui2.mp4?v=db2f46c57f9c" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-01-JDQQxan1JrOSiui2.mp4?v=db2f46c57f9c">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1280" height="720" poster="/thoughts/2026-W44/media/oct26-clip-02-etMPYqNaG3EZoVub-poster.jpg" aria-label="10月26日分享视频 2">
+  <source src="/thoughts/2026-W44/media/oct26-clip-02-etMPYqNaG3EZoVub.mp4?v=ed7275a48c16" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-02-etMPYqNaG3EZoVub.mp4?v=ed7275a48c16">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1268" height="718" poster="/thoughts/2026-W44/media/oct26-clip-03-w5HZ590uhtHNYQ3o-poster.jpg" aria-label="10月26日分享视频 3">
+  <source src="/thoughts/2026-W44/media/oct26-clip-03-w5HZ590uhtHNYQ3o.mp4?v=a034071e6261" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-03-w5HZ590uhtHNYQ3o.mp4?v=a034071e6261">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="800" height="800" poster="/thoughts/2026-W44/media/oct26-clip-04-HVFbEWbb0AAKjeN-poster.jpg" aria-label="10月26日分享视频 4">
+  <source src="/thoughts/2026-W44/media/oct26-clip-04-HVFbEWbb0AAKjeN.mp4?v=985be6eee156" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-04-HVFbEWbb0AAKjeN.mp4?v=985be6eee156">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="720" height="720" poster="/thoughts/2026-W44/media/oct26-clip-05-vRgUY8ElNIW7RR9m-poster.jpg" aria-label="10月26日分享视频 5">
+  <source src="/thoughts/2026-W44/media/oct26-clip-05-vRgUY8ElNIW7RR9m.mp4?v=9a1b9431a9f5" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-05-vRgUY8ElNIW7RR9m.mp4?v=9a1b9431a9f5">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1280" height="720" poster="/thoughts/2026-W44/media/oct26-clip-06-5aDR5wIws4TzBxrf-poster.jpg" aria-label="10月26日分享视频 6">
+  <source src="/thoughts/2026-W44/media/oct26-clip-06-5aDR5wIws4TzBxrf.mp4?v=83152887c5d5" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-06-5aDR5wIws4TzBxrf.mp4?v=83152887c5d5">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1096" height="720" poster="/thoughts/2026-W44/media/oct26-clip-07-IqJbYkGFP3_jgbii-poster.jpg" aria-label="10月26日分享视频 7">
+  <source src="/thoughts/2026-W44/media/oct26-clip-07-IqJbYkGFP3_jgbii.mp4?v=a1bae8a598ff" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-07-IqJbYkGFP3_jgbii.mp4?v=a1bae8a598ff">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1280" height="720" poster="/thoughts/2026-W44/media/oct26-clip-08-j5pgsb3P3rh9OgLp-poster.jpg" aria-label="10月26日分享视频 8">
+  <source src="/thoughts/2026-W44/media/oct26-clip-08-j5pgsb3P3rh9OgLp.mp4?v=e43eac5fe87c" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-08-j5pgsb3P3rh9OgLp.mp4?v=e43eac5fe87c">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1276" height="718" poster="/thoughts/2026-W44/media/oct26-clip-09-shenzhen-skyline-poster.jpg" aria-label="深圳天际线">
+  <source src="/thoughts/2026-W44/media/oct26-clip-09-shenzhen-skyline.mp4?v=cd30e116aaec" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-09-shenzhen-skyline.mp4?v=cd30e116aaec">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1080" height="1434" poster="/thoughts/2026-W44/media/oct26-clip-10-YwJ2j7Y-E-Df950g-poster.jpg" aria-label="10月26日分享视频 10">
+  <source src="/thoughts/2026-W44/media/oct26-clip-10-YwJ2j7Y-E-Df950g.mp4?v=dc6c20f7eee1" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-10-YwJ2j7Y-E-Df950g.mp4?v=dc6c20f7eee1">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1280" height="720" poster="/thoughts/2026-W44/media/oct26-clip-11-GGi_K9PYQdLX2y0N-poster.jpg" aria-label="10月26日分享视频 11">
+  <source src="/thoughts/2026-W44/media/oct26-clip-11-GGi_K9PYQdLX2y0N.mp4?v=39a057e6f96c" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-11-GGi_K9PYQdLX2y0N.mp4?v=39a057e6f96c">打开视频</a>观看。
+</video>
+
+
+
+<video controls playsinline preload="none" width="1500" height="1378" poster="/thoughts/2026-W44/media/oct26-clip-12-8OxmHvdLtnJBPMvf-poster.jpg" aria-label="10月26日分享视频 12">
+  <source src="/thoughts/2026-W44/media/oct26-clip-12-8OxmHvdLtnJBPMvf.mp4?v=91c7df994a00" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-12-8OxmHvdLtnJBPMvf.mp4?v=91c7df994a00">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="720" height="1280" poster="/thoughts/2026-W44/media/oct26-clip-13-0Tc8srbgMbL3FFrw-poster.jpg" aria-label="10月26日分享视频 13">
+  <source src="/thoughts/2026-W44/media/oct26-clip-13-0Tc8srbgMbL3FFrw.mp4?v=b6869bbd068f" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-13-0Tc8srbgMbL3FFrw.mp4?v=b6869bbd068f">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="1280" height="720" poster="/thoughts/2026-W44/media/oct26-clip-14-FOTIwtrkup692i9O-poster.jpg" aria-label="10月26日分享视频 14">
+  <source src="/thoughts/2026-W44/media/oct26-clip-14-FOTIwtrkup692i9O.mp4?v=2463d10bd7fa" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-14-FOTIwtrkup692i9O.mp4?v=2463d10bd7fa">打开视频</a>观看。
+</video>
+
+<video controls playsinline preload="none" width="2160" height="2160" poster="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9-poster.jpg" aria-label="10月26日分享视频 15">
+  <source src="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9.mp4?v=68b6d96de825" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9.mp4?v=68b6d96de825">打开视频</a>观看。
+</video>
 
