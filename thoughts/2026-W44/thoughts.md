@@ -17,6 +17,8 @@
 
 666 用codex写作业的来了 我真没绷住
 
+---
+
 <video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W44/media/goodnight-jensen-musk-poster.jpg" aria-label="晚安大小姐 — 黄仁勋 × 马斯克版">
   <source src="/thoughts/2026-W44/media/goodnight-jensen-musk.mp4?v=df02dbe56c50" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/goodnight-jensen-musk.mp4?v=df02dbe56c50">打开视频</a>观看。
@@ -26,4 +28,6 @@
   <source src="/thoughts/2026-W44/media/programmers-holiday-minimax.mp4?v=b7a174fcc686" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/programmers-holiday-minimax.mp4?v=b7a174fcc686">打开视频</a>观看。
 </video>
+
+
 

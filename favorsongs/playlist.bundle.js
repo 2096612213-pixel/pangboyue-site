@@ -576,11 +576,30 @@ const addedSongs = [
   {"title": "醉赤壁 — 林俊杰", "file": "zui-chi-bi-lin-jun-jie.mp3", "addedAt": "2026-10-23"},
   {"title": "魔力 — S.H.E", "file": "mo-li-she.mp3", "addedAt": "2026-10-23"},
   {"title": "泪海 — 许茹芸", "file": "lei-hai-valen-hsu.mp3", "addedAt": "2026-10-23"},
+  {"title": "Always On My Mind — S.H.E", "file": "always-on-my-mind-she.mp3", "addedAt": "2026-10-26"},
+  {"title": "Bad (2012 Remaster) — Michael Jackson", "file": "bad-2012-remaster-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "bad guy — Billie Eilish", "file": "bad-guy-billie-eilish.mp3", "addedAt": "2026-10-26"},
+  {"title": "BIRDS OF A FEATHER — Billie Eilish", "file": "birds-of-a-feather-billie-eilish.mp3", "addedAt": "2026-10-26"},
+  {"title": "Don’t Go Away — By2", "file": "dont-go-away-by2.mp3", "addedAt": "2026-10-26"},
+  {"title": "朋友 — 周华健", "file": "friends-zhou-hua-jian.mp3", "addedAt": "2026-10-26"},
+  {"title": "Man In the Mirror — Michael Jackson", "file": "man-in-the-mirror-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "Smooth Criminal (2012 Remaster) — Michael Jackson", "file": "smooth-criminal-2012-remaster-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "Thriller 7\" (Special Edit) — Michael Jackson", "file": "thriller-7-special-edit-michael-jackson.mp3", "addedAt": "2026-10-26"},
+  {"title": "You Jing — Qian Ying", "file": "you-jing-qian-ying.mp3", "addedAt": "2026-10-26"},
+  {"title": "三个心愿 — F.I.R.", "file": "san-ge-xin-yuan-fir.mp3", "addedAt": "2026-10-26"},
+  {"title": "保卫黄河 — 中央乐团合唱团", "file": "bao-wei-huang-he-zhong-yang-yue-tuan.mp3", "addedAt": "2026-10-26"},
+  {"title": "喀秋莎 — 中央乐团合唱团", "file": "ka-qiu-sha-zhong-yang-yue-tuan.mp3", "addedAt": "2026-10-26"},
+  {"title": "爱之梦 — 中央乐团合唱团", "file": "ai-zhi-meng-zhong-yang-yue-tuan.mp3", "addedAt": "2026-10-26"},
+  {"title": "春天的故事 — 董文华", "file": "chun-tian-de-gu-shi-dong-wen-hua.mp3", "addedAt": "2026-10-26"},
+  {"title": "松花江上 — 中央乐团合唱团", "file": "song-hua-jiang-shang-zhong-yang-yue-tuan.mp3", "addedAt": "2026-10-26"},
+  {"title": "男人信什么 — 卫兰", "file": "nan-ren-xin-shen-me-wei-lan.mp3", "addedAt": "2026-10-26"},
+  {"title": "穿越星河拥抱你 — 林子琪", "file": "chuan-yue-xing-he-yong-bao-ni-lin-zi-qi.mp3", "addedAt": "2026-10-26"},
+  {"title": "莫斯科郊外的晚上 — 中央乐团合唱团", "file": "mo-si-ke-jiao-wai-de-wan-shang-zhong-yang-yue-tuan.mp3", "addedAt": "2026-10-26"},
 ];
 
 let songs = [...addedSongs];
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = 'b8d5724afe1e'; // updated by build:songs
+const STREAM_REVISION = '9ac4ea94f8e7'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = 'smooth';
 try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
