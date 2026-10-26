@@ -300,6 +300,7 @@ title：算了。我最近想得太多了，不把所有东西抖出来给所有
 
 这件事情我以后就不说了。你当时怎么想现在怎么想也不用跟我解释了，我觉得我想得够清楚了也说得够清楚了。
 
+---
 
 
 
@@ -379,4 +380,6 @@ title：算了。我最近想得太多了，不把所有东西抖出来给所有
   <source src="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9.mp4?v=68b6d96de825" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W44/media/oct26-clip-15-WdHcabqUv4sJgAZ9.mp4?v=68b6d96de825">打开视频</a>观看。
 </video>
+
+
 
