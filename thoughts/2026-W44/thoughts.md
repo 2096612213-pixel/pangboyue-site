@@ -435,4 +435,10 @@ Does it matter? Our lives are temporary, so are those stars.
 
 我发现我喜欢把东西贴出来 不喜欢评价了
 
+initial timeline 本初时间线 
+
+timetable
+
+时间随着什么的变化量是不是一个常量 有没有人能用这个做出什么厉害的机器？
+
 
