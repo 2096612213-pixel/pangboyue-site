@@ -617,17 +617,38 @@ const addedSongs = [
   {"title": "童年 — 罗大佑", "file": "tong-nian-luo-da-you.mp3", "addedAt": "2026-10-26"},
   {"title": "让世界充满爱 (feat. 中国中央广播电台儿童合唱团) — Kwok Fung", "file": "rang-shi-jie-chong-man-ai-kwok-fung.mp3", "addedAt": "2026-10-26"},
   {"title": "鹿港小镇 — 罗大佑", "file": "lu-gang-xiao-zhen-luo-da-you.mp3", "addedAt": "2026-10-26"},
+  {"title": "情歌（DJ版） — 梁静茹", "file": "qing-ge-dj-liang-jing-ru.m4a", "addedAt": "2026-10-31"},
+  {"title": "其实（DJ版） — 薛之谦", "file": "qi-shi-dj-xue-zhi-qian.m4a", "addedAt": "2026-10-31"},
+  {"title": "雨过后的风景（DJ版） — 蔡诗芸", "file": "yu-guo-hou-de-feng-jing-dj-cai-shi-yun.m4a", "addedAt": "2026-10-31"},
+  {"title": "最初的记忆（DJ版）", "file": "zui-chu-de-ji-yi-dj.m4a", "addedAt": "2026-10-31"},
+  {"title": "江南（DJ版） — 林俊杰", "file": "jiang-nan-dj-lin-jun-jie.m4a", "addedAt": "2026-10-31"},
+  {"title": "樱花草（视频音频）", "file": "ying-hua-cao-video-audio.m4a", "addedAt": "2026-10-31"},
+  {"title": "Angel — YOON MIRAE、Tiger JK、Bizzy", "file": "angel-yoon-mirae-tiger-jk-bizzy.mp3", "addedAt": "2026-10-31"},
+  {"title": "One Last Kiss — Utada", "file": "one-last-kiss-utada.mp3", "addedAt": "2026-10-31"},
+  {"title": "We Are the World — U.S.A. for Africa", "file": "we-are-the-world-usa-for-africa.mp3", "addedAt": "2026-10-31"},
+  {"title": "刻在我心底的名字 — 卢广仲", "file": "ke-zai-wo-xin-di-de-ming-zi-lu-guang-zhong.mp3", "addedAt": "2026-10-31"},
+  {"title": "当你孤单你会想起谁 — 马小倩", "file": "dang-ni-gu-dan-ni-hui-xiang-qi-shei-ma-xiao-qian.mp3", "addedAt": "2026-10-31"},
+  {"title": "是你 — 梦然", "file": "shi-ni-meng-ran.mp3", "addedAt": "2026-10-31"},
+  {"title": "游京 — 浅影阿", "file": "you-jing-qian-ying-a.mp3", "addedAt": "2026-10-31"},
+  {"title": "燕无歇 — 蒋雪儿Snow.J", "file": "yan-wu-xie-jiang-xue-er.mp3", "addedAt": "2026-10-31"},
+  {"title": "甲乙丙丁Strangers — 李佳薇", "file": "jia-yi-bing-ding-strangers-li-jia-wei.mp3", "addedAt": "2026-10-31"},
+  {"title": "相约一九九八（现场版） — 陈楚生、郁可唯", "file": "xiang-yue-yi-jiu-jiu-ba-live-chen-chu-sheng-yu-ke-wei.mp3", "addedAt": "2026-10-31"},
+  {"title": "秋天不回来 — 王强", "file": "qiu-tian-bu-hui-lai-wang-qiang.mp3", "addedAt": "2026-10-31"},
+  {"title": "纸短情长 — 烟把儿乐队", "file": "zhi-duan-qing-chang-yan-ba-er.mp3", "addedAt": "2026-10-31"},
+  {"title": "我们的爱（DJ版） — 飞儿乐团", "file": "wo-men-de-ai-dj-fir.m4a", "addedAt": "2026-10-31"},
+  {"title": "最后一页（DJ版） — 江语晨", "file": "zui-hou-yi-ye-dj-jiang-yu-chen.m4a", "addedAt": "2026-10-31"},
+  {"title": "我不难过（片段） — 孙燕姿", "file": "wo-bu-nan-guo-excerpt-sun-yan-zi.m4a", "addedAt": "2026-10-31"},
 ];
 
 let songs = [...addedSongs];
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = '9037757f9c3f'; // updated by build:songs
+const STREAM_REVISION = 'bf69edc69d53'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = 'smooth';
 try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
 qualityControl.value = audioQuality;
-const audioPath = song => audioQuality === 'original' ? song.file : `streams/${song.file.replace(/\.mp3$/i, '.m4a')}?v=${STREAM_REVISION}`;
-const playbackSong = song => ({...song, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.mp3$/i, '.json')}?v=${STREAM_REVISION}`});
+const audioPath = song => audioQuality === 'original' ? song.file : `streams/${song.file.replace(/\.(?:mp3|m4a)$/i, '.m4a')}?v=${STREAM_REVISION}`;
+const playbackSong = song => ({...song, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.(?:mp3|m4a)$/i, '.json')}?v=${STREAM_REVISION}`});
 
 // Manifest order records addition order, including older entries without timestamps.
 const additionOrder = new Map(addedSongs.map((song, index) => [song.file, index]));

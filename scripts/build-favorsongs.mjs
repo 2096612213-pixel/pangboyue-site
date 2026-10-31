@@ -11,9 +11,9 @@ const hash = text => createHash('sha256').update(text).digest('hex').slice(0,12)
 const pending = new Map();
 const identities = [];
 for (const song of songs) {
-  const details = await read(`details/${song.file.replace(/\.mp3$/i, '.json')}`);
+  const details = await read(`details/${song.file.replace(/\.(?:mp3|m4a)$/i, '.json')}`);
   const info = JSON.parse(details);
-  const audio = await stat(new URL(`streams/${song.file.replace(/\.mp3$/i, '.m4a')}`, root));
+  const audio = await stat(new URL(`streams/${song.file.replace(/\.(?:mp3|m4a)$/i, '.m4a')}`, root));
   if (audio.size !== info.streamBytes || !info.sourceHash || !('embedded' in info)) throw Error(`Incomplete stream assets: ${song.file}`);
   if (info.cover) await stat(new URL(info.cover, root));
   identities.push(details);

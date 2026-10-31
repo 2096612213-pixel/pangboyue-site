@@ -2,13 +2,13 @@
 import { songs as addedSongs } from './songs.js';
 let songs = [...addedSongs];
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = '9037757f9c3f'; // updated by build:songs
+const STREAM_REVISION = 'bf69edc69d53'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = 'smooth';
 try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
 qualityControl.value = audioQuality;
-const audioPath = song => audioQuality === 'original' ? song.file : `streams/${song.file.replace(/\.mp3$/i, '.m4a')}?v=${STREAM_REVISION}`;
-const playbackSong = song => ({...song, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.mp3$/i, '.json')}?v=${STREAM_REVISION}`});
+const audioPath = song => audioQuality === 'original' ? song.file : `streams/${song.file.replace(/\.(?:mp3|m4a)$/i, '.m4a')}?v=${STREAM_REVISION}`;
+const playbackSong = song => ({...song, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.(?:mp3|m4a)$/i, '.json')}?v=${STREAM_REVISION}`});
 
 // Manifest order records addition order, including older entries without timestamps.
 const additionOrder = new Map(addedSongs.map((song, index) => [song.file, index]));
