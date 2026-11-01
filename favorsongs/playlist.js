@@ -395,10 +395,8 @@ searchForm.addEventListener('submit', event => {
   previousQuery = query;
   searchIndex = matches[matchCursor].index;
   searchStatus.textContent = `已定位：${songs[searchIndex].title}` +
-    (matches.length > 1 ? `（${matchCursor + 1}/${matches.length}，回到搜索框再次按 Enter 定位下一首）` : '');
+    (matches.length > 1 ? `（${matchCursor + 1}/${matches.length}，再次按 Enter 定位下一首）` : '');
   render(); // Materialize even a far-off card before scrolling to it.
-  const card = cards.get(searchIndex);
-  card.focus({ preventScroll: true });
   searchScrollFrame = requestAnimationFrame(() => {
     const { height, gap } = dimensions();
     const top = listContentTop() + searchIndex * (height + gap) - (scrollPosition().height - height) / 2;
