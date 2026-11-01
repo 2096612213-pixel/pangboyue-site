@@ -636,4 +636,6 @@ export const songs = [
   {"title": "我们的爱（DJ版） — 飞儿乐团", "file": "wo-men-de-ai-dj-fir.m4a", "addedAt": "2026-10-31"},
   {"title": "最后一页（DJ版） — 江语晨", "file": "zui-hou-yi-ye-dj-jiang-yu-chen.m4a", "addedAt": "2026-10-31"},
   {"title": "我不难过（片段） — 孙燕姿", "file": "wo-bu-nan-guo-excerpt-sun-yan-zi.m4a", "addedAt": "2026-10-31"},
+  {"title": "阳光下的星星（DJ版） — 金海心", "file": "yang-guang-xia-de-xing-xing-dj-jin-hai-xin.m4a", "addedAt": "2026-11-01"},
+  {"title": "传奇 — 哈尼族小女孩", "file": "chuan-qi-ha-ni-zu-xiao-nv-hai.m4a", "addedAt": "2026-11-01"},
 ];

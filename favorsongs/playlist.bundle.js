@@ -638,11 +638,13 @@ const addedSongs = [
   {"title": "我们的爱（DJ版） — 飞儿乐团", "file": "wo-men-de-ai-dj-fir.m4a", "addedAt": "2026-10-31"},
   {"title": "最后一页（DJ版） — 江语晨", "file": "zui-hou-yi-ye-dj-jiang-yu-chen.m4a", "addedAt": "2026-10-31"},
   {"title": "我不难过（片段） — 孙燕姿", "file": "wo-bu-nan-guo-excerpt-sun-yan-zi.m4a", "addedAt": "2026-10-31"},
+  {"title": "阳光下的星星（DJ版） — 金海心", "file": "yang-guang-xia-de-xing-xing-dj-jin-hai-xin.m4a", "addedAt": "2026-11-01"},
+  {"title": "传奇 — 哈尼族小女孩", "file": "chuan-qi-ha-ni-zu-xiao-nv-hai.m4a", "addedAt": "2026-11-01"},
 ];
 
 let songs = [...addedSongs];
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = 'bf69edc69d53'; // updated by build:songs
+const STREAM_REVISION = '5250e8441a45'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = 'smooth';
 try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
