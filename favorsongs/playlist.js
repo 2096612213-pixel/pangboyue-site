@@ -2,7 +2,7 @@
 import { songs as addedSongs } from './songs.js';
 let songs = [...addedSongs];
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = '5250e8441a45'; // updated by build:songs
+const STREAM_REVISION = 'aa8c491c3d7a'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = 'smooth';
 try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
