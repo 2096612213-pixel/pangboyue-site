@@ -3464,7 +3464,7 @@ class TurntableTransport {
 
   get busy() { return !['idle', 'paused', 'playing', 'error'].includes(this.state) || Boolean(this.motion); }
   get contact() { return this.pose.lift <= .000001 && Math.abs(this.pose.angle - this.io.groove(this.media.currentTime || 0)) < .035; }
-  get ready() { return !this.media.error && this.media.readyState >= 3 && (this.io.visualReady?.() ?? true) && !this.media.seeking && !this.priming && this.contextReady && this.primedRevision === this.sourceRevision; }
+  get ready() { return !this.media.error && this.media.readyState >= 2 && (this.io.visualReady?.() ?? true) && !this.media.seeking && !this.priming && this.contextReady && this.primedRevision === this.sourceRevision; }
 
   publish() { this.io.change?.(this); }
   setState(next, phase = '') {
