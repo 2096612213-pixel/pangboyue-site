@@ -93,3 +93,12 @@
 .audio-quality select{min-width:0;flex:1;padding:5px 8px;border:1px solid #ffffff30;border-radius:8px;background:#1c1c1e;color:#e3e0d9;font:inherit;color-scheme:dark;}
 
 @media(max-width:1000px){.page{padding-top:260px!important}.song-alphabet{top:calc(216px + (100svh - 216px)/2);height:min(486px,calc(100svh - 232px));}}
+
+@media (max-width: 1000px) {
+  .songs.is-flow-list .song.mobile-active { flex-basis: auto; height: auto; min-height: calc(var(--card-height) + 48px); }
+  .mobile-repeat { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-top: 8px; border: 1px solid #ffffff30; border-radius: 50%; background: #1b1b1f; color: #aaa; cursor: pointer; }
+  .mobile-repeat:hover, .mobile-repeat:focus-visible { color: #fff; background: #333; }
+  .mobile-repeat[aria-pressed="true"] { color: #e8d0a4; background: #443b2d; border-color: #c6a676; }
+  .mobile-retry { margin: 8px; cursor: pointer; }
+  .mobile-retry[hidden] { display: none; }
+}

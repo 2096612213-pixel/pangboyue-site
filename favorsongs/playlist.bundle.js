@@ -756,6 +756,7 @@ let desktopModule = null;
 let selectionRevision = 0;
 let desktopState = 'idle';
 let currentCard = null;
+let mobileRepeat = false;
 function updateDesktopState({file, state, message, resetMedia}) {
   if (flowLayout.matches || songs[activeIndex]?.file !== file) return;
   desktopState = state;
@@ -891,17 +892,38 @@ function makeCard(song, index) {
   playButton.innerHTML = '<span class="play-triangle">▶</span><span class="play-time">0:00 / 0:00</span><span class="play-progress"></span><span class="play-volume">◖</span><span class="play-more">⋮</span>';
   async function startSong() {
     if (!flowLayout.matches) { selectDesktopSong(song); return; }
-    if (audio) return;
+    if (audio) { if (audio.error) audio.load(); try { await audio.play(); } catch {} return; }
     const index = songs.indexOf(song);
     cards.get(activeIndex)?.querySelector('audio')?.pause();
     activeIndex = index;
     audio = document.createElement('audio');
-    audio.controls = true; audio.preload = 'none';
+    audio.controls = true; audio.preload = 'auto'; audio.loop = mobileRepeat;
+    card.classList.add('mobile-active');
     audio.setAttribute('aria-label', song.title);
+    const repeat = document.createElement('button');
+    repeat.type = 'button'; repeat.className = 'mobile-repeat';
+    repeat.setAttribute('aria-label', '单曲循环'); repeat.setAttribute('aria-pressed', String(mobileRepeat));
+    repeat.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3"/><path d="M11 10l1-1v6m-1 0h2"/></svg>';
+    repeat.addEventListener('click', () => {
+      mobileRepeat = !mobileRepeat; audio.loop = mobileRepeat;
+      repeat.setAttribute('aria-pressed', String(mobileRepeat));
+    });
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'mobile-retry'; retry.textContent = '重试播放'; retry.hidden = true;
+    retry.addEventListener('click', () => { if (audio.error) audio.load(); audio.play().catch(() => { retry.hidden = false; }); });
+    audio.addEventListener('error', () => { retry.hidden = false; });
+    audio.addEventListener('playing', () => { retry.hidden = true; });
     audio.addEventListener('play', () => {
       for (const card of cards.values()) {
         const other = card.querySelector('audio');
         if (other && other !== audio) other.pause();
+      }
+      for (const c of cards.values()) c.classList.toggle('mobile-active', c === card);
+      audio.loop = mobileRepeat; repeat.setAttribute('aria-pressed', String(mobileRepeat));
+      if ('mediaSession' in navigator && typeof MediaMetadata !== 'undefined') {
+        const [title, ...artist] = song.title.split('—');
+        navigator.mediaSession.metadata = new MediaMetadata({title: title.trim(), artist: artist.join('—').trim()});
+        navigator.mediaSession.setActionHandler('play', () => { audio.play().catch(() => {}); });
+        navigator.mediaSession.setActionHandler('pause', () => audio.pause());
       }
       activeIndex = songs.indexOf(song); scheduleRender();
     });
@@ -910,9 +932,9 @@ function makeCard(song, index) {
       scheduleRender();
     });
     audio.src = audioPath(song);
-    playButton.replaceWith(audio);
+    playButton.replaceWith(audio); player.append(repeat, retry);
     render();
-    try { await audio.play(); } catch { /* Native controls allow retry. */ }
+    try { await audio.play(); } catch { retry.hidden = false; }
   }
   playButton.addEventListener('click', startSong);
   card.addEventListener('click', event => {
@@ -1064,7 +1086,8 @@ searchForm.addEventListener('submit', event => {
   render(); // Materialize even a far-off card before scrolling to it.
   searchScrollFrame = requestAnimationFrame(() => {
     const { height, gap } = dimensions();
-    const top = listContentTop() + searchIndex * (height + gap) - (scrollPosition().height - height) / 2;
+    const target = cards.get(searchIndex);
+    const top = flowLayout.matches && target ? listContentTop() + target.offsetTop - (scrollPosition().height - target.offsetHeight) / 2 : listContentTop() + searchIndex * (height + gap) - (scrollPosition().height - height) / 2;
     scrollPlaylist(Math.max(0, top), matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
   });
 });
