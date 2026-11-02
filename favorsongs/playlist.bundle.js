@@ -818,7 +818,7 @@ async function selectDesktopSong(song) {
   cancelAnimationFrame(searchScrollFrame); letterNavigation = null;
   render();
   try {
-    desktopModule ||= import('./vinyl-desktop.js?v=63fcfe56451b');
+    desktopModule ||= import('./vinyl-desktop.js?v=845d71a66bb6');
     let loadTimer;
     const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
       loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);

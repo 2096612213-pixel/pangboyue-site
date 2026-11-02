@@ -43,14 +43,24 @@
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W45/media/wang-fei-1994-live.mp4?v=42f4ccc3311c">打开视频</a>观看。
 </video>
 
+---
+
 长辈总是拿身边人的结婚率说事 却没看到他们过的怎么样 幸福不幸福 离婚率怎么样 我觉得这是一件很可悲的事情
 
 这次季候风 吹的格外凶
 
 吹的世上一切 仿佛不知所踪
 
+---
+
 <video controls playsinline preload="none" width="854" height="462" poster="/thoughts/2026-W45/media/red-desert-unknown-journey-poster.jpg" aria-label="红色沙漠 DLC 未知征途主界面歌曲">
   <source src="/thoughts/2026-W45/media/red-desert-unknown-journey.mp4?v=ac5811c2b73a" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W45/media/red-desert-unknown-journey.mp4?v=ac5811c2b73a">打开视频</a>观看。
 </video>
+
+---
+
+听完季候风 仿佛又回到了香港的那个黄金年代
+
+
 
