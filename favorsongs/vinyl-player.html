@@ -1627,8 +1627,9 @@ if(typeof module!=='undefined')module.exports=ProgressRing;
     const btnPlay = document.getElementById("btn-play");
     const btnRepeatOne = document.getElementById("btn-repeat-one");
     btnRepeatOne.addEventListener('click', () => {
-      audioEl.loop = !audioEl.loop;
-      btnRepeatOne.setAttribute('aria-pressed', String(audioEl.loop));
+      const enabled = btnRepeatOne.getAttribute('aria-pressed') !== 'true';
+      audioEl.dataset.repeatOne = String(enabled);
+      btnRepeatOne.setAttribute('aria-pressed', String(enabled));
     });
     const iconPlay = document.getElementById("icon-play");
     const iconPause = document.getElementById("icon-pause");
@@ -3625,14 +3626,18 @@ class TurntableTransport {
   }
   mediaEvent(type) {
     if (type === 'error' && this.media.error) { this.fail('音频加载失败，请重新导入文件'); return; }
-    if (type === 'ended' && this.media.ended && !this.priming) { this.stop(); return; }
+    if (type === 'ended' && this.media.ended && !this.priming) {
+      if (this.media.dataset?.repeatOne === 'true' && this.intent) this.seek(0, true);
+      else this.stop();
+      return;
+    }
     if (type === 'seeking' && !this.managedSeek && !this.priming &&
         !['idle', 'paused', 'stopping', 'error'].includes(this.state)) {
       this.seek(this.media.currentTime, this.intent);
     }
     if (type === 'seeked') this.managedSeek = false;
     if (type === 'play' || type === 'playing') this.enforce();
-    if (type === 'pause' && this.media.paused && this.state === 'playing' && this.intent && !this.audioStarting) this.pause();
+    if (type === 'pause' && this.media.paused && !this.media.ended && this.state === 'playing' && this.intent && !this.audioStarting) this.pause();
   }
   commit() {
     if (this.audioStarting || !this.intent || !this.contact || !this.ready) return;
