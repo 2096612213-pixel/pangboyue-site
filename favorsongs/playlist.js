@@ -382,6 +382,36 @@ const searchInput = document.querySelector('#song-query');
 const searchStatus = document.querySelector('#search-status');
 const normalizeSearch = value => value.normalize('NFKC').toLocaleLowerCase().trim().replace(/\s+/g, ' ');
 const SONG_PINYIN_INDEX = {}; // generated at build
+let queryDictionaryPromise;
+function loadQueryDictionary() {
+  if (!queryDictionaryPromise) queryDictionaryPromise = fetch('./pinyin-han.json?v=generated')
+    .then(response => { if (!response.ok) throw new Error('pinyin dictionary'); return response.json(); })
+    .catch(() => { queryDictionaryPromise = null; return null; });
+  return queryDictionaryPromise;
+}
+function closeSubstring(haystack, needle) {
+  // Only one insertion, deletion, substitution or adjacent transposition;
+  // short searches stay exact to avoid a flood of unrelated songs.
+  if (needle.length < 4 || needle.length > 40) return false;
+  for (let start = 0; start < haystack.length; start++) {
+    for (let length = needle.length - 1; length <= needle.length + 1; length++) {
+      const part = haystack.slice(start, start + length);
+      if (part.length !== length) continue;
+      let i = 0, j = 0, edits = 0;
+      while (i < needle.length && j < part.length) {
+        if (needle[i] === part[j]) { i++; j++; continue; }
+        if (++edits > 1) break;
+        if (needle.length === part.length && needle[i] === part[j + 1] && needle[i + 1] === part[j]) { i += 2; j += 2; }
+        else if (needle.length > part.length) i++;
+        else if (needle.length < part.length) j++;
+        else { i++; j++; }
+      }
+      if (edits + (i < needle.length || j < part.length ? 1 : 0) <= 1) return true;
+    }
+  }
+  return false;
+}
+
 const compactSearch = value => normalizeSearch(value).replace(/[\s\p{P}\p{S}]+/gu, '');
 const searchRecords = new Map(addedSongs.map(song => [song.file, {text: normalizeSearch(song.title), compact: compactSearch(song.title), pinyin: SONG_PINYIN_INDEX[song.file] || ''}]));
 let composing = false;
@@ -392,11 +422,12 @@ searchInput.addEventListener('keydown', event => {
 });
 searchInput.addEventListener('input', () => {
   letterNavigation = null;
+  if (/\p{Script=Han}/u.test(searchInput.value)) loadQueryDictionary();
   previousQuery = ''; matchCursor = -1; searchIndex = -1;
   searchStatus.textContent = '搜索只定位歌曲，点击播放按钮开始听。';
   render();
 });
-searchForm.addEventListener('submit', event => {
+searchForm.addEventListener('submit', async event => {
   event.preventDefault();
   cancelAnimationFrame(searchScrollFrame);
   letterNavigation = null;
@@ -409,9 +440,23 @@ searchForm.addEventListener('submit', event => {
   }
   const terms = query.split(' ');
   const compact = compactSearch(query);
-  const matches = songs.map((song, index) => ({ ...searchRecords.get(song.file), index }))
-    .filter(song => terms.every(term => song.text.includes(term)) ||
-      (compact && (song.compact.includes(compact) || song.pinyin.includes(compact))));
+  const containsHan = /\p{Script=Han}/u.test(compact);
+  const dictionary = containsHan ? await loadQueryDictionary() : null;
+  // A late dictionary response must never navigate after the input changed.
+  if (normalizeSearch(searchInput.value) !== query || composing) return;
+  const phonetic = dictionary && containsHan
+    ? Array.from(compact, char => dictionary[char] || char).join('').replace(/[^a-z0-9]/g, '')
+    : compact;
+  const exact = [], homophones = [], approximate = [];
+  songs.forEach((song, index) => {
+    const record = searchRecords.get(song.file);
+    const direct = terms.every(term => record.text.includes(term)) ||
+      (compact && (record.compact.includes(compact) || (!containsHan && record.pinyin.includes(compact))));
+    if (direct) exact.push({index});
+    else if (phonetic && containsHan && record.pinyin.includes(phonetic)) homophones.push({index});
+    else if (phonetic && !containsHan && closeSubstring(record.compact, phonetic)) approximate.push({index});
+  });
+  const matches = [...exact, ...homophones, ...approximate];
   if (!matches.length) {
     searchIndex = -1; previousQuery = ''; matchCursor = -1;
     searchStatus.textContent = `没有找到“${searchInput.value.trim()}”，试试部分歌名或歌手名。`;
