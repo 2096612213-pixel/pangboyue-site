@@ -381,6 +381,9 @@ const searchForm = document.querySelector('#song-search');
 const searchInput = document.querySelector('#song-query');
 const searchStatus = document.querySelector('#search-status');
 const normalizeSearch = value => value.normalize('NFKC').toLocaleLowerCase().trim().replace(/\s+/g, ' ');
+const SONG_PINYIN_INDEX = {}; // generated at build
+const compactSearch = value => normalizeSearch(value).replace(/[\s\p{P}\p{S}]+/gu, '');
+const searchRecords = new Map(addedSongs.map(song => [song.file, {text: normalizeSearch(song.title), compact: compactSearch(song.title), pinyin: SONG_PINYIN_INDEX[song.file] || ''}]));
 let composing = false;
 searchInput.addEventListener('compositionstart', () => { composing = true; });
 searchInput.addEventListener('compositionend', () => { composing = false; });
@@ -405,8 +408,10 @@ searchForm.addEventListener('submit', event => {
     return;
   }
   const terms = query.split(' ');
-  const matches = songs.map((song, index) => ({ title: normalizeSearch(song.title), index }))
-    .filter(song => terms.every(term => song.title.includes(term)));
+  const compact = compactSearch(query);
+  const matches = songs.map((song, index) => ({ ...searchRecords.get(song.file), index }))
+    .filter(song => terms.every(term => song.text.includes(term)) ||
+      (compact && (song.compact.includes(compact) || song.pinyin.includes(compact))));
   if (!matches.length) {
     searchIndex = -1; previousQuery = ''; matchCursor = -1;
     searchStatus.textContent = `没有找到“${searchInput.value.trim()}”，试试部分歌名或歌手名。`;
