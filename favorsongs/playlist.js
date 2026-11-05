@@ -1,5 +1,6 @@
 // Readable module source; build:songs bundles the manifest for one startup request.
 import { songs as addedSongs } from './songs.js';
+import {normalizeSearch, createSongSearch} from './search.js';
 let songs = [...addedSongs];
 // AAC-LC copies have no large embedded artwork and their index is at the start.
 const STREAM_REVISION = 'aa8c491c3d7a'; // updated by build:songs
@@ -380,40 +381,22 @@ render();
 const searchForm = document.querySelector('#song-search');
 const searchInput = document.querySelector('#song-query');
 const searchStatus = document.querySelector('#search-status');
-const normalizeSearch = value => value.normalize('NFKC').toLocaleLowerCase().trim().replace(/\s+/g, ' ');
-const SONG_PINYIN_INDEX = {}; // generated at build
-let queryDictionaryPromise;
+const SONG_SEARCH_DATA = {}; // generated at build
+let searchSongs = createSongSearch(songs, SONG_SEARCH_DATA);
+let searchGeneration = 0;
+let queryDictionaryPromise, queryDictionary;
 function loadQueryDictionary() {
-  if (!queryDictionaryPromise) queryDictionaryPromise = fetch('./pinyin-han.json?v=generated')
-    .then(response => { if (!response.ok) throw new Error('pinyin dictionary'); return response.json(); })
-    .catch(() => { queryDictionaryPromise = null; return null; });
+  if (!queryDictionaryPromise) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    queryDictionaryPromise = fetch('./pinyin-han.json?v=generated', {signal: controller.signal})
+      .then(response => { if (!response.ok) throw new Error('pinyin dictionary'); return response.json(); })
+      .then(dictionary => (queryDictionary = dictionary))
+      .catch(() => { queryDictionaryPromise = null; return null; })
+      .finally(() => clearTimeout(timer));
+  }
   return queryDictionaryPromise;
 }
-function closeSubstring(haystack, needle) {
-  // Only one insertion, deletion, substitution or adjacent transposition;
-  // short searches stay exact to avoid a flood of unrelated songs.
-  if (needle.length < 4 || needle.length > 40) return false;
-  for (let start = 0; start < haystack.length; start++) {
-    for (let length = needle.length - 1; length <= needle.length + 1; length++) {
-      const part = haystack.slice(start, start + length);
-      if (part.length !== length) continue;
-      let i = 0, j = 0, edits = 0;
-      while (i < needle.length && j < part.length) {
-        if (needle[i] === part[j]) { i++; j++; continue; }
-        if (++edits > 1) break;
-        if (needle.length === part.length && needle[i] === part[j + 1] && needle[i + 1] === part[j]) { i += 2; j += 2; }
-        else if (needle.length > part.length) i++;
-        else if (needle.length < part.length) j++;
-        else { i++; j++; }
-      }
-      if (edits + (i < needle.length || j < part.length ? 1 : 0) <= 1) return true;
-    }
-  }
-  return false;
-}
-
-const compactSearch = value => normalizeSearch(value).replace(/[\s\p{P}\p{S}]+/gu, '');
-const searchRecords = new Map(addedSongs.map(song => [song.file, {text: normalizeSearch(song.title), compact: compactSearch(song.title), pinyin: SONG_PINYIN_INDEX[song.file] || ''}]));
 let composing = false;
 searchInput.addEventListener('compositionstart', () => { composing = true; });
 searchInput.addEventListener('compositionend', () => { composing = false; });
@@ -421,6 +404,7 @@ searchInput.addEventListener('keydown', event => {
   if (event.key === 'Enter' && (event.isComposing || composing || event.keyCode === 229)) event.preventDefault();
 });
 searchInput.addEventListener('input', () => {
+  searchGeneration++;
   letterNavigation = null;
   if (/\p{Script=Han}/u.test(searchInput.value)) loadQueryDictionary();
   previousQuery = ''; matchCursor = -1; searchIndex = -1;
@@ -432,31 +416,22 @@ searchForm.addEventListener('submit', async event => {
   cancelAnimationFrame(searchScrollFrame);
   letterNavigation = null;
   if (composing) return;
+  const generation = searchGeneration;
   const query = normalizeSearch(searchInput.value);
   if (!query) {
     searchStatus.textContent = '请输入歌名或歌手。';
     searchInput.focus();
     return;
   }
-  const terms = query.split(' ');
-  const compact = compactSearch(query);
-  const containsHan = /\p{Script=Han}/u.test(compact);
-  const dictionary = containsHan ? await loadQueryDictionary() : null;
-  // A late dictionary response must never navigate after the input changed.
-  if (normalizeSearch(searchInput.value) !== query || composing) return;
-  const phonetic = dictionary && containsHan
-    ? Array.from(compact, char => dictionary[char] || char).join('').replace(/[^a-z0-9]/g, '')
-    : compact;
-  const exact = [], homophones = [], approximate = [];
-  songs.forEach((song, index) => {
-    const record = searchRecords.get(song.file);
-    const direct = terms.every(term => record.text.includes(term)) ||
-      (compact && (record.compact.includes(compact) || (!containsHan && record.pinyin.includes(compact))));
-    if (direct) exact.push({index});
-    else if (phonetic && containsHan && record.pinyin.includes(phonetic)) homophones.push({index});
-    else if (phonetic && !containsHan && closeSubstring(record.compact, phonetic)) approximate.push({index});
-  });
-  const matches = [...exact, ...homophones, ...approximate];
+  // Literal/Latin searches are immediate. Chinese typo matching additionally
+  // uses the lazy pronunciation dictionary, without blocking normal matches.
+  let matches = searchSongs(query);
+  if (/\p{Script=Han}/u.test(query) && (queryDictionary || !matches.length || matches[0].score < .88)) {
+    if (!matches.length) searchStatus.textContent = '正在搜索…';
+    const dictionary = await loadQueryDictionary();
+    if (generation !== searchGeneration || normalizeSearch(searchInput.value) !== query || composing) return;
+    if (dictionary) matches = searchSongs(query, dictionary);
+  }
   if (!matches.length) {
     searchIndex = -1; previousQuery = ''; matchCursor = -1;
     searchStatus.textContent = `没有找到“${searchInput.value.trim()}”，试试部分歌名或歌手名。`;
@@ -465,7 +440,7 @@ searchForm.addEventListener('submit', async event => {
   }
   matchCursor = query === previousQuery ? (matchCursor + 1) % matches.length : 0;
   previousQuery = query;
-  searchIndex = matches[matchCursor].index;
+  searchIndex = songs.findIndex(song => song.file === matches[matchCursor].file);
   searchStatus.textContent = `已定位：${songs[searchIndex].title}` +
     (matches.length > 1 ? `（${matchCursor + 1}/${matches.length}，再次按 Enter 定位下一首）` : '');
   render(); // Materialize even a far-off card before scrolling to it.
@@ -479,6 +454,7 @@ searchForm.addEventListener('submit', async event => {
 
 
 function sortPlaylist(mode, resetScroll = true) {
+  searchGeneration++;
   cancelAnimationFrame(searchScrollFrame);
   letterNavigation = null;
   rowsNeedLayout = true;
@@ -492,6 +468,7 @@ function sortPlaylist(mode, resetScroll = true) {
       || pinyinCollator.compare(a.title, b.title)
       || additionOrder.get(a.file) - additionOrder.get(b.file));
   }
+  searchSongs = createSongSearch(songs, SONG_SEARCH_DATA);
   // Keep the playing card and audio element so sorting never restarts playback.
   cards.clear();
   songs.forEach((song, index) => {
