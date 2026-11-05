@@ -1,7 +1,8 @@
-// Loaded only after an explicit desktop play action. The iframe isolates the
+// Loaded on desktop selection or restoration, with audio deferred until play.
+// The iframe isolates the
 // reference player's renderer and wheel gestures from the playlist controls.
-export function createVinylPlayer({onState, onNavigate}) {
-  let frame, pending, selected, state = 'idle', disposed = false;
+export function createVinylPlayer({onState, onNavigate, onPreferences}) {
+  let frame, pending, selected, playerAPI, state = 'idle', disposed = false;
   const stage = document.querySelector('#vinyl-stage');
   function ready() {
     if (pending) return pending;
@@ -20,32 +21,37 @@ export function createVinylPlayer({onState, onNavigate}) {
           state = event.detail.state; onState(event.detail);
         });
         win.addEventListener('playlistnavigate', event => onNavigate(event.detail));
+        win.addEventListener('playlistpreferences', event => {
+          if (!disposed && event.detail.file === selected?.file) onPreferences?.(event.detail);
+        });
         stage.classList.remove('is-loading'); stage.classList.add('is-ready');
-        resolve(win.vinylPlayer);
+        playerAPI = win.vinylPlayer; resolve(playerAPI);
       }, {once:true});
-      frame.src = new URL('./vinyl-player.html?v=da1acf5989fe', import.meta.url).href;
+      frame.src = new URL('./vinyl-player.html?v=142af9157a48', import.meta.url).href;
       stage.append(frame);
     });
     return pending;
   }
   return {
-    async select(song) {
+    async select(song, {autoplay = true} = {}) {
       if (disposed) return;
       if (selected?.file === song.file && selected?.audioFile === song.audioFile && state !== 'error') {
-        const player = await ready(); if (!disposed) player.toggle(); return;
+        if (playerAPI) { if (autoplay) playerAPI.toggle(); return; }
+        const player = await ready(); if (!disposed && autoplay) player.toggle(); return;
       }
-      selected = song; state = 'loading';
+      selected = song; state = autoplay ? 'loading' : 'paused';
       onState({file:song.file, state});
       try {
         const player = await ready();
-        if (!disposed && selected === song) await player.select(song);
+        if (!disposed && selected === song) await player.select(song, {autoplay});
       } catch (error) {
         if (disposed || selected !== song) return;
         state = 'error'; onState({file:song.file,state,message:error.message,resetMedia:true});
-        frame?.remove(); frame = null; pending = null;
+        frame?.remove(); frame = null; pending = null; playerAPI = null;
         stage.classList.remove('is-ready','is-loading');
       }
     },
+    save() { frame?.contentWindow?.vinylPlayer?.save(); },
     destroy() {
       disposed = true; frame?.contentWindow?.vinylPlayer?.destroy(); frame?.remove();
       stage.classList.remove('is-ready','is-loading');

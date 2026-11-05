@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import {createPlaylistPreferences, PLAYLIST_PREFERENCES_KEY as key, PLAYLIST_CONSENT_KEY as consentKey} from '../favorsongs/preferences.js';
+const values = new Map(), reads = [], writes = [];
+const storage = {getItem(k) {reads.push(k); return values.get(k) ?? null;}, setItem(k,v) {writes.push(k); values.set(k,v);}};
+let prefs = createPlaylistPreferences(['a.mp3','b.m4a'],storage);
+assert.equal(prefs.hasConsent(),false);
+assert.deepEqual(reads,[consentKey],'Before acceptance, inspect only the permission marker');
+prefs.update({file:'a.mp3', position:35.25, repeatOne:true, quality:'original', sort:'pinyin', query:'hongkong'});
+assert.equal(prefs.get().file,'a.mp3','Playback choices work for the current visit');
+assert.deepEqual(writes,[],'Search, playback and quality must not write before explicit acceptance');
+assert.equal(createPlaylistPreferences(['a.mp3'],storage).get().file,null,'A new visit without acceptance starts fresh');
+prefs.allowStorage();
+assert.equal(prefs.hasConsent(),true);
+assert.equal(values.get(consentKey),'allowed');
+assert.deepEqual(createPlaylistPreferences(['a.mp3'], storage).get(), prefs.get());
+assert.equal(createPlaylistPreferences(['a.mp3'], storage).hasConsent(),true);
+assert.equal(createPlaylistPreferences(['removed.mp3'], storage).get().file,null);
+assert.equal(createPlaylistPreferences(['removed.mp3'], storage).get().position,0);
+prefs.update({file:'b.m4a',position:0});assert.equal(prefs.get().repeatOne,true);
+prefs.update({position:Infinity});assert.equal(prefs.get().position,0);
+prefs.update({position:-3});assert.equal(prefs.get().position,0);
+prefs.update({position:1000000});assert.equal(prefs.get().position,86400);
+prefs.update({quality:'unknown',sort:'unknown',query:'x'.repeat(1000)});
+assert.equal(prefs.get().quality,'smooth');assert.equal(prefs.get().sort,'added');assert.equal(prefs.get().query.length,200);
+values.set(key,'{bad json');assert.equal(createPlaylistPreferences(['a.mp3'],storage).get().file,null);
+values.set(key,JSON.stringify({version:99,file:'a.mp3'}));assert.equal(createPlaylistPreferences(['a.mp3'],storage).get().file,null);
+
+// Existing records from the previous release do not imply permission.
+const previous={version:1,file:'a.mp3',position:47,repeatOne:true,quality:'original',sort:'pinyin',query:'old query'};
+values.set(key,JSON.stringify(previous));values.delete(consentKey);reads.length=0;writes.length=0;
+prefs=createPlaylistPreferences(['a.mp3','b.m4a'],storage);
+assert.deepEqual(reads,[consentKey]);assert.equal(prefs.get().file,null);assert.equal(prefs.get().repeatOne,false);
+prefs.update({query:'new query'});assert.deepEqual(writes,[]);
+assert.equal(values.get(key),JSON.stringify(previous),'Do not alter an old record while permission is pending');
+prefs.allowStorage();assert.equal(prefs.get().file,'a.mp3');assert.equal(prefs.get().repeatOne,true);assert.equal(prefs.get().query,'new query');
+values.delete(consentKey);
+prefs=createPlaylistPreferences(['a.mp3','b.m4a'],storage);prefs.update({file:'b.m4a',position:9,repeatOne:false});prefs.allowStorage();
+assert.equal(prefs.get().file,'b.m4a');assert.equal(prefs.get().position,9);assert.equal(prefs.get().repeatOne,false,'Accepting must preserve current playback choices');
+assert.equal(prefs.get().quality,'smooth','Do not apply an older quality choice over an already active player');
+
+values.delete(key);values.delete(consentKey);values.set('favorite-audio-quality','original');
+prefs=createPlaylistPreferences([],storage);assert.equal(prefs.get().quality,'smooth');prefs.allowStorage();assert.equal(prefs.get().quality,'original');
+for(const marker of ['denied','true','false','']){values.set(consentKey,marker);assert.equal(createPlaylistPreferences([],storage).hasConsent(),false);}
+prefs=createPlaylistPreferences(['a.mp3'],{getItem(){throw Error('disabled')},setItem(){throw Error('quota')}});
+assert.equal(prefs.hasConsent(),false);
+assert.doesNotThrow(()=>{prefs.update({file:'a.mp3',repeatOne:true});prefs.allowStorage();});assert.equal(prefs.get().repeatOne,true);
+assert.equal(createPlaylistPreferences([],undefined).hasConsent(),false,'Without writable storage the next visit asks again');
+console.log('PASS: no settings reads/writes before acceptance; session-only use, explicit permission, restoration, legacy records and disabled storage are safe.');

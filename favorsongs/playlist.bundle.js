@@ -809,15 +809,77 @@ function createSongSearch(songs, data) {
   };
 }
 
+// Browser-local listening preferences; invalid/old data never blocks the page.
+const PLAYLIST_PREFERENCES_KEY = 'favorite-playlist-config-v1';
+const PLAYLIST_CONSENT_KEY = 'favorite-playlist-storage-consent-v1';
+function createPlaylistPreferences(files, storage) {
+  const available = new Set(files);
+  function validate(value = {}) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) value = {};
+    const file = available.has(value.file) ? value.file : null;
+    return {
+      version: 1,
+      file,
+      repeatOne: value.repeatOne === true,
+      position: file && Number.isFinite(value.position) && value.position >= 0 ? Math.min(value.position, 86400) : 0,
+      quality: value.quality === 'original' ? 'original' : 'smooth',
+      sort: value.sort === 'pinyin' ? 'pinyin' : 'added',
+      query: typeof value.query === 'string' ? value.query.slice(0, 200) : '',
+    };
+  }
+  let consented = false;
+  try { consented = storage?.getItem(PLAYLIST_CONSENT_KEY) === 'allowed'; } catch {}
+  function readSaved() {
+    try {
+      const saved = storage?.getItem(PLAYLIST_PREFERENCES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.version === 1) return validate(parsed);
+      } else return validate({quality: storage?.getItem('favorite-audio-quality')});
+    } catch { /* Disabled storage or an invalid old record must not block use. */ }
+    return validate();
+  }
+  let current = consented ? readSaved() : validate();
+  let pending = {};
+  function persist() {
+    if (!consented) return;
+    try { storage?.setItem(PLAYLIST_PREFERENCES_KEY, JSON.stringify(current)); } catch {}
+  }
+  return {
+    get: () => ({...current}),
+    hasConsent: () => consented,
+    allowStorage() {
+      if (!consented) {
+        // Only this explicit action may read earlier settings and enable writes.
+        // Choices made before accepting remain the current session's choices.
+        const base = current.file ? current : readSaved();
+        current = validate({...base, ...pending});
+        pending = {}; consented = true;
+        try { storage?.setItem(PLAYLIST_CONSENT_KEY, 'allowed'); } catch {}
+        persist();
+      }
+      return {...current};
+    },
+    update(patch) {
+      current = validate({...current, ...patch});
+      if (!consented) pending = {...pending, ...patch};
+      persist();
+      return {...current};
+    },
+  };
+}
+
 let songs = [...addedSongs];
+let preferenceStorage;
+try { preferenceStorage = localStorage; } catch {}
+const preferences = createPlaylistPreferences(addedSongs.map(song => song.file), preferenceStorage);
 // AAC-LC copies have no large embedded artwork and their index is at the start.
 const STREAM_REVISION = 'aa8c491c3d7a'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
-let audioQuality = 'smooth';
-try {audioQuality = localStorage.getItem('favorite-audio-quality') === 'original' ? 'original' : 'smooth';} catch {}
+let audioQuality = preferences.get().quality;
 qualityControl.value = audioQuality;
 const audioPath = song => audioQuality === 'original' ? song.file : `streams/${song.file.replace(/\.(?:mp3|m4a)$/i, '.m4a')}?v=${STREAM_REVISION}`;
-const playbackSong = song => ({...song, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.(?:mp3|m4a)$/i, '.json')}?v=${STREAM_REVISION}`});
+const playbackSong = song => ({...song, repeatOne:preferences.get().repeatOne, startAt:preferences.get().file === song.file ? preferences.get().position : 0, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.(?:mp3|m4a)$/i, '.json')}?v=${STREAM_REVISION}`});
 
 // Manifest order records addition order, including older entries without timestamps.
 const additionOrder = new Map(addedSongs.map((song, index) => [song.file, index]));
@@ -900,7 +962,25 @@ let desktopModule = null;
 let selectionRevision = 0;
 let desktopState = 'idle';
 let currentCard = null;
-let mobileRepeat = false;
+let mobileRepeat = preferences.get().repeatOne;
+function rememberSelection(song) {
+  if (preferences.get().file !== song.file) preferences.update({file: song.file, position: 0});
+}
+function rememberDesktopPreferences(detail) {
+  if (detail.file !== preferences.get().file) return;
+  const patch = {};
+  if (typeof detail.repeatOne === 'boolean') patch.repeatOne = detail.repeatOne;
+  if (Number.isFinite(detail.position)) patch.position = detail.position;
+  preferences.update(patch);
+  mobileRepeat = preferences.get().repeatOne;
+}
+function flushPreferences() {
+  preferences.update({query: document.querySelector('#song-query').value, sort: sortMode});
+  if (flowLayout.matches) cards.get(activeIndex)?.savePlayer?.();
+  else desktopPlayer?.save();
+}
+addEventListener('pagehide', flushPreferences);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushPreferences(); });
 function updateDesktopState({file, state, message, resetMedia}) {
   if (flowLayout.matches || songs[activeIndex]?.file !== file) return;
   desktopState = state;
@@ -942,10 +1022,11 @@ function unlockDesktopAudio() {
     window.__favoriteVinylAudioContext.resume().catch(() => {});
   } catch { /* The player's controls expose a retry if audio is unavailable. */ }
 }
-async function selectDesktopSong(song) {
-  unlockDesktopAudio();
+async function selectDesktopSong(song, {restore = false} = {}) {
+  rememberSelection(song);
+  if (!restore && !desktopPlayer) unlockDesktopAudio();
   // Start buffering the selected audio while the renderer is downloading.
-  if (!desktopPlayer) {
+  if (!desktopPlayer && !restore) {
     const audio = window.__favoriteVinylAudio;
     delete audio.dataset.vinylWarm;
     const url = new URL(audioPath(song), location.href).href;
@@ -958,28 +1039,31 @@ async function selectDesktopSong(song) {
   for (const card of cards.values()) card.querySelector('audio')?.pause();
   const same = songs[activeIndex]?.file === song.file;
   activeIndex = songs.indexOf(song);
-  if (!same) desktopState = 'loading';
+  if (!same || restore) desktopState = restore ? 'paused' : 'loading';
   document.body.classList.add('vinyl-selected');
   cancelAnimationFrame(searchScrollFrame); letterNavigation = null;
   render();
   try {
-    desktopModule ||= import('./vinyl-desktop.js?v=d9ec29dc065a');
+    if (desktopPlayer) { desktopPlayer.select(playbackSong(song), {autoplay: !restore}); return; }
+    desktopModule ||= import('./vinyl-desktop.js?v=0a91bf9614ce');
     let loadTimer;
     const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
       loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);
     })]).finally(() => clearTimeout(loadTimer));
     if (revision !== selectionRevision || flowLayout.matches) return;
-    desktopPlayer ||= createVinylPlayer({onState:updateDesktopState, onNavigate:direction => {
+    desktopPlayer ||= createVinylPlayer({onState:updateDesktopState, onPreferences:rememberDesktopPreferences, onNavigate:direction => {
       const next = (activeIndex + direction + songs.length) % songs.length;
       selectDesktopSong(songs[next]);
     }});
-    desktopPlayer.select(playbackSong(song));
+    desktopPlayer.select(playbackSong(song), {autoplay: !restore});
   } catch (error) {
     desktopModule = null;
     if (revision === selectionRevision) updateDesktopState({file:song.file,state:'error',message:'播放器加载失败，请重试',resetMedia:true});
   }
 }
 flowLayout.addEventListener('change', () => {
+  cards.get(activeIndex)?.savePlayer?.();
+  desktopPlayer?.save();
   selectionRevision++;
   desktopPlayer?.destroy(); desktopPlayer = null;
   releaseDesktopAudio();
@@ -987,7 +1071,7 @@ flowLayout.addEventListener('change', () => {
   cards.clear(); activeIndex = -1; rowsNeedLayout = true;
   currentCard?.remove(); currentCard = null;
   document.body.classList.remove('vinyl-selected');
-  render(); scrollPlaylist(0);
+  render(); restoreSavedSelection();
 });
 
 function scrollPosition() {
@@ -1034,14 +1118,33 @@ function makeCard(song, index) {
   playButton.className = 'load-play';
   playButton.setAttribute('aria-label', `播放 ${song.title}`);
   playButton.innerHTML = '<span class="play-triangle">▶</span><span class="play-time">0:00 / 0:00</span><span class="play-progress"></span><span class="play-volume">◖</span><span class="play-more">⋮</span>';
-  async function startSong() {
+  async function startSong(autoplay = true) {
     if (!flowLayout.matches) { selectDesktopSong(song); return; }
-    if (audio) { if (audio.error) audio.load(); try { await audio.play(); } catch {} return; }
+    if (audio) { if (autoplay) { if (audio.error) audio.load(); try { await audio.play(); } catch {} } return; }
+    rememberSelection(song);
     const index = songs.indexOf(song);
     cards.get(activeIndex)?.querySelector('audio')?.pause();
     activeIndex = index;
     audio = document.createElement('audio');
-    audio.controls = true; audio.preload = 'auto'; audio.loop = mobileRepeat;
+    audio.controls = true; audio.preload = autoplay ? 'auto' : 'none'; audio.loop = mobileRepeat;
+    let pendingPosition = preferences.get().position;
+    const applyPosition = () => {
+      if (pendingPosition > 0 && Number.isFinite(audio.duration)) {
+        audio.currentTime = Math.min(pendingPosition, Math.max(0, audio.duration - .1));
+      }
+      pendingPosition = 0;
+    };
+    audio.addEventListener('loadedmetadata', applyPosition, {once: true});
+    let lastSave = 0;
+    const savePosition = force => {
+      if (preferences.get().file !== song.file || pendingPosition > 0 || audio.readyState < 1) return;
+      if (force || performance.now() - lastSave >= 5000) {
+        lastSave = performance.now(); preferences.update({position: audio.ended ? 0 : audio.currentTime});
+      }
+    };
+    card.savePlayer = () => savePosition(true);
+    audio.addEventListener('timeupdate', () => savePosition(false));
+    for (const type of ['pause','seeked','ended']) audio.addEventListener(type, () => savePosition(true));
     card.classList.add('mobile-active');
     audio.setAttribute('aria-label', song.title);
     const repeat = document.createElement('button');
@@ -1050,6 +1153,7 @@ function makeCard(song, index) {
     repeat.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3"/><path d="M11 10l1-1v6m-1 0h2"/></svg>';
     repeat.addEventListener('click', () => {
       mobileRepeat = !mobileRepeat; audio.loop = mobileRepeat;
+      preferences.update({repeatOne: mobileRepeat});
       repeat.setAttribute('aria-pressed', String(mobileRepeat));
     });
     const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'mobile-retry'; retry.textContent = '重试播放'; retry.hidden = true;
@@ -1069,6 +1173,7 @@ function makeCard(song, index) {
         navigator.mediaSession.setActionHandler('play', () => { audio.play().catch(() => {}); });
         navigator.mediaSession.setActionHandler('pause', () => audio.pause());
       }
+      rememberSelection(song);
       activeIndex = songs.indexOf(song); scheduleRender();
     });
     audio.addEventListener('ended', () => {
@@ -1078,9 +1183,10 @@ function makeCard(song, index) {
     audio.src = audioPath(song);
     playButton.replaceWith(audio); player.append(repeat, retry);
     render();
-    try { await audio.play(); } catch { retry.hidden = false; }
+    if (autoplay) try { await audio.play(); } catch { retry.hidden = false; }
   }
-  playButton.addEventListener('click', startSong);
+  playButton.addEventListener('click', () => startSong(true));
+  card.restorePlayer = () => startSong(false);
   card.addEventListener('click', event => {
     if (!flowLayout.matches && !event.target.closest('button,audio')) selectDesktopSong(song);
   });
@@ -1213,6 +1319,7 @@ searchInput.addEventListener('keydown', event => {
 });
 searchInput.addEventListener('input', () => {
   searchGeneration++;
+  preferences.update({query: searchInput.value});
   letterNavigation = null;
   if (/\p{Script=Han}/u.test(searchInput.value)) loadQueryDictionary();
   previousQuery = ''; matchCursor = -1; searchIndex = -1;
@@ -1267,6 +1374,7 @@ function sortPlaylist(mode, resetScroll = true) {
   letterNavigation = null;
   rowsNeedLayout = true;
   sortMode = mode;
+  preferences.update({sort: mode});
   const activeFile = songs[activeIndex]?.file;
   const matchedFile = songs[searchIndex]?.file;
   const retained = new Map([...cards.values()].map(card => [card.dataset.file, card]));
@@ -1466,7 +1574,7 @@ render();
 
 qualityControl.addEventListener('change', () => {
   audioQuality = qualityControl.value;
-  try {localStorage.setItem('favorite-audio-quality', audioQuality);} catch {}
+  preferences.update({quality: audioQuality});
   if (activeIndex < 0) return;
   if (!flowLayout.matches) {
     if (['playing','preparing','spinningUp','movingArm','loweringStylus','loading'].includes(desktopState)) selectDesktopSong(songs[activeIndex]);
@@ -1478,3 +1586,44 @@ qualityControl.addEventListener('change', () => {
     if (playing) audio.play().catch(() => {});
   }
 });
+
+// Restore a selected track without requesting autoplay permission or loading
+// audio bytes. The next play gesture resumes the saved position and repeat mode.
+function restoreSavedSelection() {
+  const saved = preferences.get();
+  const index = songs.findIndex(song => song.file === saved.file);
+  if (index < 0) return;
+  activeIndex = index; searchIndex = index;
+  if (flowLayout.matches) { render(); cards.get(index)?.restorePlayer(); }
+  else selectDesktopSong(songs[index], {restore: true});
+  if (flowLayout.matches) requestAnimationFrame(() => {
+    const target = cards.get(index);
+    if (!target) return;
+    const top = listContentTop() + target.offsetTop - (scrollPosition().height - target.offsetHeight) / 2;
+    scrollPlaylist(Math.max(0, top));
+  });
+}
+function applyStoredPreferences() {
+  const saved = preferences.get();
+  mobileRepeat = saved.repeatOne;
+  audioQuality = saved.quality; qualityControl.value = audioQuality;
+  if (sortMode !== saved.sort) sortPlaylist(saved.sort, false);
+  searchInput.value = saved.query;
+  if (activeIndex < 0) restoreSavedSelection();
+}
+const consentPanel = document.querySelector('#playlist-storage-consent');
+consentPanel.hidden = preferences.hasConsent();
+document.querySelector('#allow-playlist-storage').addEventListener('click', () => {
+  if (activeIndex >= 0) flushPreferences();
+  preferences.allowStorage();
+  consentPanel.hidden = true;
+  applyStoredPreferences();
+});
+document.querySelector('#dismiss-playlist-storage').addEventListener('click', () => {
+  // Dismiss for this visit only. Never write a refusal or infer permission.
+  consentPanel.hidden = true;
+});
+addEventListener('pageshow', event => {
+  if (event.persisted && !preferences.hasConsent()) consentPanel.hidden = false;
+});
+applyStoredPreferences();

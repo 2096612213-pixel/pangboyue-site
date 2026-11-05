@@ -1,11 +1,13 @@
 /* Adapter for the supplied Hi-Fi renderer. One selected file, one media element. */
 (() => {
   let selected = null, loading = false, shouldPlay = false, failed = false;
+  let saveCurrentPreferences = () => {};
   const notify = (state, message = '') => window.dispatchEvent(new CustomEvent('playliststate', {
     detail: { file: selected?.file, state, message }
   }));
   const statusLine = text => installLyrics(LyricTimeline.normalize([{text, source:'status'}]), false);
-  async function select(song) {
+  async function select(song, {autoplay = true} = {}) {
+    saveCurrentPreferences();
     selected = song; failed = false;
     const requestedURL = new URL(song.audioFile || song.file, location.href).href;
     const prebuffered = audioEl.dataset.prebufferSrc === requestedURL && audioEl.src === requestedURL;
@@ -14,9 +16,18 @@
     const valid = () => generation === trackGeneration && !signal.aborted;
     const [title, ...artists] = song.title.split('—');
     const artist = artists.join('—').trim();
-    loading = true; shouldPlay = true; currentAudioFile = null; isDemoMode = false;
+    loading = true; shouldPlay = autoplay; currentAudioFile = null; isDemoMode = false;
     updateTrackLabels(title.trim(), artist); updateAlbumCover(null);
-    statusLine('正在加载这张唱片…'); setLyricsStatus('正在连接音频'); notify('loading');
+    statusLine(autoplay ? '正在加载这张唱片…' : ''); setLyricsStatus(autoplay ? '正在连接音频' : ''); notify(autoplay ? 'loading' : 'paused');
+    if (!autoplay) {
+      // A restored selection displays its controls immediately. Defer even
+      // assigning the media URL until a real play gesture (Safari may fetch
+      // metadata despite preload=none).
+      audioEl.dataset.repeatOne = String(song.repeatOne === true);
+      document.getElementById('btn-repeat-one').setAttribute('aria-pressed', audioEl.dataset.repeatOne);
+      saveCurrentPreferences = () => {};
+      loading = false; notify('paused'); return;
+    }
     let revision = timelineRevision;
     const fail = message => {
       if (!valid() || failed) return;
@@ -27,14 +38,44 @@
       transport.pause(); audioEl.removeAttribute('src'); audioEl.load();
       statusLine(message); setLyricsStatus(message); notify('error', message);
     };
-    ensureMediaConnection().catch(() => {});
+    if (autoplay) ensureMediaConnection().catch(() => {});
     try {
       const url = new URL(requestedURL);
       if (url.origin !== location.origin || !url.pathname.startsWith(new URL('./', location.href).pathname)) throw Error('无效的歌曲地址');
       currentTrackMeta = {title:title.trim(), artist, album:''};
       // Let the media engine stream/range-request the original URL. Never gate
       // playback on downloading a complete MP3 or on a lyrics service response.
-      if (!prebuffered) {audioEl.src = url.href; audioEl.preload = 'auto'; audioEl.load();}
+      audioEl.dataset.repeatOne = String(song.repeatOne === true);
+      document.getElementById('btn-repeat-one').setAttribute('aria-pressed', audioEl.dataset.repeatOne);
+      let pendingPosition = Number.isFinite(song.startAt) ? Math.max(0, song.startAt) : 0;
+      const applyPosition = () => {
+        if (!valid()) return;
+        if (pendingPosition > 0 && Number.isFinite(audioEl.duration)) {
+          const target = Math.min(pendingPosition, Math.max(0, audioEl.duration - .1));
+          transport.managedSeek = true; transport.resumeTime = target; audioEl.currentTime = target;
+          syncFromMedia();
+        }
+        pendingPosition = 0;
+      };
+      audioEl.addEventListener('loadedmetadata', applyPosition, {signal});
+      if (!prebuffered) {audioEl.preload = autoplay ? 'auto' : 'none';audioEl.src = url.href;audioEl.load();}
+      else if (audioEl.readyState >= 1) applyPosition();
+      let lastSave = 0;
+      const savePosition = force => {
+        if (!valid() || pendingPosition > 0 || transport.priming || audioEl.readyState < 1) return;
+        if (force || performance.now() - lastSave >= 5000) {
+          lastSave = performance.now();
+          // WebKit can briefly report the old decoder clock while the arm
+          // repositions. Save the transport's seek target until it is settled.
+          const position = audioEl.ended ? 0 : transport.busy ? transport.resumeTime : audioEl.currentTime;
+          window.dispatchEvent(new CustomEvent('playlistpreferences', {detail: {file: song.file,
+            position, repeatOne: audioEl.dataset.repeatOne === 'true'}}));
+        }
+      };
+      saveCurrentPreferences = () => savePosition(true);
+      audioEl.addEventListener('timeupdate', () => savePosition(false), {signal});
+      for (const type of ['pause','seeked','ended']) audioEl.addEventListener(type, () => savePosition(true), {signal});
+
       let lastTime = audioEl.currentTime, lastAdvance = performance.now();
       let waitingSince = null, tagsStarted = false;
       let lastCheck = performance.now(), foregroundAt = lastCheck;
@@ -133,18 +174,21 @@
   }
   function toggle() {
     if (!selected) return;
+    if (!loading && !failed && !audioEl.getAttribute('src')) {
+      select({...selected, repeatOne:audioEl.dataset.repeatOne === 'true'}); return;
+    }
     if (loading) { shouldPlay = !shouldPlay; notify(shouldPlay ? 'loading' : 'paused'); return; }
     togglePlay();
   }
   function pause() { shouldPlay = false; transport.pause(); }
   document.getElementById('btn-play').addEventListener('click', event => {
-    if (!failed && !loading) return;
+    if (!failed && !loading && !(selected && !audioEl.getAttribute('src'))) return;
     event.stopImmediatePropagation();
     if (failed) select(selected); else toggle();
   }, true);
   window.addEventListener('keydown', event => {
     if (event.target.matches('input,textarea,select,[contenteditable=true]')) return;
-    if (event.code === 'Space' && (failed || loading)) {
+    if (event.code === 'Space' && (failed || loading || (selected && !audioEl.getAttribute('src')))) {
       event.preventDefault(); event.stopImmediatePropagation();
       if (failed) select(selected); else toggle();
     } else if (event.key === 'Escape' && loading) {shouldPlay=false;notify('paused');}
@@ -163,7 +207,11 @@
   }
   // The site owns track selection; standalone audio drag-and-drop is disabled.
   for (const type of ['dragover','drop']) window.addEventListener(type, event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);
-  window.vinylPlayer = {select, toggle, pause, destroy() {selected=null; clearCurrentTrack(); currentAudioFile=null; updateAlbumCover(null);}};
+  document.getElementById('btn-repeat-one').addEventListener('click', () => {
+    if (selected) window.dispatchEvent(new CustomEvent('playlistpreferences', {detail: {file:selected.file, repeatOne:audioEl.dataset.repeatOne === 'true'}}));
+  });
+  addEventListener('pagehide', () => saveCurrentPreferences());
+  window.vinylPlayer = {select, toggle, pause, save: () => saveCurrentPreferences(), destroy() {selected=null; clearCurrentTrack(); currentAudioFile=null; updateAlbumCover(null);}};
   updateTrackLabels('最爱的歌曲', '选择一首，开始听');
   statusLine('从右侧选择一首歌'); setLyricsStatus('');
 })();
