@@ -653,3 +653,89 @@ K\mathbf a=\omega^2M\mathbf a
 
 
 
+
+## 2026-11-07
+
+不过感觉其他人都好自信好强大
+
+感觉我好屌丝
+
+是有工作和没工作的区别吗？
+
+他们花的是自己的钱 我花的是我父母的钱
+
+外面的人 不管男的女的 丑的好看的 他们看起来都很自信 都把自己打扮的很精致
+
+还有这么多禁止入境物品
+
+晚上的国际港澳台出发值机岛
+
+全是外国人
+
+我要占几个座位在这睡觉了
+
+主要是韩国人跟日本人 还有新加坡菲律宾的多 基本没有欧洲人跟美国人
+
+还有一些阿拉伯国家的 戴着围巾面罩的
+
+这些韩国人大老远几千公里从韩国跑过来长沙爬岳麓山 看湘江 逛橘子洲
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-01.jpg" width="1280" height="1707" alt="机场里随身带着的行李" loading="lazy" decoding="async">
+
+
+我发现每个男的从车上下来 进入机场大厅前做的最多的第一件事就是抽一根烟 抽完烟他们就三五成群 不紧不慢的一起走进机场大厅
+
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-10.jpg" width="1707" height="1280" alt="机场国际及港澳台到达区前等待的人群" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-11.jpg" width="4032" height="3024" alt="机场到达区前等待接机的人群" loading="lazy" decoding="async">
+
+黄花AP修的比西安AP 沈阳AP阔气多了
+
+真感觉不要一直在老外身边 附近转悠 感觉要是在国外可能已经开枪打我了（exaggerate一下）
+
+老外心里：你在这转啥呢 是不是想抢劫我
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-07.jpg" width="1707" height="1280" alt="夜晚的长沙黄花机场外部" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-08.jpg" width="1280" height="1707" alt="黄花机场航站楼外的玻璃幕墙" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-09.jpg" width="1707" height="1280" alt="黄花机场夜晚的航站楼" loading="lazy" decoding="async">
+
+外国人好像他们普遍喷香水 不管男的女的 中国人好像不管男的女的 喷香水的都很少
+
+真的是这样吗 还是我的错觉
+
+他们周围真的味道好大
+
+不过我有感觉 我肯定会成为我想成为的人
+
+一个非常厉害的具身智能工程师 像马斯克一样
+
+然后宽肩 长头发 脸稍微有点方
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-02.jpg" width="1707" height="1280" alt="海关展柜里的燕窝" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-03.jpg" width="1707" height="1280" alt="海关展柜里的动物角和其他物品" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-04.jpg" width="1707" height="1280" alt="海关展柜里的水果" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-05.jpg" width="1707" height="1280" alt="海关展柜里的带土壤物品" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-photo-06.jpg" width="4032" height="3024" alt="海关展柜里的燕窝和其他物品" loading="lazy" decoding="async">
+
+
+
+他们虽然有的人看起来很强 但是我觉得我发发力肯定能做到比他们更强、
+
+而且不是骆驼祥子
+
+我旁边两个EU holiday的向导
+
+在这举着个大韩语牌子 接出来的韩国tourists
+
+旁边还有好多韩国向导
+
+还有中国向导
+
+
