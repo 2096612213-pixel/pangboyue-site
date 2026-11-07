@@ -1264,6 +1264,94 @@ K\mathbf a=\omega^2M\mathbf a
 
 特别声明：以上内容(如有图片或视频亦包括在内)为自媒体平台“网易号”用户上传并发布，本平台仅提供信息存储服务。
 
+嗯 爱情到最后会变成亲情 在社会上一般都是亲情 很难有纯粹的爱情了 
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W45/media/2026-11-07-marry-someone-you-dont-love-poster.jpg" aria-label="What is it like to marry someone you don't love">
+  <source src="/thoughts/2026-W45/media/2026-11-07-marry-someone-you-dont-love.mp4?v=b955c5224146" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W45/media/2026-11-07-marry-someone-you-dont-love.mp4?v=b955c5224146">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W45/media/2026-11-07-li-daxiao-when-young-poster.jpg" aria-label="李大霄年轻时的故事">
+  <source src="/thoughts/2026-W45/media/2026-11-07-li-daxiao-when-young.mp4?v=b7f7fba01037" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W45/media/2026-11-07-li-daxiao-when-young.mp4?v=b7f7fba01037">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="640" height="480" poster="/thoughts/2026-W45/media/2026-11-07-zhuangzi-testing-wife-poster.jpg" aria-label="庄子试妻">
+  <source src="/thoughts/2026-W45/media/2026-11-07-zhuangzi-testing-wife.mp4?v=db46a8ebea90" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W45/media/2026-11-07-zhuangzi-testing-wife.mp4?v=db46a8ebea90">打开视频</a>观看。
+</video>
+
+---
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-01.jpg" width="1440" height="2561" alt="11月7日照片，第1张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-02.jpg" width="4032" height="3024" alt="11月7日照片，第2张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-03.jpg" width="4032" height="3024" alt="11月7日照片，第3张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-04.jpg" width="4032" height="3024" alt="11月7日照片，第4张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-05.jpg" width="4032" height="3024" alt="11月7日照片，第5张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-06.jpg" width="3024" height="4032" alt="11月7日照片，第6张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-07.jpg" width="3024" height="4032" alt="11月7日照片，第7张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-08.jpg" width="4032" height="3024" alt="11月7日照片，第8张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-09.jpg" width="4032" height="3024" alt="11月7日照片，第9张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-10.jpg" width="4032" height="3024" alt="11月7日照片，第10张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-11.jpg" width="4032" height="3024" alt="11月7日照片，第11张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-12.jpg" width="4032" height="3024" alt="11月7日照片，第12张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-13.jpg" width="3024" height="4032" alt="11月7日照片，第13张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-14.jpg" width="4032" height="3024" alt="11月7日照片，第14张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-15.jpg" width="4032" height="3024" alt="11月7日照片，第15张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-16.jpg" width="4032" height="3024" alt="11月7日照片，第16张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-17.jpg" width="4032" height="3024" alt="11月7日照片，第17张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-18.jpg" width="3024" height="4032" alt="11月7日照片，第18张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-19.jpg" width="3024" height="4032" alt="11月7日照片，第19张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-20.jpg" width="4032" height="3024" alt="11月7日照片，第20张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-21.jpg" width="4032" height="3024" alt="11月7日照片，第21张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-22.jpg" width="4032" height="3024" alt="11月7日照片，第22张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-23.jpg" width="3024" height="4032" alt="11月7日照片，第23张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-24.jpg" width="3024" height="4032" alt="11月7日照片，第24张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-25.jpg" width="4032" height="3024" alt="11月7日照片，第25张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-26.jpg" width="4032" height="3024" alt="11月7日照片，第26张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-27.jpg" width="3024" height="4032" alt="11月7日照片，第27张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-28.jpg" width="4032" height="3024" alt="11月7日照片，第28张" loading="lazy" decoding="async">
+
+<img src="/thoughts/2026-W45/media/2026-11-07-extra-photo-29.jpg" width="3024" height="4032" alt="11月7日照片，第29张" loading="lazy" decoding="async">
+
+
+
+
+## 2026-11-08
+
 
 
 
