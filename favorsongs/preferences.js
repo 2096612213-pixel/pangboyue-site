@@ -10,6 +10,7 @@ export function createPlaylistPreferences(files, storage) {
       version: 1,
       file,
       repeatOne: value.repeatOne === true,
+      shuffle: value.shuffle === true,
       position: file && Number.isFinite(value.position) && value.position >= 0 ? Math.min(value.position, 86400) : 0,
       quality: value.quality === 'original' ? 'original' : 'smooth',
       sort: value.sort === 'pinyin' ? 'pinyin' : 'added',

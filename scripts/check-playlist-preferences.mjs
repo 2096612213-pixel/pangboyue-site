@@ -5,7 +5,7 @@ const storage = {getItem(k) {reads.push(k); return values.get(k) ?? null;}, setI
 let prefs = createPlaylistPreferences(['a.mp3','b.m4a'],storage);
 assert.equal(prefs.hasConsent(),false);
 assert.deepEqual(reads,[consentKey],'Before acceptance, inspect only the permission marker');
-prefs.update({file:'a.mp3', position:35.25, repeatOne:true, quality:'original', sort:'pinyin', query:'hongkong'});
+prefs.update({file:'a.mp3', position:35.25, repeatOne:true, shuffle:true, quality:'original', sort:'pinyin', query:'hongkong'});
 assert.equal(prefs.get().file,'a.mp3','Playback choices work for the current visit');
 assert.deepEqual(writes,[],'Search, playback and quality must not write before explicit acceptance');
 assert.equal(createPlaylistPreferences(['a.mp3'],storage).get().file,null,'A new visit without acceptance starts fresh');
@@ -13,6 +13,9 @@ prefs.allowStorage();
 assert.equal(prefs.hasConsent(),true);
 assert.equal(values.get(consentKey),'allowed');
 assert.deepEqual(createPlaylistPreferences(['a.mp3'], storage).get(), prefs.get());
+assert.equal(createPlaylistPreferences(['a.mp3'], storage).get().shuffle,true,'Shuffle survives a reload after consent');
+prefs.update({shuffle:false});
+assert.equal(createPlaylistPreferences(['a.mp3'], storage).get().shuffle,false,'Disabling shuffle also survives a reload');
 assert.equal(createPlaylistPreferences(['a.mp3'], storage).hasConsent(),true);
 assert.equal(createPlaylistPreferences(['removed.mp3'], storage).get().file,null);
 assert.equal(createPlaylistPreferences(['removed.mp3'], storage).get().position,0);

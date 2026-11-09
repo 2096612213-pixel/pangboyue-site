@@ -40,3 +40,28 @@ assert.equal(t.state, 'paused');
 assert.equal(media.paused, true);
 assert.equal(t.outputOpen, false, 'Cancel during realignment must stay silent');
 console.log('PASS: duration corrections in both directions recover; cancellation stays silent.');
+
+// Hidden pages can stop delivering animation frames. Exercise the real state
+// machine without calling tick externally, including repeat and replacement.
+const hiddenDocument = {hidden: true};
+const HiddenTransport = vm.runInNewContext(`${html.slice(start, end)}; TurntableTransport`, {document: hiddenDocument});
+const hiddenMedia = {currentTime: 0, duration: 10, paused: true, readyState: 4, seeking: false,
+  dataset: {repeatOne: 'true'}, get ended() {return this.currentTime >= this.duration;},
+  play() {this.paused = false; return Promise.resolve();}, pause() {this.paused = true;}};
+const hidden = new HiddenTransport({media: hiddenMedia, groove: time => 10 + 20 * time / 10,
+  visualReady: () => false, unlock: () => Promise.resolve(), gate() {}}, {restAngle: 0});
+async function microtasks() {for (let i = 0; i < 30; i++) await Promise.resolve();}
+hidden.play(); await microtasks();
+assert.equal(hidden.state, 'playing', 'Hidden playback starts without animation frames');
+assert.equal(hidden.outputOpen, true);
+hiddenMedia.currentTime = 10; hidden.mediaEvent('ended'); hidden.scheduleBackground(); await microtasks();
+assert.equal(hidden.state, 'playing', 'Hidden single-track repeat resumes');
+assert.equal(hiddenMedia.currentTime, 0);
+hidden.replaceSource(); hiddenMedia.currentTime = 0; hidden.play(); await microtasks();
+assert.equal(hidden.state, 'playing', 'Hidden track replacement resumes');
+hidden.pause(); await microtasks();
+assert.equal(hidden.state, 'paused');
+hiddenDocument.hidden = false;
+hidden.play(); await microtasks();
+assert.notEqual(hidden.state, 'playing', 'Foreground still waits for the renderer');
+console.log('PASS: hidden startup, repeat and track replacement work without animation frames.');

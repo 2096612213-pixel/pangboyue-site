@@ -115,7 +115,7 @@ const shuffle = new ShuffleQueue(addedSongs.map(song => song.file));
 let shuffleEnabled = false;
 const shuffleIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5M4 18h3c4 0 6-12 10-12h4M16 21h5v-5M4 6h3c2 0 3 2 4 4m2 4c1 2 2 4 4 4h4"/></svg>';
 function updateShuffleButtons() { document.querySelectorAll('.shuffle-button').forEach(b=>b.setAttribute('aria-pressed', String(shuffleEnabled))); desktopPlayer?.setShuffle?.(shuffleEnabled); }
-function toggleShuffle() { shuffleEnabled=!shuffleEnabled; if (shuffleEnabled) shuffle.enable(songs[activeIndex]?.file); else shuffle.enabled=false; updateShuffleButtons(); }
+function toggleShuffle() { shuffleEnabled=!shuffleEnabled; if (shuffleEnabled) shuffle.enable(songs[activeIndex]?.file); else shuffle.enabled=false; preferences.update({shuffle: shuffleEnabled}); updateShuffleButtons(); }
 function navigateTrack(direction, automatic=false) {
   const current=songs[activeIndex]?.file; let target;
   if (shuffleEnabled) target=direction<0 ? shuffle.previous() : shuffle.next(current,!automatic);
@@ -209,7 +209,7 @@ async function selectDesktopSong(song, {restore = false, navigation = false} = {
   render();
   try {
     if (desktopPlayer) { desktopPlayer.select(playbackSong(song), {autoplay: !restore}); return; }
-    desktopModule ||= import('./vinyl-desktop.js?v=52636d783a1f');
+    desktopModule ||= import('./vinyl-desktop.js?v=9f39f460ead6');
     let loadTimer;
     const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
       loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);
@@ -779,6 +779,12 @@ function restoreSavedSelection() {
 }
 function applyStoredPreferences() {
   const saved = preferences.get();
+  if (shuffleEnabled !== saved.shuffle) {
+    shuffleEnabled = saved.shuffle;
+    if (shuffleEnabled) shuffle.enable(songs[activeIndex]?.file || saved.file);
+    else shuffle.enabled = false;
+    updateShuffleButtons();
+  }
   mobileRepeat = saved.repeatOne;
   audioQuality = saved.quality; qualityControl.value = audioQuality;
   if (sortMode !== saved.sort) sortPlaylist(saved.sort, false);

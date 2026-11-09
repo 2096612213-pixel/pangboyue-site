@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 
 <head>
-  <link rel="modulepreload" href="playlist.bundle.js?v=3b7ff1577b05">
+  <link rel="modulepreload" href="playlist.bundle.js?v=a6587bb90354">
   <meta name="description" content="庞博约最爱的歌曲列表与播放器。">
   <link rel="canonical" href="https://pangboyue.com/favorsongs/">
   <link rel="icon" type="image/x-icon" href="../favicon.ico">
@@ -431,6 +431,10 @@
  .back,.title,.subtitle {left:var(--gutter)}
  .song-search {padding:0;border:0;border-radius:0;background:#09090a;box-shadow:0 15px 18px #09090a}
  .song-search {isolation:isolate}
+ .song-search {display:grid;grid-template-rows:50px minmax(16px,1fr) 27px 36px;row-gap:8px;height:155px}
+ .song-search .search-status,.song-search .audio-quality,.song-search .sort-buttons {margin:0;min-height:0}
+ .song-search .audio-quality select {height:27px;padding:2px 8px}
+ .song-search .sort-buttons button {min-height:36px;padding:4px 8px}
  .song-search::before {content:"";position:absolute;z-index:-1;left:0;right:0;top:-23px;bottom:0;background:#09090a;pointer-events:none}
  .search-glass {border-radius:7px;background:#171718}
  .sort-buttons button {border-radius:7px;box-shadow:none}
@@ -569,7 +573,7 @@
     <button class="playlist-consent-allow" id="allow-playlist-storage" type="button">允许存储</button>
   </aside>
 
-  <script type="module" src="playlist.bundle.js?v=3b7ff1577b05"></script>
+  <script type="module" src="playlist.bundle.js?v=a6587bb90354"></script>
 </body>
 
 </html>

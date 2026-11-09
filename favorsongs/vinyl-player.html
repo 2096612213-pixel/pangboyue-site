@@ -2311,11 +2311,14 @@ class PLXTurntableScene {
     .replace('#include <color_fragment>',`#include <color_fragment>
      float visibleR=length(vPVC.xz), visibleA=atan(vPVC.z,vPVC.x);
      float visibleBand=smoothstep(51.,57.,visibleR)*(1.-smoothstep(146.,149.,visibleR))*smoothstep(2.5,2.95,vPVC.y);
-     float finePhase=visibleR*2.6 + .12*sin(visibleA*3.);
+     float finePhase=visibleR*2.6 + .24*sin(visibleA*3.+visibleR*.07)+.10*sin(visibleA*11.-visibleR*.13);
      float fineAA=1.-smoothstep(1.,3.,fwidth(finePhase));
-     float bands=.5+.5*cos(visibleR*.75+.22*sin(visibleA*2.));
+     float bands=.5+.5*cos(visibleR*.75+.4*sin(visibleR*.11)+.24*sin(visibleA*2.));
      float glint=(.5+.5*cos(visibleA*2.4+visibleR*.08));
-     diffuseColor.rgb *= 1.0 + visibleBand * (.38*cos(finePhase)*fineAA + .18*bands + .16*glint*bands);`)
+     float patina=.5+.5*sin(visibleA*4.+sin(visibleR*.09)*2.)*cos(visibleR*.16-visibleA*3.);
+     float scuff=pow(max(0.,sin(visibleA*17.+visibleR*.12)*sin(visibleR*.21-visibleA*5.)),12.);
+     float scratch=pow(max(0.,cos(visibleA*9.+.7)),110.)*smoothstep(68.,78.,visibleR)*(1.-smoothstep(112.,120.,visibleR));
+     diffuseColor.rgb *= 1.0 + visibleBand * (.24*cos(finePhase)*fineAA + .12*bands + .10*glint*bands - .16*patina + .16*scuff + .20*scratch);`)
     .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
      float groovePhase=length(vPVC.xz)*39.5;float resolved=1.-smoothstep(1.,3.,fwidth(groovePhase));
      float groupPhase=length(vPVC.xz)*5.2+.12*sin(atan(vPVC.z,vPVC.x)*3.);
@@ -2328,7 +2331,7 @@ class PLXTurntableScene {
      #ifdef USE_CLEARCOAT
        clearcoatNormal=normalize(clearcoatNormal+normalize(vPVCRadial+vec3(.00001))*etched*.7);
      #endif`);
-  };pvc.customProgramCacheKey=()=> 'plx-record-pvc-2';
+  };pvc.customProgramCacheKey=()=> 'plx-record-pvc-3';
   const recordGeo=this.lathe([[148.8,1.2],[148.9,1.2],[149.7,1.5],[150,2.2],[149.65,2.8],[148.8,3]],768);
   const topGeo=new THREE.RingGeometry(3.6,148.8,768,1);topGeo.rotateX(-Math.PI/2);topGeo.translate(0,3,0);
   for(const geo of [recordGeo,topGeo]){
@@ -3484,7 +3487,28 @@ class TurntableTransport {
 
   get busy() { return !['idle', 'paused', 'playing', 'error'].includes(this.state) || Boolean(this.motion); }
   get contact() { return this.pose.lift <= .000001 && Math.abs(this.pose.angle - this.io.groove(this.media.currentTime || 0)) < .035; }
-  get ready() { return !this.media.error && this.media.readyState >= 2 && (this.io.visualReady?.() ?? true) && !this.media.seeking && !this.priming && this.contextReady && this.primedRevision === this.sourceRevision; }
+  get visualAvailable() { return (typeof document !== 'undefined' && document.hidden) || (this.io.visualReady?.() ?? true); }
+  get ready() { return !this.media.error && this.media.readyState >= 2 && this.visualAvailable && !this.media.seeking && !this.priming && this.contextReady && this.primedRevision === this.sourceRevision; }
+
+  // A hidden browser tab may suspend animation frames indefinitely. Advance
+  // the mechanical interlock on events, without making audio depend on frames.
+  scheduleBackground() {
+    if (typeof document === 'undefined' || !document.hidden || this.backgroundQueued || this.backgroundPumping) return;
+    this.backgroundQueued = true;
+    Promise.resolve().then(() => {
+      this.backgroundQueued = false;
+      if (!document.hidden) return;
+      this.backgroundPumping = true;
+      try {
+        for (let i = 0; i < 200; i++) {
+          this.tick(.05, 1, 1);
+          if (this.audioStarting || this.state === 'playing' || this.state === 'error' ||
+              (this.state === 'preparing' && this.phase === 'waitingMedia' && !this.ready) ||
+              (this.state === 'idle' && !this.pendingPlay) || (this.state === 'paused' && !this.intent)) break;
+        }
+      } finally { this.backgroundPumping = false; }
+    });
+  }
 
   publish() { this.io.change?.(this); }
   setState(next, phase = '') {
@@ -3495,6 +3519,7 @@ class TurntableTransport {
       angle: this.pose.angle, lift: this.pose.lift, gate: this.outputOpen});
     if (this.history.length > 100) this.history.shift();
     this.publish();
+    this.scheduleBackground();
   }
   gate(open) {
     // This assertion is also the final physical interlock; callers cannot bypass it.
@@ -3537,7 +3562,7 @@ class TurntableTransport {
     this.contextReady = false;
     try {
       Promise.resolve(this.io.unlock()).then(() => {
-        if (revision === this.sourceRevision) this.contextReady = true;
+        if (revision === this.sourceRevision) { this.contextReady = true; this.scheduleBackground(); }
       }).catch(() => { if (revision === this.sourceRevision) this.fail('请再次点击播放，允许浏览器播放音频'); });
     } catch (_) { this.fail('浏览器未能初始化音频，请再次点击播放'); return; }
     if (this.primedRevision === revision) return;
@@ -3554,6 +3579,7 @@ class TurntableTransport {
       this.priming = false;
       this.primedRevision = revision;
       this.io.sync?.();
+      this.scheduleBackground();
     }).catch(error => {
       if (revision !== this.sourceRevision || token !== this.primeToken) { this.enforce(); return; }
       this.priming = false;
@@ -3570,7 +3596,7 @@ class TurntableTransport {
     this.resumeTime = this.media.currentTime || 0;
     if (this.media.ended) { this.managedSeek = true; this.media.currentTime = 0; this.resumeTime = 0; }
     if (gesture) this.primeGesture();
-    if (this.state === 'stopping') { this.pendingPlay = true; this.publish(); return; }
+    if (this.state === 'stopping') { this.pendingPlay = true; this.publish(); this.scheduleBackground(); return; }
     this.beginStart();
   }
   beginStart() {
@@ -3691,7 +3717,7 @@ class TurntableTransport {
     this.move({lift: 1}, .36);
   }
   tick(dt, motorSpeed, targetSpeed) {
-    if(this.intent&&this.state!=='playing'&&this.io.visualReady&&!this.io.visualReady()){this.gate(false);this.io.pose?.(this.pose,this);return;}
+    if(this.intent&&this.state!=='playing'&&!this.visualAvailable){this.gate(false);this.io.pose?.(this.pose,this);return;}
     if (this.state === 'playing') {
       this.pose.angle = this.io.groove(this.media.currentTime || 0);
       this.pose.lift = 0;
@@ -4437,9 +4463,13 @@ const AutomaticLyrics=(()=>{
       }).join('\n');
     }
     for(const type of ['play','playing','pause','ended','error','seeking','seeked','loadedmetadata','canplay','timeupdate','durationchange','waiting','stalled','ratechange']){
-      audioEl.addEventListener(type,()=>{transport.mediaEvent(type);syncFromMedia();});
+      audioEl.addEventListener(type,()=>{transport.mediaEvent(type);syncFromMedia();transport.scheduleBackground();});
     }
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden){syncFromMedia();lastFrameTime=performance.now();}});
+    document.addEventListener('visibilitychange',()=>{
+      if(document.hidden){transport.scheduleBackground();return;}
+      transport.followContactClock();syncFromMedia();lastFrameTime=performance.now();
+      vinylAngularVel=transport.motor?TARGET_VINYL_SPEED:0;
+    });
     window.addEventListener('pageshow',syncFromMedia);
 
     let holdTimer=null,holdConsumed=false;
