@@ -89,6 +89,9 @@
  .song-name {font-size:15px;line-height:1.35;margin-bottom:5px;overflow-wrap:anywhere}
  .load-play {height:38px;min-height:38px;border-radius:5px;background:#242426;color:#ddd}
  .mobile-repeat {margin:6px 8px 2px 0;width:44px;height:44px}
+ .mobile-transport {display:flex;align-items:center;gap:6px;margin-top:7px;min-width:0}
+ .mobile-transport .mobile-repeat {flex:0 0 40px;width:40px;height:34px;margin:0;border-radius:10px}
+ .mobile-volume {flex:1 1 55px;min-width:40px;max-width:100px;height:32px;margin:0 0 0 3px;accent-color:#d3b589;cursor:pointer}
  .song.mobile-active {background:#c8a97e12!important;box-shadow:inset 2px 0 #c8a97e}
  .song-alphabet {top:calc(190px + (100svh - 190px)/2);height:min(486px,calc(100svh - 200px))}
 }

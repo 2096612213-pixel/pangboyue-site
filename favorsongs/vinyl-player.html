@@ -656,6 +656,14 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
       pointer-events: auto;
     }
 
+    .deck-volume {
+      display:flex;align-items:center;gap:7px;margin-left:12px;padding:0 12px;
+      height:38px;border:1px solid rgba(255,255,255,.11);border-radius:999px;
+      background:rgba(16,16,19,.78);color:#aaa;pointer-events:auto;
+    }
+    .deck-volume input {width:72px;height:24px;margin:0;accent-color:#d3b589;cursor:pointer}
+    .deck-volume input:focus-visible {outline:2px solid #e8d0a4;outline-offset:3px}
+
     .ctrl-btn {
       background: transparent;
       border: none;
@@ -1109,6 +1117,7 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
         </svg>
       </button>
     </div>
+    <label class="deck-volume"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12-1a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg><input id="deck-volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="音量"></label>
   </div>
 
   <!-- 右下角时间计数器 -->
@@ -1628,6 +1637,10 @@ if(typeof module!=='undefined')module.exports=ProgressRing;
       document.getElementById('audio-player').replaceWith(unlockedAudio);
     }
     const audioEl = document.getElementById("audio-player");
+    const deckVolume = document.getElementById('deck-volume');
+    deckVolume.value = String(audioEl.volume);
+    deckVolume.addEventListener('input', () => { audioEl.volume = Number(deckVolume.value); });
+    audioEl.addEventListener('volumechange', () => { deckVolume.value = String(audioEl.volume); });
     const lyricsViewport = document.getElementById("lyrics-viewport");
     const lyricsStage = document.getElementById("lyrics-stage");
     const vinylDisc = document.getElementById("vinyl-disc");

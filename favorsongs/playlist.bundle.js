@@ -1078,6 +1078,7 @@ let selectionRevision = 0;
 let desktopState = 'idle';
 let currentCard = null;
 let mobileRepeat = preferences.get().repeatOne;
+let mobileVolume = 1;
 // A round uses stable source filenames, independent of display order.
 class ShuffleQueue {
   constructor(ids) { this.ids = [...ids]; this.enabled = false; this.pending = []; this.seen = new Set(); this.history = []; this.cursor = -1; }
@@ -1186,7 +1187,7 @@ async function selectDesktopSong(song, {restore = false, navigation = false} = {
   render();
   try {
     if (desktopPlayer) { desktopPlayer.select(playbackSong(song), {autoplay: !restore}); return; }
-    desktopModule ||= import('./vinyl-desktop.js?v=9f39f460ead6');
+    desktopModule ||= import('./vinyl-desktop.js?v=9bb19c76ce14');
     let loadTimer;
     const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
       loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);
@@ -1271,6 +1272,7 @@ function makeCard(song, index) {
     activeIndex = index;
     audio = document.createElement('audio');
     audio.controls = true; audio.preload = autoplay ? 'auto' : 'none'; audio.loop = mobileRepeat;
+    audio.volume = mobileVolume;
     let pendingPosition = preferences.get().position;
     const applyPosition = () => {
       if (pendingPosition > 0 && Number.isFinite(audio.duration)) {
@@ -1329,7 +1331,20 @@ function makeCard(song, index) {
     const random = document.createElement('button'); random.type='button'; random.className='mobile-repeat shuffle-button'; random.setAttribute('aria-label','随机播放'); random.innerHTML=shuffleIcon; random.addEventListener('click',toggleShuffle);
     const next = document.createElement('button'); next.type='button'; next.className='mobile-repeat'; next.setAttribute('aria-label','下一首'); next.textContent='▶|'; next.addEventListener('click',()=>navigateTrack(1));
     const prev = document.createElement('button'); prev.type='button'; prev.className='mobile-repeat'; prev.setAttribute('aria-label','上一首'); prev.textContent='|◀'; prev.addEventListener('click',()=>navigateTrack(-1));
-    playButton.replaceWith(audio); player.append(prev, repeat, random, next, retry); updateShuffleButtons();
+    const controls = document.createElement('div'); controls.className = 'mobile-transport';
+    const volume = document.createElement('input'); volume.type = 'range'; volume.className = 'mobile-volume';
+    volume.min = '0'; volume.max = '1'; volume.step = '0.01'; volume.value = String(mobileVolume);
+    volume.setAttribute('aria-label', '音量');
+    volume.addEventListener('input', () => {
+      mobileVolume = Number(volume.value);
+      for (const item of cards.values()) {
+        const other = item.querySelector('audio'); if (other) other.volume = mobileVolume;
+        const slider = item.querySelector('.mobile-volume'); if (slider) slider.value = volume.value;
+      }
+    });
+    audio.addEventListener('volumechange', () => { mobileVolume = audio.volume; volume.value = String(mobileVolume); });
+    controls.append(prev, repeat, random, next, volume);
+    playButton.replaceWith(audio); player.append(controls, retry); updateShuffleButtons();
     render();
     if (autoplay) try { await audio.play(); } catch { retry.hidden = false; }
   }
