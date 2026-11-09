@@ -6,9 +6,32 @@
     detail: { file: selected?.file, state, message }
   }));
   const statusLine = text => installLyrics(LyricTimeline.normalize([{text, source:'status'}]), false);
+  const palettes = new Map(); let paletteGeneration = 0, paletteLayer = 0;
+  async function setAmbient(song) {
+    const generation=++paletteGeneration;
+    let palette=palettes.get(song.file);
+    if (palette === undefined) {
+      palette=null;
+      try {
+        const response=await fetch(new URL(song.detailsFile, location.href)); if (!response.ok) throw Error('metadata');
+        const meta=await response.json(); if (!meta.cover) throw Error('no cover');
+        const img=new Image(); img.src=new URL(meta.cover,location.href).href;
+        await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;});
+        const canvas=document.createElement('canvas'); canvas.width=canvas.height=32; const ctx=canvas.getContext('2d',{willReadFrequently:true}); ctx.drawImage(img,0,0,32,32);
+        const data=ctx.getImageData(0,0,32,32).data, buckets=new Map();
+        for(let i=0;i<data.length;i+=4) {const r=data[i],g=data[i+1],b=data[i+2]; if(data[i+3]<128 || Math.max(r,g,b)<25)continue;const key=[r,g,b].map(x=>Math.floor(x/48)).join(',');const v=buckets.get(key)||[0,0,0,0];v[0]+=r;v[1]+=g;v[2]+=b;v[3]++;buckets.set(key,v);}
+        palette=[...buckets.values()].sort((a,b)=>b[3]-a[3]).slice(0,3).map(v=>v.slice(0,3).map(x=>Math.round(x/v[3]))); if (!palette.length) palette=null;
+      } catch {} palettes.set(song.file,palette);
+    }
+    if(generation!==paletteGeneration) return;
+    const layers=document.querySelectorAll('.album-ambient'); const next=1-paletteLayer; const layer=layers[next];
+    const color=(i,a)=>{const c=palette?.[i] || palette?.[0];return c ? `rgba(${c.join(',')},${a})` : 'transparent';};
+    layer.style.background=palette ? `radial-gradient(ellipse at 20% 35%,${color(0,.46)},transparent 65%),radial-gradient(ellipse at 82% 70%,${color(1,.34)},transparent 64%),radial-gradient(ellipse at 60% 0%,${color(2,.24)},transparent 72%)` : 'transparent';
+    layer.classList.add('visible');layers[paletteLayer].classList.remove('visible');paletteLayer=next;
+  }
   async function select(song, {autoplay = true} = {}) {
     saveCurrentPreferences();
-    selected = song; failed = false;
+    selected = song; failed = false; setAmbient(song);
     const requestedURL = new URL(song.audioFile || song.file, location.href).href;
     const prebuffered = audioEl.dataset.prebufferSrc === requestedURL && audioEl.src === requestedURL;
     delete audioEl.dataset.prebufferSrc;
@@ -205,13 +228,15 @@
       window.dispatchEvent(new CustomEvent('playlistnavigate', {detail:direction}));
     }, true);
   }
+  document.getElementById('btn-shuffle').addEventListener('click', () => window.dispatchEvent(new CustomEvent('playlistnavigate', {detail:'shuffle'})));
+  audioEl.addEventListener('ended', () => { if (selected && audioEl.dataset.repeatOne !== 'true') window.dispatchEvent(new CustomEvent('playlistnavigate', {detail:'ended'})); });
   // The site owns track selection; standalone audio drag-and-drop is disabled.
   for (const type of ['dragover','drop']) window.addEventListener(type, event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);
   document.getElementById('btn-repeat-one').addEventListener('click', () => {
     if (selected) window.dispatchEvent(new CustomEvent('playlistpreferences', {detail: {file:selected.file, repeatOne:audioEl.dataset.repeatOne === 'true'}}));
   });
   addEventListener('pagehide', () => saveCurrentPreferences());
-  window.vinylPlayer = {select, toggle, pause, save: () => saveCurrentPreferences(), destroy() {selected=null; clearCurrentTrack(); currentAudioFile=null; updateAlbumCover(null);}};
+  window.vinylPlayer = {select, toggle, pause, setShuffle(value) { document.getElementById('btn-shuffle').setAttribute('aria-pressed', String(value)); }, save: () => saveCurrentPreferences(), destroy() {selected=null; clearCurrentTrack(); currentAudioFile=null; updateAlbumCover(null);}};
   updateTrackLabels('最爱的歌曲', '选择一首，开始听');
   statusLine('从右侧选择一首歌'); setLyricsStatus('');
 })();

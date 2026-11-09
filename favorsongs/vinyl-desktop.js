@@ -27,7 +27,7 @@ export function createVinylPlayer({onState, onNavigate, onPreferences}) {
         stage.classList.remove('is-loading'); stage.classList.add('is-ready');
         playerAPI = win.vinylPlayer; resolve(playerAPI);
       }, {once:true});
-      frame.src = new URL('./vinyl-player.html?v=142af9157a48', import.meta.url).href;
+      frame.src = new URL('./vinyl-player.html?v=beeb2ce99d6b', import.meta.url).href;
       stage.append(frame);
     });
     return pending;
@@ -51,6 +51,7 @@ export function createVinylPlayer({onState, onNavigate, onPreferences}) {
         stage.classList.remove('is-ready','is-loading');
       }
     },
+    setShuffle(value) { if (playerAPI) playerAPI.setShuffle(value); else ready().then(player => { if (!disposed) player.setShuffle(value); }).catch(() => {}); },
     save() { frame?.contentWindow?.vinylPlayer?.save(); },
     destroy() {
       disposed = true; frame?.contentWindow?.vinylPlayer?.destroy(); frame?.remove();

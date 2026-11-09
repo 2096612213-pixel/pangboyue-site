@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 
 <head>
-  <link rel="modulepreload" href="playlist.bundle.js?v=e972cd216605">
+  <link rel="modulepreload" href="playlist.bundle.js?v=a99650125748">
   <meta name="description" content="庞博约最爱的歌曲列表与播放器。">
   <link rel="canonical" href="https://pangboyue.com/favorsongs/">
   <link rel="icon" type="image/x-icon" href="../favicon.ico">
@@ -425,6 +425,43 @@
   @media (max-width:1150px) {:root {--queue-width:270px;--stage-right:338px}.song.is-current .song-name {font-size:15px}}
 }
 
+/* A common twelve-column measurement for the deck and queue. */
+@media (min-width:1001px) {
+ :root {--gutter:clamp(24px,2.4vw,44px);--grid-gap:20px;--col:calc((100vw - 2 * var(--gutter) - 11 * var(--grid-gap)) / 12);--queue-width:calc(4 * var(--col) + 3 * var(--grid-gap));--queue-right:var(--gutter);--stage-right:calc(var(--gutter) + var(--queue-width) + var(--grid-gap))}
+ .back,.title,.subtitle {left:var(--gutter)}
+ .song-search {padding:0;border:0;border-radius:0;background:#09090a;box-shadow:0 15px 18px #09090a}
+ .search-glass {border-radius:7px;background:#171718}
+ .sort-buttons button {border-radius:7px;box-shadow:none}
+ .songs {--card-height:70px;--card-gap:0px; padding-inline:4px}
+ .song {padding:10px 12px;border:0;border-bottom:1px solid #ffffff12;background:transparent;border-radius:0;transition:background .2s,border-color .2s}
+ .song:hover {transform:none;background:#1b1a1c;border-color:#c8a97e66;z-index:2}
+ .song.is-playing-row {background:#c8a97e16;box-shadow:inset 2px 0 #c8a97e}
+ .song-name {margin-bottom:2px;font-size:13px;line-height:1.35}
+ .song.is-current {left:var(--gutter);right:var(--stage-right);border-radius:3px;background:#171615;box-shadow:none}
+ .vinyl-stage {right:var(--stage-right);left:var(--gutter)}
+}
+@media (max-width:1000px) {
+ .song-search {display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;left:12px;width:calc(100% - 24px);top:8px}
+ .search-glass,.search-status,.audio-quality,.sort-buttons {grid-column:1 / -1;margin:0}
+ .search-glass {min-height:44px;border-radius:6px;padding:0 12px;background:#171718;box-shadow:none}
+ .search-glass input {padding:10px 0}
+ .search-status {min-height:18px;font-size:11px;line-height:1.4}
+ .audio-quality select {border-radius:5px}
+ .sort-buttons {display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px}
+ .sort-buttons button {grid-column:span 6;border-radius:6px;min-height:40px;box-shadow:none}
+ .page {padding-top:220px!important}
+ .songs {--card-height:92px;--card-gap:0px}
+ .songs.is-flow-list {gap:0}
+ .songs.is-flow-list .song {flex:0 0 auto;min-height:92px;height:auto;padding:10px 12px;border:0;border-bottom:1px solid #ffffff16;border-radius:0;background:transparent}
+ .song-name {font-size:15px;line-height:1.35;margin-bottom:5px;overflow-wrap:anywhere}
+ .load-play {height:38px;min-height:38px;border-radius:5px;background:#242426;color:#ddd}
+ .mobile-repeat {margin:6px 8px 2px 0;width:44px;height:44px}
+ .song.mobile-active {background:#c8a97e12!important;box-shadow:inset 2px 0 #c8a97e}
+ .song-alphabet {top:calc(190px + (100svh - 190px)/2);height:min(486px,calc(100svh - 200px))}
+}
+
+@media(max-width:1000px){.title .star{color:#c8a97e}.sort-buttons button[aria-pressed="true"]{background:#c8a97e24;border-color:#c8a97e55;color:#e1caa8}}
+
 /* Consent is local to this visit until the user explicitly accepts. */
 .playlist-consent {
   position: fixed; z-index: 100; left: 24px; bottom: max(24px, env(safe-area-inset-bottom));
@@ -530,7 +567,7 @@
     <button class="playlist-consent-allow" id="allow-playlist-storage" type="button">允许存储</button>
   </aside>
 
-  <script type="module" src="playlist.bundle.js?v=e972cd216605"></script>
+  <script type="module" src="playlist.bundle.js?v=a99650125748"></script>
 </body>
 
 </html>

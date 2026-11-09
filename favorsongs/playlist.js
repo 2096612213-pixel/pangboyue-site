@@ -71,7 +71,12 @@ function syncAlphabet(listTop, stride) {
   const edge = matchMedia('(max-width: 1000px)').matches ? 216 : 266;
   const position = scrollPosition();
   const atBottom = position.top + position.height >= position.scrollHeight - 2;
-  const first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
+  let first = atBottom ? songs.length - 1 : Math.max(0, Math.min(songs.length - 1, Math.floor((edge - listTop + 1) / stride)));
+  if (flowLayout.matches && !atBottom && cards.size) {
+    let lo=0, hi=songs.length-1;
+    while(lo<hi) {const mid=Math.floor((lo+hi+1)/2); const card=cards.get(mid); if (card && card.getBoundingClientRect().top<=edge+2) lo=mid; else hi=mid-1;}
+    first=lo;
+  }
   markLetter(sortMode === 'pinyin' ? initials.get(songs[first]?.file) : '');
 }
 
@@ -96,6 +101,31 @@ let selectionRevision = 0;
 let desktopState = 'idle';
 let currentCard = null;
 let mobileRepeat = preferences.get().repeatOne;
+// A round uses stable source filenames, independent of display order.
+class ShuffleQueue {
+  constructor(ids) { this.ids = [...ids]; this.enabled = false; this.pending = []; this.seen = new Set(); this.history = []; this.cursor = -1; }
+  randomBelow(n) { const limit = Math.floor(0x100000000 / n) * n, v = new Uint32Array(1); do { crypto.getRandomValues(v); } while (v[0] >= limit); return v[0] % n; }
+  round(last) { this.pending = [...this.ids]; for (let i=this.pending.length-1;i>0;i--) { const j=this.randomBelow(i+1); [this.pending[i],this.pending[j]]=[this.pending[j],this.pending[i]]; } if (this.pending.length>1 && this.pending[0]===last) { const j=1+this.randomBelow(this.pending.length-1); [this.pending[0],this.pending[j]]=[this.pending[j],this.pending[0]]; } this.seen.clear(); }
+  enable(current) { this.enabled=true; this.history=[]; this.cursor=-1; this.round(null); if (current) this.choose(current); }
+  choose(id, history=true) { if (!this.enabled || !this.ids.includes(id)) return; if (!this.seen.has(id)) {this.seen.add(id); this.pending=this.pending.filter(x=>x!==id);} if (history && this.history[this.cursor]!==id) {this.history=this.history.slice(0,this.cursor+1);this.history.push(id);this.cursor=this.history.length-1;} }
+  next(current, restart=false) { if (!this.ids.length) return null; if(this.cursor<this.history.length-1) return this.history[++this.cursor]; if (!this.pending.length) { if(!restart) return null; this.round(current); } const id=this.pending.shift(); this.choose(id); return id; }
+  previous() { return this.cursor>0 ? this.history[--this.cursor] : null; }
+}
+const shuffle = new ShuffleQueue(addedSongs.map(song => song.file));
+let shuffleEnabled = false;
+const shuffleIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5M4 18h3c4 0 6-12 10-12h4M16 21h5v-5M4 6h3c2 0 3 2 4 4m2 4c1 2 2 4 4 4h4"/></svg>';
+function updateShuffleButtons() { document.querySelectorAll('.shuffle-button').forEach(b=>b.setAttribute('aria-pressed', String(shuffleEnabled))); desktopPlayer?.setShuffle?.(shuffleEnabled); }
+function toggleShuffle() { shuffleEnabled=!shuffleEnabled; if (shuffleEnabled) shuffle.enable(songs[activeIndex]?.file); else shuffle.enabled=false; updateShuffleButtons(); }
+function navigateTrack(direction, automatic=false) {
+  const current=songs[activeIndex]?.file; let target;
+  if (shuffleEnabled) target=direction<0 ? shuffle.previous() : shuffle.next(current,!automatic);
+  else if (songs.length && (!automatic || activeIndex+1<songs.length)) target=songs[(activeIndex+direction+songs.length)%songs.length]?.file;
+  if (!target) return;
+  const song=addedSongs.find(s=>s.file===target); if (!song) return;
+  if (flowLayout.matches) { const i=songs.findIndex(s=>s.file===target); cards.get(i)?.startPlayer?.(); }
+  else selectDesktopSong(song,{navigation:true});
+}
+
 function rememberSelection(song) {
   if (preferences.get().file !== song.file) preferences.update({file: song.file, position: 0});
 }
@@ -155,7 +185,8 @@ function unlockDesktopAudio() {
     window.__favoriteVinylAudioContext.resume().catch(() => {});
   } catch { /* The player's controls expose a retry if audio is unavailable. */ }
 }
-async function selectDesktopSong(song, {restore = false} = {}) {
+async function selectDesktopSong(song, {restore = false, navigation = false} = {}) {
+  if (!restore && !navigation) shuffle.choose(song.file);
   rememberSelection(song);
   if (!restore && !desktopPlayer) unlockDesktopAudio();
   // Start buffering the selected audio while the renderer is downloading.
@@ -178,16 +209,18 @@ async function selectDesktopSong(song, {restore = false} = {}) {
   render();
   try {
     if (desktopPlayer) { desktopPlayer.select(playbackSong(song), {autoplay: !restore}); return; }
-    desktopModule ||= import('./vinyl-desktop.js?v=0a91bf9614ce');
+    desktopModule ||= import('./vinyl-desktop.js?v=56ca2fbb5f7b');
     let loadTimer;
     const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
       loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);
     })]).finally(() => clearTimeout(loadTimer));
     if (revision !== selectionRevision || flowLayout.matches) return;
     desktopPlayer ||= createVinylPlayer({onState:updateDesktopState, onPreferences:rememberDesktopPreferences, onNavigate:direction => {
-      const next = (activeIndex + direction + songs.length) % songs.length;
-      selectDesktopSong(songs[next]);
+      if (direction === 'shuffle') toggleShuffle();
+      else if (direction === 'ended') navigateTrack(1, true);
+      else navigateTrack(direction);
     }});
+    desktopPlayer.setShuffle(shuffleEnabled);
     desktopPlayer.select(playbackSong(song), {autoplay: !restore});
   } catch (error) {
     desktopModule = null;
@@ -254,6 +287,7 @@ function makeCard(song, index) {
   async function startSong(autoplay = true) {
     if (!flowLayout.matches) { selectDesktopSong(song); return; }
     if (audio) { if (autoplay) { if (audio.error) audio.load(); try { await audio.play(); } catch {} } return; }
+    shuffle.choose(song.file);
     rememberSelection(song);
     const index = songs.indexOf(song);
     cards.get(activeIndex)?.querySelector('audio')?.pause();
@@ -294,6 +328,7 @@ function makeCard(song, index) {
     audio.addEventListener('error', () => { retry.hidden = false; });
     audio.addEventListener('playing', () => { retry.hidden = true; });
     audio.addEventListener('play', () => {
+      shuffle.choose(song.file);
       for (const card of cards.values()) {
         const other = card.querySelector('audio');
         if (other && other !== audio) other.pause();
@@ -310,16 +345,20 @@ function makeCard(song, index) {
       activeIndex = songs.indexOf(song); scheduleRender();
     });
     audio.addEventListener('ended', () => {
-      if (activeIndex === songs.indexOf(song)) activeIndex = -1;
+      if (activeIndex === songs.indexOf(song) && !mobileRepeat) navigateTrack(1, true);
       scheduleRender();
     });
     audio.src = audioPath(song);
-    playButton.replaceWith(audio); player.append(repeat, retry);
+    const random = document.createElement('button'); random.type='button'; random.className='mobile-repeat shuffle-button'; random.setAttribute('aria-label','随机播放'); random.innerHTML=shuffleIcon; random.addEventListener('click',toggleShuffle);
+    const next = document.createElement('button'); next.type='button'; next.className='mobile-repeat'; next.setAttribute('aria-label','下一首'); next.textContent='▶|'; next.addEventListener('click',()=>navigateTrack(1));
+    const prev = document.createElement('button'); prev.type='button'; prev.className='mobile-repeat'; prev.setAttribute('aria-label','上一首'); prev.textContent='|◀'; prev.addEventListener('click',()=>navigateTrack(-1));
+    playButton.replaceWith(audio); player.append(prev, repeat, random, next, retry); updateShuffleButtons();
     render();
     if (autoplay) try { await audio.play(); } catch { retry.hidden = false; }
   }
   playButton.addEventListener('click', () => startSong(true));
   card.restorePlayer = () => startSong(false);
+  card.startPlayer = () => startSong(true);
   card.addEventListener('click', event => {
     if (!flowLayout.matches && !event.target.closest('button,audio')) selectDesktopSong(song);
   });
@@ -390,6 +429,7 @@ function render() {
       }
     }
     card.classList.toggle("search-match", index === searchIndex);
+    card.classList.toggle("is-playing-row", index === activeIndex);
   }
   if (!flow && activeIndex >= 0) {
     // The fixed now-playing card is separate: queue rows and scroll stay put.
@@ -576,7 +616,7 @@ function jumpToLetter(letter) {
   // Use the virtual row's layout position, not a card's animated hover transform.
   const { height, gap } = dimensions();
   const listOrigin = dragBounds?.listOrigin ?? listContentTop();
-  const top = listOrigin + index * (height + gap);
+  const top = listOrigin + (flowLayout.matches && cards.get(index) ? cards.get(index).offsetTop : index * (height + gap));
   const edge = matchMedia('(max-width: 1000px)').matches ? 216 : 266;
   const position = scrollPosition();
   const target = Math.max(0, Math.min(top - edge, position.scrollHeight - position.height));
@@ -710,11 +750,12 @@ qualityControl.addEventListener('change', () => {
   preferences.update({quality: audioQuality});
   if (activeIndex < 0) return;
   if (!flowLayout.matches) {
-    if (['playing','preparing','spinningUp','movingArm','loweringStylus','loading'].includes(desktopState)) selectDesktopSong(songs[activeIndex]);
+    if (['playing','preparing','spinningUp','movingArm','loweringStylus','loading'].includes(desktopState)) { desktopPlayer?.save(); selectDesktopSong(songs[activeIndex], {navigation:true}); }
   } else {
     const audio = cards.get(activeIndex)?.querySelector('audio');
     if (!audio) return;
-    const playing = !audio.paused;
+    const playing = !audio.paused, position = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    audio.addEventListener('loadedmetadata', () => { if (position > 0) audio.currentTime = Math.min(position, Math.max(0, audio.duration - .1)); }, {once:true});
     audio.src = audioPath(songs[activeIndex]); audio.load();
     if (playing) audio.play().catch(() => {});
   }
