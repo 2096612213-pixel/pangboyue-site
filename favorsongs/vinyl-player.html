@@ -860,6 +860,12 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
   </style>
 <style>
 /* Playlist edition: the surrounding page owns the title, song choice and layout. */
+/* The foreground is selected from the blended background luminance. */
+.lyric-line .lyric-sentence,.lyric-line .words-wrap,.lyric-line .lyric-word,.lyric-line .section-tag {color:var(--lyric-contrast,#fff)!important}
+.lyric-line.active {background:color-mix(in srgb,var(--lyric-contrast,#fff) 12%,transparent);box-shadow:inset 3px 0 var(--lyric-contrast,#fff)}
+.lyric-line.active .lyric-word.current {color:var(--lyric-contrast,#fff)!important;background:color-mix(in srgb,var(--lyric-contrast,#fff) 14%,transparent)!important;background-clip:border-box!important;-webkit-background-clip:border-box!important}
+.lyric-line.active .words-wrap .lyric-word.current {color:transparent!important;background:linear-gradient(90deg,var(--lyric-contrast,#fff) 0%,var(--lyric-contrast,#fff) var(--char-fill,0%),color-mix(in srgb,var(--lyric-contrast,#fff) 65%,transparent) var(--char-fill,0%),color-mix(in srgb,var(--lyric-contrast,#fff) 65%,transparent) 100%)!important;background-clip:text!important;-webkit-background-clip:text!important}
+
 .album-ambient {position:absolute;inset:0;z-index:1;opacity:0;transition:opacity 1.1s ease;pointer-events:none}
 .album-ambient.visible {opacity:1}
 
@@ -1706,7 +1712,7 @@ class PLXTurntableScene {
    this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,alpha:true,antialias:true,premultipliedAlpha:true,powerPreference:'high-performance'});
    this.renderer.setClearColor(0,0);this.renderer.outputColorSpace=THREE.SRGBColorSpace;
    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.0;
-   this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.shadowMap.autoUpdate=false;
+   this.renderer.shadowMap.enabled=false;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.shadowMap.autoUpdate=false;
    this.scene=new THREE.Scene();this.camera=new THREE.OrthographicCamera(-170,420,235,-235,.1,1800);
    this.camera.up.set(0,0,-1);this.camera.position.set(0,1000,122.78);this.camera.lookAt(0,0,0);this.defaultCamera=this.camera.clone();
    this.resize();this.ro=new ResizeObserver(this.onResize);this.ro.observe(this.host);window.addEventListener('resize',this.onResize);
@@ -2302,19 +2308,27 @@ class PLXTurntableScene {
      float pvcR=length(vPVC.xz),pvcA=atan(vPVC.z,vPVC.x);float grooveBand=smoothstep(51.,57.,pvcR)*(1.-smoothstep(146.,149.5,pvcR));
      float microSurface=.55*sin(pvcA*3.+sin(pvcR*.037))+.27*cos(pvcA*7.-pvcR*.023)+.18*sin(pvcA*13.+pvcR*.11);
      roughnessFactor=clamp(roughnessFactor+grooveBand*(microSurface*.025+.010*sin(pvcR*.55)),.25,.38);`)
+    .replace('#include <color_fragment>',`#include <color_fragment>
+     float visibleR=length(vPVC.xz), visibleA=atan(vPVC.z,vPVC.x);
+     float visibleBand=smoothstep(51.,57.,visibleR)*(1.-smoothstep(146.,149.,visibleR))*smoothstep(2.5,2.95,vPVC.y);
+     float finePhase=visibleR*2.6 + .12*sin(visibleA*3.);
+     float fineAA=1.-smoothstep(1.,3.,fwidth(finePhase));
+     float bands=.5+.5*cos(visibleR*.75+.22*sin(visibleA*2.));
+     float glint=(.5+.5*cos(visibleA*2.4+visibleR*.08));
+     diffuseColor.rgb *= 1.0 + visibleBand * (.38*cos(finePhase)*fineAA + .18*bands + .16*glint*bands);`)
     .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
      float groovePhase=length(vPVC.xz)*39.5;float resolved=1.-smoothstep(1.,3.,fwidth(groovePhase));
-     float groupPhase=length(vPVC.xz)*8.9+.45*sin(length(vPVC.xz)*.06);
+     float groupPhase=length(vPVC.xz)*5.2+.12*sin(atan(vPVC.z,vPVC.x)*3.);
      float groupAA=1.-smoothstep(1.,3.,fwidth(groupPhase));
      float grooveMask=smoothstep(2.5,2.95,vPVC.y)*smoothstep(51.,57.,length(vPVC.xz))*(1.-smoothstep(146.,149.,length(vPVC.xz)));
-     float etched=(sin(groovePhase)*.045*resolved+sin(groupPhase)*.025*groupAA)*grooveMask;
+     float etched=(sin(groovePhase)*.045*resolved+sin(groupPhase)*.12*groupAA)*grooveMask;
      normal=normalize(normal+normalize(vPVCRadial+vec3(.00001))*etched);
      roughnessFactor+=grooveMask*(.024*cos(groovePhase)*resolved+.013*cos(groupPhase)*groupAA);`)
     .replace('#include <clearcoat_normal_fragment_maps>',`#include <clearcoat_normal_fragment_maps>
      #ifdef USE_CLEARCOAT
        clearcoatNormal=normalize(clearcoatNormal+normalize(vPVCRadial+vec3(.00001))*etched*.7);
      #endif`);
-  };pvc.customProgramCacheKey=()=> 'plx-record-pvc-1';
+  };pvc.customProgramCacheKey=()=> 'plx-record-pvc-2';
   const recordGeo=this.lathe([[148.8,1.2],[148.9,1.2],[149.7,1.5],[150,2.2],[149.65,2.8],[148.8,3]],768);
   const topGeo=new THREE.RingGeometry(3.6,148.8,768,1);topGeo.rotateX(-Math.PI/2);topGeo.translate(0,3,0);
   for(const geo of [recordGeo,topGeo]){
@@ -2827,9 +2841,9 @@ class PLXTurntableScene {
   // shadow key in that SAME softbox direction supplies moving contact visibility;
   // it is not the source of the metal's long specular reflection.
   const key=new THREE.DirectionalLight(0xfffaf3,.28);key.position.set(-325,270,190);key.target.position.set(50,0,0);this.scene.add(key,key.target);
-  key.castShadow=true;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-260,right:290,top:260,bottom:-260,near:10,far:900});
+  key.castShadow=false;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-260,right:290,top:260,bottom:-260,near:10,far:900});
   key.shadow.bias=-.00006;key.shadow.normalBias=.10;key.shadow.radius=2.0;this.key=key;
-  const floorMat=this.own(new THREE.ShadowMaterial({color:0x000000,opacity:.17}));
+  const floorMat=this.own(new THREE.ShadowMaterial({color:0x000000,opacity:0}));
   const floor=this.mesh(this.scene,'ground-contact-shadow',new THREE.PlaneGeometry(960,760),floorMat,[120,-24.1,0],false);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;
  }
  makePhotographicPipeline(){
@@ -2877,7 +2891,7 @@ class PLXTurntableScene {
      vec4 sampleAO=texture2D(tAO,vUv+(vec2(float(x),float(y))-.5)*px);
      float w=1./(1.+abs(sampleAO.a-d)*depthRange*4.);a+=sampleAO.r*w;weight+=w;
     }}
-    colour.rgb*=mix(1.,a/max(weight,.0001),step(d,.99999));gl_FragColor=colour;
+    gl_FragColor=colour;
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
     #include <premultiplied_alpha_fragment>
@@ -3156,7 +3170,8 @@ class VinylSurfaceLighting {render(angle){tonearmMetalLighting.setRecordAngle(an
         const focusDist = Math.min(absDiff, isUserScrolling ? absDiff : Math.abs(idx - activeLineIndex));
         const rawBlur = focusDist < 0.35 ? 0 : Math.min(6.5, (focusDist - 0.25) * 1.65);
         const quantizedBlur = Math.round(rawBlur * 4) / 4;
-        const opacity = Math.max(0.08, 1 - absDiff * 0.23);
+        const opacity = Math.max(0.65, 1 - absDiff * 0.16);
+        el.style.setProperty("--lyric-contrast", window.lyricContrastFor?.((innerHeight/2 + translateY) / innerHeight) || "#fff");
 
         el.style.transform = `translate3d(${translateX.toFixed(1)}px, calc(-50% + ${translateY.toFixed(1)}px), 0) rotate(${angleDeg.toFixed(2)}deg) scale(${scale.toFixed(3)})`;
         el.style.filter = quantizedBlur > 0 ? `blur(${quantizedBlur}px)` : "none";
@@ -4616,6 +4631,6 @@ const AutomaticLyrics=(()=>{
     applyTonearmTransformAndLighting();bindProgressRing();
     requestAnimationFrame(animateLoop);
   </script>
-  <script src="vinyl-bridge.js?v=f06d9de79211"></script>
+  <script src="vinyl-bridge.js?v=d69c84b55e96"></script>
 </body>
 </html>

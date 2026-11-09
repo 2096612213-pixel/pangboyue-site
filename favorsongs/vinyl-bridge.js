@@ -7,6 +7,20 @@
   }));
   const statusLine = text => installLyrics(LyricTimeline.normalize([{text, source:'status'}]), false);
   const palettes = new Map(); let paletteGeneration = 0, paletteLayer = 0;
+  // Evaluate the actual palette blended onto the dark stage in linear sRGB.
+  function lyricContrast(palette, x, y) {
+    let bg=[17,17,19];
+    if(palette) {
+      const spots=[[.6,0,.72,.24],[.82,.70,.64,.34],[.20,.35,.65,.46]];
+      for(let i=0;i<spots.length;i++) { const [cx,cy,r,a]=spots[i], c=palette[2-i]||palette[0]; const distance=Math.hypot((x-cx)/r,(y-cy)/r); const t=Math.max(0,1-distance), alpha=a*t; bg=bg.map((v,j)=>v*(1-alpha)+c[j]*alpha); }
+    }
+    const linear=v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};
+    const luminance=.2126*linear(bg[0])+.7152*linear(bg[1])+.0722*linear(bg[2]);
+    return (1.05/(luminance+.05)) >= ((luminance+.05)/.05) ? '#fff' : '#080808';
+  }
+  let activePalette=null;
+  window.lyricContrastFor = y => lyricContrast(activePalette,.70,Math.max(0,Math.min(1,y)));
+
   async function setAmbient(song) {
     const generation=++paletteGeneration;
     let palette=palettes.get(song.file);
@@ -24,6 +38,7 @@
       } catch {} palettes.set(song.file,palette);
     }
     if(generation!==paletteGeneration) return;
+    activePalette=palette;
     const layers=document.querySelectorAll('.album-ambient'); const next=1-paletteLayer; const layer=layers[next];
     const color=(i,a)=>{const c=palette?.[i] || palette?.[0];return c ? `rgba(${c.join(',')},${a})` : 'transparent';};
     layer.style.background=palette ? `radial-gradient(ellipse at 20% 35%,${color(0,.46)},transparent 65%),radial-gradient(ellipse at 82% 70%,${color(1,.34)},transparent 64%),radial-gradient(ellipse at 60% 0%,${color(2,.24)},transparent 72%)` : 'transparent';

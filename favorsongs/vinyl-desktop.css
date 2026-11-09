@@ -33,7 +33,7 @@
   .song.is-current .song-name {margin:0;font-size:17px;min-width:0}
   .song.is-current .player {flex-shrink:0}
   .song.is-current .load-play {color:#dfc69e;font-size:12px}
-  .song.is-current::before {content:'当前唱片';position:absolute;right:0;top:-31px;font-size:10px;letter-spacing:2px;color:#928575}
+  .song.is-current::before {content:none}
   .vinyl-stage {display:block;position:fixed;inset:188px var(--stage-right) 0 0;z-index:0;overflow:hidden;background:radial-gradient(ellipse at 22% 50%,#20201f55,transparent 65%)}
   .vinyl-stage iframe {display:block;border:0;width:100%;height:100%;position:absolute;inset:0;opacity:0}
   .vinyl-stage.is-ready iframe {opacity:1}
@@ -57,6 +57,8 @@
  :root {--gutter:clamp(24px,2.4vw,44px);--grid-gap:20px;--col:calc((100vw - 2 * var(--gutter) - 11 * var(--grid-gap)) / 12);--queue-width:calc(4 * var(--col) + 3 * var(--grid-gap));--queue-right:var(--gutter);--stage-right:calc(var(--gutter) + var(--queue-width) + var(--grid-gap))}
  .back,.title,.subtitle {left:var(--gutter)}
  .song-search {padding:0;border:0;border-radius:0;background:#09090a;box-shadow:0 15px 18px #09090a}
+ .song-search {isolation:isolate}
+ .song-search::before {content:"";position:absolute;z-index:-1;left:0;right:0;top:-23px;bottom:0;background:#09090a;pointer-events:none}
  .search-glass {border-radius:7px;background:#171718}
  .sort-buttons button {border-radius:7px;box-shadow:none}
  .songs {--card-height:70px;--card-gap:0px; padding-inline:4px}

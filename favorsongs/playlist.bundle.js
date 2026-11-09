@@ -1185,7 +1185,7 @@ async function selectDesktopSong(song, {restore = false, navigation = false} = {
   render();
   try {
     if (desktopPlayer) { desktopPlayer.select(playbackSong(song), {autoplay: !restore}); return; }
-    desktopModule ||= import('./vinyl-desktop.js?v=56ca2fbb5f7b');
+    desktopModule ||= import('./vinyl-desktop.js?v=52636d783a1f');
     let loadTimer;
     const {createVinylPlayer} = await Promise.race([desktopModule, new Promise((_, reject) => {
       loadTimer = setTimeout(() => reject(Error('播放器加载超时，请重试')), 30000);
