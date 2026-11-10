@@ -64,3 +64,11 @@ AI现在还只是一个写东西的工具
 
 
 
+<img src="/thoughts/2026-W46/media/2026-11-11-mountain-lake.jpg" width="1260" height="840" alt="山湖前的两位人物插画" loading="lazy" decoding="async">
+
+
+
+
+
+
+
