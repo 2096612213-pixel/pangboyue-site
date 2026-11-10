@@ -870,7 +870,7 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
 /* Playlist edition: the surrounding page owns the title, song choice and layout. */
 /* The foreground is selected from the blended background luminance. */
 .lyric-line .lyric-sentence,.lyric-line .words-wrap,.lyric-line .lyric-word,.lyric-line .section-tag {color:var(--lyric-contrast,#fff)!important}
-.lyric-line.active {background:color-mix(in srgb,var(--lyric-contrast,#fff) 12%,transparent);box-shadow:inset 3px 0 var(--lyric-contrast,#fff)}
+.lyric-line.active {background:rgba(255,255,255,.22);border-radius:16px;box-shadow:none;padding-inline:14px}
 .lyric-line.active .lyric-word.current {color:var(--lyric-contrast,#fff)!important;background:color-mix(in srgb,var(--lyric-contrast,#fff) 14%,transparent)!important;background-clip:border-box!important;-webkit-background-clip:border-box!important}
 .lyric-line.active .words-wrap .lyric-word.current {color:transparent!important;background:linear-gradient(90deg,var(--lyric-contrast,#fff) 0%,var(--lyric-contrast,#fff) var(--char-fill,0%),color-mix(in srgb,var(--lyric-contrast,#fff) 65%,transparent) var(--char-fill,0%),color-mix(in srgb,var(--lyric-contrast,#fff) 65%,transparent) 100%)!important;background-clip:text!important;-webkit-background-clip:text!important}
 
