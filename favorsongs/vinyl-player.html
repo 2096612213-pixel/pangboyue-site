@@ -871,6 +871,7 @@ return a}},{key:"addTagReader",value:function(b){u.push(b);return a}},{key:"remo
 /* The foreground is selected from the blended background luminance. */
 .lyric-line .lyric-sentence,.lyric-line .words-wrap,.lyric-line .lyric-word,.lyric-line .section-tag {color:var(--lyric-contrast,#fff)!important}
 .lyric-line.active {background:rgba(255,255,255,.22);border-radius:16px;box-shadow:none;padding-inline:14px}
+.lyric-line.active .section-tag {min-width:0;text-align:left}
 .lyric-line.active .lyric-word.current {color:var(--lyric-contrast,#fff)!important;background:color-mix(in srgb,var(--lyric-contrast,#fff) 14%,transparent)!important;background-clip:border-box!important;-webkit-background-clip:border-box!important}
 .lyric-line.active .words-wrap .lyric-word.current {color:transparent!important;background:linear-gradient(90deg,var(--lyric-contrast,#fff) 0%,var(--lyric-contrast,#fff) var(--char-fill,0%),color-mix(in srgb,var(--lyric-contrast,#fff) 65%,transparent) var(--char-fill,0%),color-mix(in srgb,var(--lyric-contrast,#fff) 65%,transparent) 100%)!important;background-clip:text!important;-webkit-background-clip:text!important}
 
@@ -1331,7 +1332,25 @@ const LyricTimeline = (() => {
     }), duration);
   }
 
-  function at(lines, seconds) {
+  const estimateCache = new WeakMap();
+  function at(lines, seconds, duration = Infinity) {
+    // Untimed text receives a display-only estimate; keep its source timestamps intact.
+    let estimate = estimateCache.get(lines);
+    if (!estimate) {
+      const lyrics = lines.map((line, index) => ({line, index, count: [...line.text].filter(char => /[\p{L}\p{N}]/u.test(char)).length}))
+        .filter(item => item.count && item.line.source !== 'metadata' && item.line.source !== 'status');
+      estimate = {lyrics, total: lyrics.reduce((sum, item) => sum + item.count, 0), untimed: lyrics.every(item => item.line.time === null)};
+      estimateCache.set(lines, estimate);
+    }
+    const {lyrics, total} = estimate;
+    if (total && estimate.untimed && Number.isFinite(duration) && duration > 0) {
+      const position = Math.min(total - 1, Math.floor(Math.max(0, seconds) / duration * total));
+      let cumulative = 0;
+      for (const item of lyrics) {
+        cumulative += item.count;
+        if (position < cumulative) return {index: item.index, anchor: item.index};
+      }
+    }
     let index = -1, anchor = 0;
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i];
@@ -4271,7 +4290,7 @@ const AutomaticLyrics=(()=>{
         });
         lyricsStage.appendChild(row);lyricNodes.push(row);
       }
-      const at=LyricTimeline.at(lyricsData,lyricClock());lyricScrollAnchor=at.anchor;
+      const at=LyricTimeline.at(lyricsData,lyricClock(),duration);lyricScrollAnchor=at.anchor;
       currentScrollPos=targetScrollPos=at.anchor;lastRenderedScrollPos=-999;
       syncLyricsProgress(audioEl.currentTime||0);renderLyricsWheelAt(currentScrollPos,true);
     }
@@ -4284,7 +4303,7 @@ const AutomaticLyrics=(()=>{
       const t=formatTime(seconds),total=formatTime(duration);
       if(timeCurrentEl.textContent!==t){timeCurrentEl.textContent=t;visCanvas.setAttribute('aria-valuenow',String(Math.floor(seconds)));visCanvas.setAttribute('aria-valuetext',t+' / '+total);}
       if(timeTotalEl.textContent!==total){timeTotalEl.textContent=total;visCanvas.setAttribute('aria-valuemax',String(duration||0));}
-      const at=LyricTimeline.at(lyricsData,seconds+lyricOffset);lyricScrollAnchor=at.anchor;
+      const at=LyricTimeline.at(lyricsData,seconds+lyricOffset,duration);lyricScrollAnchor=at.anchor;
       if(at.index!==activeLineIndex){
         activeLineIndex=at.index;if(!isUserScrolling)targetScrollPos=at.anchor;
         renderLyricsWheelAt(currentScrollPos,true);
