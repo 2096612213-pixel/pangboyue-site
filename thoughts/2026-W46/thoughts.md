@@ -67,6 +67,12 @@ AI现在还只是一个写东西的工具
 <img src="/thoughts/2026-W46/media/2026-11-11-mountain-lake.jpg" width="1260" height="840" alt="山湖前的两位人物插画" loading="lazy" decoding="async">
 
 
+## 2026-11-12
+
+流体力学期中考了84 这周末要接着考机械设计 理论力学和量子力学了 发发力孩子们 我要上90！
+
+
+
 
 
 
