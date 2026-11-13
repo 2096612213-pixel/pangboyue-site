@@ -132,3 +132,12 @@ AI现在还只是一个写东西的工具
   <source src="/thoughts/2026-W46/media/2026-11-13-kang-hui.mp4?v=56af7fbe474e" type="video/mp4">
   你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-13-kang-hui.mp4?v=56af7fbe474e">打开视频</a>观看。
 </video>
+
+
+kanghui and his wife 
+
+kanghui loves his wife
+
+有意思 这样翻译 感觉像是那种神笔马良 西游记 翻译经典作品的语气风格
+
+
