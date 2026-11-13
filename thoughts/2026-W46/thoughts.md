@@ -200,11 +200,52 @@ kanghui loves his wife
 
 真是太美妙了
 
+---
+
 吃了芊一和路亚山鸡一年前结婚今年离婚的瓜
 
 太逆天了 看的我笑死了
 
 晚上睡着了看到都能笑醒
+
+---
+
+
+
+## 2026-11-14
+
+<video controls playsinline preload="none" width="640" height="480" poster="/thoughts/2026-W46/media/2026-11-14-opalite-poster.jpg" aria-label="霉霉《Opalite》音乐 MV">
+  <source src="/thoughts/2026-W46/media/2026-11-14-opalite.mp4?v=05bddc32ee5c" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-14-opalite.mp4?v=05bddc32ee5c">打开视频</a>观看。
+</video>
+
+---
+
+
+<video controls playsinline preload="none" width="480" height="852" poster="/thoughts/2026-W46/media/2026-11-14-attention-poster.jpg" aria-label="《Attention》hyein 位舞蹈">
+  <source src="/thoughts/2026-W46/media/2026-11-14-attention.mp4?v=0b9932e8529e" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-14-attention.mp4?v=0b9932e8529e">打开视频</a>观看。
+</video>
+
+---
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W46/media/2026-11-14-xian-dance-poster.jpg" aria-label="西安交通大学千人广场双人舞">
+  <source src="/thoughts/2026-W46/media/2026-11-14-xian-dance.mp4?v=33b17603a7d7" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-14-xian-dance.mp4?v=33b17603a7d7">打开视频</a>观看。
+</video>
+
+---
+
+
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W46/media/2026-11-14-zhujiaofan-poster.jpg" aria-label="眼泪打湿猪脚饭 发誓要赚一千万">
+  <source src="/thoughts/2026-W46/media/2026-11-14-zhujiaofan.mp4?v=b991e668b87b" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-14-zhujiaofan.mp4?v=b991e668b87b">打开视频</a>观看。
+</video>
+
+
+
+---
+
 
 
 
