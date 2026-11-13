@@ -123,13 +123,12 @@ AI现在还只是一个写东西的工具
 
 我量子力学 理论力学 材料力学 流体力学期末都要冲100分 我相信我肯定有这个实力
 
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W46/media/2026-11-13-vast-land-poster.jpg" aria-label="A vast land cannot breed narrow-minded love">
+  <source src="/thoughts/2026-W46/media/2026-11-13-vast-land.mp4?v=0bb9f49b17ee" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-13-vast-land.mp4?v=0bb9f49b17ee">打开视频</a>观看。
+</video>
 
-
-
-
-
-
-
-
-
-
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W46/media/2026-11-13-kang-hui-poster.jpg" aria-label="Kang Hui and his wife">
+  <source src="/thoughts/2026-W46/media/2026-11-13-kang-hui.mp4?v=56af7fbe474e" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-13-kang-hui.mp4?v=56af7fbe474e">打开视频</a>观看。
+</video>
