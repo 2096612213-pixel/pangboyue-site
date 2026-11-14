@@ -246,6 +246,15 @@ kanghui loves his wife
 
 ---
 
+<video controls playsinline preload="none" width="852" height="480" poster="/thoughts/2026-W46/media/2026-11-14-wechat-video-poster.jpg" aria-label="11月14日视频">
+  <source src="/thoughts/2026-W46/media/2026-11-14-wechat-video.mp4?v=e58b51cdbc45" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W46/media/2026-11-14-wechat-video.mp4?v=e58b51cdbc45">打开视频</a>观看。
+</video>
+
+---
+
+
+可以的 欧文还是太强了
 
 
 
