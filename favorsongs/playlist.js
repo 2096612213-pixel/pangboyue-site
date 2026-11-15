@@ -7,7 +7,7 @@ let preferenceStorage;
 try { preferenceStorage = localStorage; } catch {}
 const preferences = createPlaylistPreferences(addedSongs.map(song => song.file), preferenceStorage);
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = '6bb2c91648e3'; // updated by build:songs
+const STREAM_REVISION = '5f11baa63f1e'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = preferences.get().quality;
 qualityControl.value = audioQuality;
