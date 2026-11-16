@@ -624,7 +624,7 @@ export const songs = [
   {"title": "Angel — YOON MIRAE、Tiger JK、Bizzy", "file": "angel-yoon-mirae-tiger-jk-bizzy.mp3", "addedAt": "2026-10-31"},
   {"title": "One Last Kiss — Utada", "file": "one-last-kiss-utada.mp3", "addedAt": "2026-10-31"},
   {"title": "We Are the World — U.S.A. for Africa", "file": "we-are-the-world-usa-for-africa.mp3", "addedAt": "2026-10-31"},
-  {"title": "刻在我心底的名字 — 卢广仲", "file": "ke-zai-wo-xin-di-de-ming-zi-lu-guang-zhong.mp3", "addedAt": "2026-10-31"},
+  {"title": "刻在我心底的名字 — 卢广仲", "file": "2026-11-16-crowd-lu-mv.m4a", "addedAt": "2026-10-31"},
   {"title": "当你孤单你会想起谁 — 马小倩", "file": "dang-ni-gu-dan-ni-hui-xiang-qi-shei-ma-xiao-qian.mp3", "addedAt": "2026-10-31"},
   {"title": "是你 — 梦然", "file": "shi-ni-meng-ran.mp3", "addedAt": "2026-10-31"},
   {"title": "游京 — 浅影阿", "file": "you-jing-qian-ying-a.mp3", "addedAt": "2026-10-31"},
@@ -819,4 +819,5 @@ export const songs = [
   {"title":"美丽的神话（电影《神话》主题曲） — 成龙、金喜善","file":"2026-11-15-song-09.mp3","addedAt":"2026-11-15"},
   {"title":"愿你 — 黄霄云","file":"2026-11-15-song-10.mp3","addedAt":"2026-11-15"},
   {"title":"一样的月光 — 徐佳莹","file":"2026-11-16-song-01.mp3","addedAt":"2026-11-16"},
+  {"title":"初遇街口 — 张子墨","file":"2026-11-16-chu-yu-jie-kou.m4a","addedAt":"2026-11-16"},
 ];
