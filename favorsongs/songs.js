@@ -820,4 +820,7 @@ export const songs = [
   {"title":"愿你 — 黄霄云","file":"2026-11-15-song-10.mp3","addedAt":"2026-11-15"},
   {"title":"一样的月光 — 徐佳莹","file":"2026-11-16-song-01.mp3","addedAt":"2026-11-16"},
   {"title":"初遇街口 — 张子墨","file":"2026-11-16-chu-yu-jie-kou.m4a","addedAt":"2026-11-16"},
+  {"title":"你的眼神（DJ版）","file":"2026-11-19-ni-de-yan-shen-dj.m4a","addedAt":"2026-11-19"},
+  {"title":"爱情讯息（DJ版）","file":"2026-11-19-ai-qing-xun-xi-dj.m4a","addedAt":"2026-11-19"},
+  {"title":"传奇（DJ版） — 黄艳秋","file":"2026-11-19-chuan-qi-dj-huang-yan-qiu.m4a","addedAt":"2026-11-19"},
 ];
