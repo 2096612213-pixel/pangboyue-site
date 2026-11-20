@@ -824,4 +824,5 @@ export const songs = [
   {"title":"爱情讯息（DJ版）","file":"2026-11-19-ai-qing-xun-xi-dj.m4a","addedAt":"2026-11-19"},
   {"title":"传奇（DJ版） — 黄艳秋","file":"2026-11-19-chuan-qi-dj-huang-yan-qiu.m4a","addedAt":"2026-11-19"},
   {"title":"龙卷风 — 邓紫棋","file":"2026-11-20-long-juan-feng-deng-zi-qi.m4a","addedAt":"2026-11-20"},
+  {"title":"本命 · 逐志 — 王者荣耀","file":"2026-11-20-ben-ming-zhu-zhi.mp3","addedAt":"2026-11-20"},
 ];
