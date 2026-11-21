@@ -825,4 +825,5 @@ export const songs = [
   {"title":"传奇（DJ版） — 黄艳秋","file":"2026-11-19-chuan-qi-dj-huang-yan-qiu.m4a","addedAt":"2026-11-19"},
   {"title":"龙卷风 — 邓紫棋","file":"2026-11-20-long-juan-feng-deng-zi-qi.m4a","addedAt":"2026-11-20"},
   {"title":"本命 · 逐志 — 王者荣耀","file":"2026-11-20-ben-ming-zhu-zhi-video.m4a","addedAt":"2026-11-20"},
+  {"title":"巴啦啦小魔仙主题曲","file":"2026-11-21-balala-theme.m4a","addedAt":"2026-11-21"},
 ];
