@@ -827,4 +827,5 @@ export const songs = [
   {"title":"本命 · 逐志 — 王者荣耀","file":"2026-11-20-ben-ming-zhu-zhi-video.m4a","addedAt":"2026-11-20"},
   {"title":"巴啦啦小魔仙主题曲","file":"2026-11-21-balala-theme.m4a","addedAt":"2026-11-21"},
   {"title":"说爱你（Live） — 黄霄云","file":"2026-11-21-shuo-ai-ni-huang-xiaoyun-live.m4a","addedAt":"2026-11-21"},
+  {"title":"后来（合唱版）","file":"2026-11-22-hou-lai-chorus.m4a","addedAt":"2026-11-22"},
 ];
