@@ -828,4 +828,6 @@ export const songs = [
   {"title":"巴啦啦小魔仙主题曲","file":"2026-11-21-balala-theme.m4a","addedAt":"2026-11-21"},
   {"title":"说爱你（Live） — 黄霄云","file":"2026-11-21-shuo-ai-ni-huang-xiaoyun-live.m4a","addedAt":"2026-11-21"},
   {"title":"后来（合唱版）","file":"2026-11-22-hou-lai-chorus.m4a","addedAt":"2026-11-22"},
+  {"title":"茉莉花（纯音乐）","file":"2026-11-24-mo-li-hua-instrumental.m4a","addedAt":"2026-11-24"},
+  {"title":"北京欢迎你（群星合唱版） — 群星","file":"2026-11-24-bei-jing-huan-ying-ni.m4a","addedAt":"2026-11-24"},
 ];
