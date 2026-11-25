@@ -1044,11 +1044,12 @@ let preferenceStorage;
 try { preferenceStorage = localStorage; } catch {}
 const preferences = createPlaylistPreferences(addedSongs.map(song => song.file), preferenceStorage);
 // AAC-LC copies have no large embedded artwork and their index is at the start.
-const STREAM_REVISION = 'ce725cfa5dad'; // updated by build:songs
+const STREAM_REVISION = '137a6826f83a'; // updated by build:songs
 const qualityControl = document.querySelector('#audio-quality');
 let audioQuality = preferences.get().quality;
 qualityControl.value = audioQuality;
-const audioPath = song => audioQuality === 'original' ? song.file : `streams/${song.file.replace(/\.(?:mp3|m4a)$/i, '.m4a')}?v=${STREAM_REVISION}`;
+const originalAudioRevisions = new Map([['jiang-nan-dj-lin-jun-jie.m4a', 'faststart1'], ['qing-ge-dj-liang-jing-ru.m4a', 'faststart1']]);
+const audioPath = song => audioQuality === 'original' ? `${song.file}${originalAudioRevisions.has(song.file) ? `?v=${originalAudioRevisions.get(song.file)}` : ''}` : `streams/${song.file.replace(/\.(?:mp3|m4a)$/i, '.m4a')}?v=${STREAM_REVISION}`;
 const playbackSong = song => ({...song, repeatOne:preferences.get().repeatOne, startAt:preferences.get().file === song.file ? preferences.get().position : 0, audioFile:audioPath(song), detailsFile:`details/${song.file.replace(/\.(?:mp3|m4a)$/i, '.json')}?v=${STREAM_REVISION}`});
 
 // Manifest order records addition order, including older entries without timestamps.
