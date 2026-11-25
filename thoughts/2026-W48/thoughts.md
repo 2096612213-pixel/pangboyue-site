@@ -98,5 +98,14 @@ nmd神了
 
 不出意外的话 流体力学应该是我上学四年里面学的最牛逼的一门课了 给这个投入和回报最多 这个也快期末考试了 我对这个的投入还在加大
 
+<video controls playsinline preload="none" width="854" height="482" poster="/thoughts/2026-W48/media/2026-11-25-early-relationships-poster.jpg" aria-label="中国社会为什么敌视早恋？ — Anthony看世界">
+  <source src="/thoughts/2026-W48/media/2026-11-25-early-relationships.mp4?v=f84669ecc19e" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W48/media/2026-11-25-early-relationships.mp4?v=f84669ecc19e">打开视频</a>观看。
+</video>
 
+---
 
+<video controls playsinline preload="none" width="854" height="450" poster="/thoughts/2026-W48/media/2026-11-25-civilization-vi-jasmine-poster.jpg" aria-label="文明6《茉莉花》China 原子时代">
+  <source src="/thoughts/2026-W48/media/2026-11-25-civilization-vi-jasmine.mp4?v=3d065e3eb928" type="video/mp4">
+  你的浏览器不支持视频播放，可<a href="/thoughts/2026-W48/media/2026-11-25-civilization-vi-jasmine.mp4?v=3d065e3eb928">打开视频</a>观看。
+</video>
